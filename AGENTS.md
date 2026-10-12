@@ -108,6 +108,19 @@ Derived from Gerard J. Holzmann's NASA JPL Power of 10 safety-critical code rule
 •  *Single Cohesive Concern*: Each module must do one thing (e.g. geometry, occupancy policy, enhancement, spatial clustering).
 •  *Harmony with Surgical Changes (§3)*: Apply this standard to new or refactored components; do not arbitrarily refactor untouched adjacent code unless requested.
 
+## 10. Python 3.14 Multithreading & Concurrency Standards
+
+*Design for free-threaded execution (PEP 703), subinterpreters (PEP 734), and explicit thread safety.*
+
+Python 3.14 officially supports free-threading (GIL-disabled runtime `python3.14t`). Concurrency code must be built for true multi-core parallel execution:
+
+•  **No Implicit Thread-Safety Assumptions**: Without the GIL serializing bytecode, never rely on compound operations (e.g. `if k not in dict: dict[k] = v`, `counter += 1`) being atomic. Always guard mutable shared state with `threading.Lock` / `threading.RLock` using context managers (`with lock:`).
+•  **Prefer Queue-Based / Message-Passing Architecture**: Favor `queue.Queue` over raw shared memory between threads. Producer-consumer pipelines eliminate race conditions and reduce lock contention.
+•  **High-Level Concurrency Abstractions**: Prefer `concurrent.futures.ThreadPoolExecutor` for worker pools rather than raw unmanaged `threading.Thread` instances. For process-isolated parallelism without heavy IPC overhead, use Python 3.14 subinterpreters (`concurrent.futures.InterpreterPoolExecutor`).
+•  **Cooperative Cancellation & Clean Lifecycle**: Never rely on unmanaged `daemon=True` threads that can be abruptly terminated mid-operation, leaving locks orphaned or files corrupted. Use `threading.Event` (e.g. `stop_event.is_set()`) to coordinate clean shutdown across all workers.
+•  **Free-Threaded Runtime Awareness**: If high-throughput CPU-parallel threading is required, check runtime status via `sys._is_gil_enabled()`. Beware that legacy C-extensions lacking free-threaded ABI (`cp314t`) support may silently re-enable the GIL.
+•  **Deadlock Prevention**: Keep critical sections minimal (≤ 5 lines under lock). Never perform blocking I/O, sleep, or network calls while holding a lock. Always acquire locks in a globally consistent order.
+
 ---
 
 *These guidelines are working if:* fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
