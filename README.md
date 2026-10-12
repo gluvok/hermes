@@ -53,7 +53,7 @@ uv run python scripts/deploy.py \
     --host gluvok@hermes.local \
     --device-id pi1 \
     --device-key hardware123 \
-    --center-id 1 \
+    --center-id 2 \
     --min-weight 70.0
 ```
 
