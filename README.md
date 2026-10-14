@@ -11,7 +11,7 @@ Asynchronous, non-blocking multithreaded vehicle image streaming client that pre
 - **SQLite Database Persistence**: Stores filename, recognized vehicle number, and raw image bytes (`BLOB`) in `data/vehicles.db` (WAL mode).
 - **Barebones Loguru**: Clean, colorful console logging via `loguru`.
 - **Cooperative Cancellation**: Clean shutdown on `SIGINT` / `SIGTERM` (`Ctrl+C`) via `threading.Event`.
-- **NASA JPL Rule 4 Architecture**: Every module and function strictly ≤ 60 lines.
+- **NASA JPL Rule 4 Architecture**: Every module and function strictly ≤ 60 lines. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full architectural patterns and topology.
 
 ## Requirements
 

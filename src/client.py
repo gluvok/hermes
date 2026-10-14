@@ -7,8 +7,11 @@ from loguru import logger
 from src.database import DatabaseManager
 from src.image_loader import InMemoryImage
 
+type RecognitionPayload = dict[str, Any]
+type VehicleNumber = str | None
 
-def extract_first_plate(result: dict[str, Any]) -> str | None:
+
+def extract_first_plate(result: RecognitionPayload) -> VehicleNumber:
     results = result.get("results")
     if isinstance(results, list) and results and "plate" in results[0]:
         return str(results[0]["plate"])
@@ -20,12 +23,12 @@ def send_and_record_image(
     server_url: str,
     img: InMemoryImage,
     db: DatabaseManager,
-) -> dict[str, Any] | None:
+) -> RecognitionPayload | None:
     try:
         files = {"file": (img.name, img.data, "image/jpeg")}
         response = client.post(server_url, files=files)
         response.raise_for_status()
-        result: dict[str, Any] = response.json()
+        result: RecognitionPayload = response.json()
         first_plate = extract_first_plate(result)
         db.save_detection(img.name, first_plate, img.data)
         plate_display = first_plate if first_plate is not None else "NONE"

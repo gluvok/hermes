@@ -11,6 +11,17 @@ from src.database import DatabaseManager
 from src.image_loader import InMemoryImage
 
 
+def dispatch_batch(
+    pool: ThreadPoolExecutor,
+    client: httpx.Client,
+    server_url: str,
+    batch: list[InMemoryImage],
+    db: DatabaseManager,
+) -> None:
+    for img in batch:
+        pool.submit(send_and_record_image, client, server_url, img, db)
+
+
 def run_streamer(
     images: list[InMemoryImage],
     cfg: StreamerConfig,
@@ -21,9 +32,7 @@ def run_streamer(
         logger.warning("No images available in RAM to stream.")
         return
 
-    cursor = 0
-    total = len(images)
-
+    cursor, total = 0, len(images)
     with (
         httpx.Client(timeout=cfg.timeout_sec) as client,
         ThreadPoolExecutor(max_workers=cfg.max_workers) as pool,
@@ -41,10 +50,5 @@ def run_streamer(
 
             batch = images[cursor : cursor + cfg.batch_size]
             cursor += len(batch)
-
-            for img in batch:
-                pool.submit(
-                    send_and_record_image, client, cfg.server_url, img, db
-                )
-
+            dispatch_batch(pool, client, cfg.server_url, batch, db)
             stop_event.wait(cfg.interval_sec)
