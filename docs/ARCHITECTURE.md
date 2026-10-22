@@ -39,7 +39,7 @@ graph TD
     SessionMgr -->|Parallel Fleet Trigger| CamAux
     SessionMgr -->|Session Package| GluvokAPI
     WebDiag <-->|Telemetry & Reconfig| SessionMgr
-    WiFiWatchdog <-->|NetworkManager nmcli| WebDiag
+    WiFiWatchdog <-->|balena wifi-connect D-Bus| WebDiag
 ```
 
 ---
@@ -55,7 +55,7 @@ graph TD
 - **Non-Blocking Real-Time Threading**: Scale serial reading is completely decoupled from disk spooling and network I/O; cloud uploads and camera captures are dispatched in dedicated background threads.
 - **Gluvok Cloud API Multipart Integration**: Matches curl specification (`curl -X POST ... -u "pi1:hardware123" -F "center_id=..." -F "detected_vehicle_number=..." -F "weight=..." -F "file=@..."`).
 - **Web Diagnostics Dashboard**: Modular Flask application factory on port `8080` displaying live scale weight, ANPR status, cloud spool queue counts, error monitoring, and configuration.
-- **Emergency Wi-Fi Hotspot Fallback**: Detects network disconnections via NetworkManager (`nmcli`) and automatically starts an emergency AP (`hermes`) for on-site recovery.
+- **Balena-Powered Wi-Fi & Native Captive Portal**: Direct NetworkManager D-Bus control via `balena-io/wifi-connect` with DNS interception, flap-debounced watchdog, live network scanning, persistent SQLite vault, and automatic fallback AP restoration.
 
 ---
 
@@ -101,7 +101,7 @@ hermes/
     │   ├── __init__.py         # Subpackage exports
     │   ├── scale.py           # UART serial stream reader & line buffer parser
     │   ├── camera.py          # HTTP snapshot / RTSP frame grabber & parallel aux captures
-    │   └── wifi.py            # Automatic Wi-Fi watchdog & emergency hotspot monitor
+    │   └── wifi/              # Balena wifi-connect subpackage (process, connection, watchdog, scanner)
     ├── integrations/
     │   ├── __init__.py         # Subpackage exports
     │   ├── anpr.py            # Argus ANPR server client & plate voting algorithm

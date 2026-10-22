@@ -209,6 +209,14 @@ def post_config():
     }), 200
 
 
+@api_bp.route("/networks", methods=["GET"])
+@api_bp.route("/wifi/scan", methods=["GET"])
+def get_scanned_networks():
+    """Returns scanned Wi-Fi access points from balena."""
+    from src.devices.wifi import get_available_networks
+    return jsonify({"success": True, "networks": get_available_networks()}), 200
+
+
 @api_bp.route("/wifi/saved", methods=["GET"])
 def get_saved_wifi():
     """Returns saved Wi-Fi networks (SSID and metadata, no passwords)."""

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+import unittest.mock
 
 from src.config import config
 from src.core.telemetry import reset_state
@@ -340,6 +341,34 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertTrue(server._is_running)
         server.stop()
         self.assertFalse(server._is_running)
+
+    def test_networks_and_scan_endpoints(self):
+        res1 = self.client.get("/networks")
+        self.assertEqual(res1.status_code, 200)
+        self.assertTrue(res1.get_json()["success"])
+        self.assertIsInstance(res1.get_json()["networks"], list)
+
+        res2 = self.client.get("/api/wifi/scan")
+        self.assertEqual(res2.status_code, 200)
+        self.assertTrue(res2.get_json()["success"])
+
+    def test_captive_portal_probes(self):
+        with unittest.mock.patch("src.web.blueprints.views.is_wifi_connected", return_value=False):
+            res_gen = self.client.get("/generate_204")
+            self.assertEqual(res_gen.status_code, 302)
+            self.assertIn("/wifi", res_gen.headers.get("Location", ""))
+
+            res_cna = self.client.get("/hotspot-detect.html")
+            self.assertEqual(res_cna.status_code, 302)
+
+        with unittest.mock.patch("src.web.blueprints.views.is_wifi_connected", return_value=True):
+            res_online = self.client.get("/generate_204")
+            self.assertEqual(res_online.status_code, 204)
+
+    def test_wifi_portal_view(self):
+        res = self.client.get("/wifi_portal")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/html", res.content_type)
 
 
 if __name__ == "__main__":

@@ -121,12 +121,16 @@ cd /opt/hermes && ./run.sh
 
 ---
 
-## 🖥️ Web Diagnostics Dashboard
+## 🖥️ Web Diagnostics Dashboard & Balena Wi-Fi Captive Portal
 
 - **URL**: `http://localhost:8080` (or `http://<pi-ip>:8080`)
-- **Emergency Hotspot AP**: `hermes` (Password: `12345678` | Fallback Portal: `http://10.42.0.1:8080`)
-  - *Self-Healing Hotspot*: Automatically re-creates and activates `hermes` Access Point if deleted from NetworkManager.
+- **Native Captive Portal**: Powered by `balena-io/wifi-connect` with direct NetworkManager D-Bus integration. Intercepts DNS queries on `192.168.42.1:80`; smartphones (iOS & Android) automatically display *"Sign in to Wi-Fi"* modal.
+- **Emergency Hotspot AP**: `hermes` (Password: `12345678` | Captive Portal: `http://192.168.42.1:80`, Web Console: `http://192.168.42.1:8080/wifi`)
+  - *Automated AP Restoration*: If target network connection fails or credentials reject, AP restores instantly so user is never locked out.
+  - *Flap-Debounced Watchdog*: Requires consecutive network check failures before engaging emergency portal, preventing flapping from momentary packet drops. Never interrupts active connection handshakes.
+  - *Live Network Scanning*: Scans and displays live nearby SSIDs with signal strength (dBm) and security modes via `/api/networks` and `/networks`.
   - *Persistent Wi-Fi Vault*: Remembers all known networks in local SQLite DB for 1-click reconnection without re-entering passwords.
+- **Standalone Wi-Fi CLI**: Run `python wifi_setup.py` (or `scripts/install_wifi.sh`) for standalone hotspot management or architecture-aware binary installation.
 - **Default Superadmin User**: `superadmin`
 - **Default Superadmin Password**: `Gluvok@241821`
 - **Dynamic Configuration**: Live tuning of Serial Port path, Baud Rate, Stability Duration (1.0–60.0s), Stability Tolerance (0.1–50.0kg), and ANPR / Auxiliary camera URLs with hot-reload directly from the browser.
