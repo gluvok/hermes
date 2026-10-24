@@ -21,8 +21,10 @@ DEFAULT_ACTIVITY_TIMEOUT = 0
 BALENA_BINARY_NAMES = (
     "wifi-connect",
     str(BASE_DIR / "bin" / "wifi-connect"),
+    str(BASE_DIR.parents[2] / "scripts" / "bin" / "wifi-connect"),
     "/usr/local/sbin/wifi-connect",
     "/usr/local/bin/wifi-connect",
+    "/usr/bin/wifi-connect",
 )
 
 UI_DIR = BASE_DIR / "ui"

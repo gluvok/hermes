@@ -116,6 +116,24 @@ class TestWiFiManager(unittest.TestCase):
         self.assertIsInstance(is_balena_available(), bool)
         self.assertIsInstance(is_nmcli_available(), bool)
 
+    @patch("src.devices.wifi.cmd_builder.build_portal_cmd", return_value=None)
+    def test_start_portal_fails_when_binary_missing(self, mock_cmd: MagicMock) -> None:
+        with patch.object(balena_manager, "is_running", return_value=False):
+            result = balena_manager.start_portal("hermes", "12345678")
+            self.assertFalse(result)
+
+    @patch("src.devices.wifi.cmd_builder.build_portal_cmd", return_value=["wifi-connect"])
+    @patch("src.devices.wifi.cmd_builder.spawn_portal_process", return_value=None)
+    def test_start_portal_fails_when_spawn_fails(self, mock_spawn: MagicMock, mock_cmd: MagicMock) -> None:
+        with patch.object(balena_manager, "is_running", return_value=False):
+            result = balena_manager.start_portal("hermes", "12345678")
+            self.assertFalse(result)
+
+    def test_balena_binary_names_includes_scripts_bin(self) -> None:
+        from src.devices.wifi.constants import BALENA_BINARY_NAMES
+        found = any("scripts/bin/wifi-connect" in name for name in BALENA_BINARY_NAMES)
+        self.assertTrue(found)
+
 
 if __name__ == "__main__":
     unittest.main()

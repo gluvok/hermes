@@ -130,7 +130,7 @@ cd /opt/hermes && ./run.sh
   - *Flap-Debounced Watchdog*: Requires consecutive network check failures before engaging emergency portal, preventing flapping from momentary packet drops. Never interrupts active connection handshakes.
   - *Live Network Scanning*: Scans and displays live nearby SSIDs with signal strength (dBm) and security modes via `/api/networks` and `/networks`.
   - *Persistent Wi-Fi Vault*: Remembers all known networks in local SQLite DB for 1-click reconnection without re-entering passwords.
-- **Standalone Wi-Fi CLI**: Run `python wifi_setup.py` (or `scripts/install_wifi.sh`) for standalone hotspot management or architecture-aware binary installation.
+- **Standalone Wi-Fi CLI & Installer**: Run `bash scripts/install_wifi.sh` to download and install architecture-aware `balena wifi-connect` (installs to `scripts/bin/` and `src/devices/wifi/bin/`, symlinks to `/usr/local/sbin` if root). Note: requires NetworkManager active and passwordless sudo (`sudo -n`) if running as non-root.
 - **Default Superadmin User**: `superadmin`
 - **Default Superadmin Password**: `Gluvok@241821`
 - **Dynamic Configuration**: Live tuning of Serial Port path, Baud Rate, Stability Duration (1.0–60.0s), Stability Tolerance (0.1–50.0kg), and ANPR / Auxiliary camera URLs with hot-reload directly from the browser.

@@ -33,6 +33,8 @@ def start_emergency_hotspot(
         gateway=gateway, dhcp_range=dhcp_range, interface=interface,
         ui_dir=ui_dir, activity_timeout=activity_timeout,
     )
+    if not ok:
+        logger.error(f"[WiFi] Failed to initiate balena hotspot AP: SSID='{ssid}'")
     led_controller.set_network_status(False)
     return ok
 

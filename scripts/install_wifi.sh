@@ -51,11 +51,19 @@ if [ -n "$TARGET" ]; then
         cp "$EXTRACTED" "$BIN_DIR/wifi-connect"
         chmod +x "$BIN_DIR/wifi-connect"
         echo "Installed wifi-connect to $BIN_DIR/wifi-connect"
-        
+
+        DEV_BIN_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd)/src/devices/wifi/bin"
+        mkdir -p "$DEV_BIN_DIR"
+        cp "$EXTRACTED" "$DEV_BIN_DIR/wifi-connect"
+        chmod +x "$DEV_BIN_DIR/wifi-connect"
+        echo "Installed wifi-connect to $DEV_BIN_DIR/wifi-connect"
+
         # Optionally symlink to /usr/local/sbin if root
         if [ "$(id -u)" -eq 0 ]; then
             ln -sf "$BIN_DIR/wifi-connect" /usr/local/sbin/wifi-connect
             echo "Symlinked to /usr/local/sbin/wifi-connect"
+        else
+            echo "Note: Non-root install. Ensure passwordless sudo (sudo -n) is enabled for $(whoami)."
         fi
     else
         echo "Failed to extract wifi-connect binary."

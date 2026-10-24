@@ -164,9 +164,10 @@ hermes/
   - Concurrently captures snapshots from all configured cameras (ANPR + Auxiliary) using a bounded `ThreadPoolExecutor` via `capture_all_camera_snapshots()`.
   - Runs parallel multi-ANPR camera frame grabbing via `capture_anpr_snapshots()`.
   - Logs clear camera fleet topology at startup via `log_camera_fleet()`, distinguishing Main (ANPR active loop) from Auxiliary (post-stability audit) cameras.
-- **`WiFi Manager` (`wifi.py`)**:
-  - Continuously monitors active Wi-Fi connection via `nmcli`.
-  - Automatically spins up an emergency Wi-Fi Access Point (`hermes` / `12345678`) on the wireless interface if connection to the facility router is lost, allowing on-site technicians to connect directly.
+- **`WiFi Manager` (`src/devices/wifi/`)**:
+  - Supervised daemon lifecycle for `balena-io/wifi-connect` with automatic fallback hotspot (`hermes` / `12345678`).
+  - Robust multi-path binary discovery (`PATH`, `src/devices/wifi/bin`, `scripts/bin`, `/usr/local/sbin`, `/usr/local/bin`, `/usr/bin`).
+  - Active error logging and process monitoring without silent simulation fallback when real binaries fail to spawn.
   - Synchronizes online / offline status with the RGB LED state machine.
 - **`RGB LED Controller` (`src/devices/led/`)**:
   - Hardware driver (`python-periphery` GPIO) and state machine coordinating visual status signals on GPIO 17 (Red), GPIO 27 (Green), and GPIO 22 (Blue).
