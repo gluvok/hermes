@@ -74,11 +74,12 @@ hermes/
 │   ├── ARCHITECTURE.md        # Deep architectural design, threading, and hardware interfaces
 │   └── CODEBASE_REFERENCE.md  # Exhaustive function-by-function developer guide
 ├── tests/
+│   ├── test_anpr_async.py     # Asynchronous ANPR dispatch, concurrency, and truck session association tests
 │   ├── test_anpr_client.py    # ANPR client, response schemas, and plate voting tests
 │   ├── test_scale_uart.py     # Scale UART parser, framing, and silence flush tests
 │   ├── test_session_fallback.py # Weighbridge session error propagation tests
 │   ├── test_cloud_post.py     # Gluvok API multipart and Basic Auth tests
-│   ├── test_spool_db.py       # SQLite WAL durable spool, atomic leasing & idempotency tests
+│   ├── test_online_transmission.py # Direct online upload, offline discard, and Wi-Fi vault tests
 │   ├── test_threading_isolation.py # Threading concurrency and non-blocking isolation tests
 │   ├── test_web_server.py     # Diagnostics web console & REST API tests
 │   └── test_wifi_manager.py   # Wi-Fi watchdog & emergency hotspot fallback tests
@@ -92,9 +93,8 @@ hermes/
     │   └── store.py           # SQLite persistence for runtime overrides (`data/hermes.db`)
     ├── core/
     │   ├── __init__.py         # Subpackage exports
-    │   ├── db.py              # SQLite WAL durable outbox store with atomic lease locking
+    │   ├── db.py              # SQLite initialization for Wi-Fi credentials vault
     │   ├── session.py         # Weighbridge session lifecycle & multi-camera coordinator
-    │   ├── spool.py           # Background outbox dispatcher & retry worker with verify-before-retry
     │   ├── stability.py       # 10s continuous weight stability state machine
     │   └── telemetry.py       # Decoupled thread-safe telemetry and event log buffer
     ├── devices/
@@ -128,7 +128,7 @@ hermes/
 
 | Subsystem | Primary Responsibilities | Key Components |
 | :--- | :--- | :--- |
-| **Core Business Logic & Durable Spool** (`src/core/`) | Orchestrates weighbridge sessions, 10s continuous weight stability (±2 kg), WAL SQLite outbox storage, background FIFO retry dispatcher, and telemetry store. | `db.py`, `spool.py`, `session.py`, `stability.py`, `telemetry.py` |
+| **Core Business Logic & State Machine** (`src/core/`) | Orchestrates weighbridge sessions, 10s continuous weight stability (±2 kg), direct online cloud dispatch, and telemetry store. | `db.py`, `session.py`, `stability.py`, `telemetry.py` |
 | **Physical Hardware Devices** (`src/devices/`) | Direct drivers: reads RS-232 serial stream at 1200 baud, HTTP/RTSP camera snapshot grabbers, and Linux NetworkManager (`nmcli`) Wi-Fi watchdog. | `scale.py`, `camera.py`, `wifi.py` |
 | **External Integrations** (`src/integrations/`) | Integrates external networks: Argus ANPR microservice with consensus voting, and Gluvok Cloud API with Basic Auth (`-u`), multipart form uploads, and anti-duplicate verification. | `anpr.py`, `gluvok.py` |
 | **Diagnostics Web Console** (`src/web/`) | Modular Flask application factory on port `8080` with Tailwind CSS v4 single-page dashboard for live telemetry, spool queue state, system logs, and authenticated configuration. | `create_app`, `FallbackWebServer`, `index.html` |
@@ -178,7 +178,9 @@ hermes/
 
 ### 5.3 External Integrations (`src/integrations/`)
 - **`Argus ANPR Client` (`anpr.py`)**:
-  - Sends raw JPEG bytes to the Argus FastAPI microservice endpoint (`/recognize`).
+  - Sends raw JPEG bytes to the Argus FastAPI microservice endpoint (`/recognize`) with pooled HTTP keep-alive connection reuse.
+  - Implements non-blocking concurrent dispatch (`dispatch_anpr_batch`, `send_and_record_anpr_frame`) via a dedicated `ThreadPoolExecutor`, completely decoupling camera frame grabbing and scale UART polling from Argus network response times.
+  - Correlates each async ANPR recognition request with its originating weighbridge `session_id`; late responses from previously weighed trucks are safely rejected under thread locks.
   - Supports full Argus `RecognitionResponse` schemas (evaluating `results[0]` directly as the pre-sorted best plate) and flat JSON schemas, producing `NO_PLATE_DETECTED` whenever recognition fails.
   - Employs a frequency counter (`get_highest_frequency_plate`) to pick the consensus plate candidate across multi-sample captures.
 - **`Gluvok Cloud API Client` (`gluvok.py`)**:
@@ -257,9 +259,9 @@ Because Python 3.14 on a multi-core Pi 5 supports free-threaded CPython (PEP 703
 | **`ScaleUART`** | Dedicated Daemon Thread | Continuous (50ms read, 300ms flush) | Reads `/dev/ttyAMA0` serial bytes; never blocks on network or camera I/O. |
 | **`FallbackWebServer`** | Werkzeug WSGI Daemon Thread | Persistent on port `:8080` | Serves web UI and REST API asynchronously without delaying scale operations. |
 | **`WiFiWatchdog`** | Dedicated Daemon Thread | Every 30.0s | Runs `nmcli` network checks and controls emergency AP fallback independently. |
-| **`ANPRLoop_<id>`** | Ephemeral Session Thread | Every 2.0s during weighing | Fetches Cam 1 frame and queries Argus microservice asynchronously. |
+| **`ANPRLoop_<id>`** | Ephemeral Session Thread | Every 1.0s during weighing | Fetches ANPR snapshots and dispatches async recognition tasks to ThreadPoolExecutor. |
 | **`AuxCapture_<id>`** | Ephemeral Session Worker | Triggered upon 10s stability | Fetches overview angles (Cams 2..N) via `ThreadPoolExecutor(4)` without stalling serial reads. |
-| **`SpoolWorker`** | Dedicated Daemon Thread | Event-driven + 5.0s poll | Sequentially leases records from SQLite WAL queue and uploads to Gluvok API via multipart POST; completely non-blocking to scale UART. |
+| **`CloudUpload_<id>`** | Ephemeral Daemon Thread | On session finalization (when online) | Directly transmits weighment package and camera snapshots to Gluvok API via multipart POST; non-blocking to scale UART. |
 
 ### 7.2 Python 3.14 Free-Threading & Synchronization Invariants
 
@@ -268,45 +270,32 @@ Under Python 3.14, threads execute with true hardware parallelism across all 4 C
 - **`ScaleUARTReader`**: Line buffer bytearray and inter-character timeout tracking are synchronized via `threading.Lock()`.
 - **`WeighbridgeSessionManager`**: Phase transitions, frame buffers, and candidate plate lists are guarded by `threading.Lock()`.
 - **`telemetry.py`**: Telemetry circular buffer and live error statistics are guarded by `_events_lock` and `_live_lock`.
-- **`db.py`**: SQLite database operations, schema creation, and atomic lease acquisitions are synchronized with `_db_lock`.
+- **`db.py`**: SQLite database operations for Wi-Fi credentials are synchronized with `_db_lock`.
 
 ---
 
-## 8. Local Durable Outbox Storage & Anti-Duplication Architecture
+## 8. Direct Online Transmission & Offline Discard Architecture
 
-To guarantee zero data loss during power loss or offline network drops, Hermes employs a **Write-Ahead Local Outbox Spool**:
+Weighment transactions are only transmitted when a valid, active Wi-Fi / Internet connection is confirmed. Offline weighment queuing and local database storage are disabled:
 
 ```
 WEIGHMENT FINALIZED
         │
         ▼
-SQLite WAL Database (data/hermes.db)
-- weighment_spool: status='PENDING', lease_until=0, session_id (UNIQUE)
-- spool_images: raw binary BLOBs (all camera_snapshots: anpr_1..N, aux_1..M)
+Is Wi-Fi / Internet Connected?
+        ├── NO  ──► DISCARD WEIGHMENT
+        │           - Do not store locally in SQLite or any database
+        │           - Log warning & record WEIGHMENT_DISCARDED telemetry event
         │
-        ▼
-Single SpoolWorker (FIFO Sequential Processing)
-        │
-        ├── 1. Acquire Atomic Lease Lock (status='UPLOADING', lease_until=now+60s)
-        │      (Prevents concurrent worker threads or timer ticks from double-sending)
-        │
-        ├── 2. Execute Multipart POST (-u "pi1:hardware123")
-        │      - Fields: center_id, detected_vehicle_number, weight
-        │      - Files: file=@truck_001.jpg;type=image/jpeg
-        │      │
-        │      ├── HTTP 200/201 (Success) ──► ACKNOWLEDGED (cloud_entry_id recorded)
-        │      │
-        │      ├── Connect Failure (Socket / DNS / Wi-Fi drop)
-        │      │   └── Safe RETRY: Data never left the device, 0% chance cloud received it.
-        │      │
-        │      └── Read Timeout / Mid-Stream Drop (Ambiguous: Did cloud commit before drop?)
-        │          └── VERIFY-BEFORE-RETRY Protocol:
-        │              1. Query Cloud GET /api/entries?center_id=X&detected_vehicle_number=Y
-        │              2. If entry with matching plate and weight within past 5m exists:
-        │                 Mark as ACKNOWLEDGED (Avoid duplicate upload!)
-        │              3. If confirmed not present:
-        │                 Schedule RETRY with exponential backoff (5s, 10s, 20s... max 300s + jitter).
+        └── YES ──► DIRECT ONLINE CLOUD TRANSMISSION (CloudUpload_<session_id>)
+                    - Asynchronously POST /api/entries with multipart/form-data
+                    - Pulse RGB LED Blue (10s cloud success pulse)
+                    - Record CLOUD upload telemetry event
 ```
+
+The local SQLite database (`data/hermes.db`) is retained solely for:
+1. **Wi-Fi Vault (`wifi_networks`)**: Storing saved Wi-Fi SSIDs and WPA passwords for automated reconnects and captive portal management.
+2. **Runtime Configuration (`runtime_config`)**: Storing dynamic hardware/serial/camera overrides modified via the diagnostics web console.
 
 ---
 

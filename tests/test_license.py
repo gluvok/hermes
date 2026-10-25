@@ -67,8 +67,10 @@ def test_config_manager_with_license(tmp_path: Path, sample_payload: dict[str, o
 
 
 def test_config_manager_fallback_without_license(tmp_path: Path) -> None:
+    from src.config import client_config as cc
+
     db_file = tmp_path / "test_fallback.db"
     mgr = ConfigManager(db_path=str(db_file), lic_path="/nonexistent/client.lic")
-    assert mgr.center_id == 5
-    assert mgr.device_id == "pi1"
-    assert mgr.device_key == "hardware123"
+    assert mgr.center_id == cc.CENTER_ID
+    assert mgr.device_id == cc.DEVICE_ID
+    assert mgr.device_key == cc.DEVICE_KEY

@@ -7,15 +7,18 @@ auxiliary camera snapshots, 10-second post-stabilization timing, and data packag
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import threading
 import time
 import uuid
+from concurrent.futures import Future, ThreadPoolExecutor
 from enum import Enum
 from typing import Any
 
 import requests
 
+from src.config import config
 from src.config.constants import (
     ANPR_CAPTURE_INTERVAL,
     POST_STABILITY_DURATION,
@@ -27,6 +30,7 @@ from src.devices.camera import (
     fetch_image_bytes,
 )
 from src.integrations.anpr import (
+    dispatch_anpr_batch,
     get_highest_frequency_plate,
     send_frame_to_anpr_server,
 )
@@ -63,6 +67,9 @@ class WeighbridgeSessionManager:
         self._anpr_thread: threading.Thread | None = None
         self._fleet_snapshot_thread: threading.Thread | None = None
         self._stop_anpr_event = threading.Event()
+        self._anpr_pool: ThreadPoolExecutor | None = None
+        self._http_session: requests.Session | None = None
+        self._pending_anpr_futures: list[Future[tuple[str | None, str]]] = []
 
         self._post_stability_start_time: float = 0.0
         self._lock = threading.Lock()
@@ -80,6 +87,14 @@ class WeighbridgeSessionManager:
             else:
                 old_thread = None
 
+            if self._anpr_pool is not None:
+                self._anpr_pool.shutdown(wait=False, cancel_futures=True)
+            if self._http_session is not None:
+                try:
+                    self._http_session.close()
+                except (OSError, RuntimeError):
+                    pass
+
             self.session_id = f"SESS_{int(time.time())}_{uuid.uuid4().hex[:6]}"
             self.phase = SessionPhase.PHASE_STABILIZING
             self.stable_weight = 0.0
@@ -87,7 +102,15 @@ class WeighbridgeSessionManager:
             self._anpr_statuses.clear()
             self._anpr_frame_buffers.clear()
             self._fleet_snapshots.clear()
+            self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
+
+            workers = getattr(config, "max_parallel_camera_workers", 4)
+            self._anpr_pool = ThreadPoolExecutor(
+                max_workers=workers,
+                thread_name_prefix=f"ANPR_{self.session_id}",
+            )
+            self._http_session = requests.Session()
 
             logger.info(f"[Session] Started new weighbridge session: {self.session_id}")
 
@@ -105,12 +128,52 @@ class WeighbridgeSessionManager:
         if old_thread and old_thread.is_alive():
             old_thread.join(timeout=0.3)
 
-    def _capture_and_record_anpr_sample(self) -> None:
-        """Fetch frames from all configured ANPR cameras in parallel, buffer them, and query Argus."""
+    def record_anpr_result(
+        self,
+        session_id: str,
+        cam_idx: int,
+        plate: str | None,
+        status_code: str,
+    ) -> bool:
+        """Record candidate plate from async worker if session still matches active truck."""
+        with self._lock:
+            if self.session_id != session_id or self.phase == SessionPhase.PHASE_IDLE:
+                logger.debug(
+                    f"[ANPR] Stale response discarded for session {session_id} "
+                    f"(active: {self.session_id})"
+                )
+                return False
+
+            if plate:
+                self._anpr_plates.append(plate)
+            self._anpr_statuses.append(status_code)
+            sample_count = len(self._anpr_plates)
+
+        if plate:
+            logger.info(
+                f"[ANPR] Camera {cam_idx} -> Argus response: Plate='{plate}' "
+                f"(Status={status_code}, Valid plates collected: {sample_count})"
+            )
+        else:
+            logger.info(
+                f"[ANPR] Camera {cam_idx} -> Argus response: No plate detected (Status={status_code})"
+            )
+        return True
+
+    def _capture_and_record_anpr_sample(
+        self, wait: bool = True
+    ) -> list[Future[tuple[str | None, str]]]:
+        """Fetch frames from ANPR cameras and dispatch asynchronously to Argus worker pool."""
         snapshots = capture_anpr_snapshots()
         if not snapshots:
             logger.warning("[ANPR] No ANPR cameras available or configured.")
-            return
+            return []
+
+        batch_to_dispatch: list[tuple[int, bytes]] = []
+        with self._lock:
+            active_sid = self.session_id
+            pool = self._anpr_pool
+            http_sess = self._http_session
 
         for cam_idx, _cam_url, img_bytes in snapshots:
             if not img_bytes:
@@ -123,26 +186,39 @@ class WeighbridgeSessionManager:
                     buf.pop(0)
                 buf.append(img_bytes)
 
-            logger.info(f"[ANPR] Camera {cam_idx} snapshot captured ({len(img_bytes)} bytes). Sending to Argus...")
-            plate, status_code = send_frame_to_anpr_server(img_bytes)
-            with self._lock:
-                if plate:
-                    self._anpr_plates.append(plate)
-                self._anpr_statuses.append(status_code)
-                sample_count = len(self._anpr_plates)
+            batch_to_dispatch.append((cam_idx, img_bytes))
 
-            if plate:
-                logger.info(
-                    f"[ANPR] Camera {cam_idx} -> Argus response: Plate='{plate}' "
-                    f"(Status={status_code}, Valid plates collected: {sample_count})"
-                )
-            else:
-                logger.info(
-                    f"[ANPR] Camera {cam_idx} -> Argus response: No plate detected (Status={status_code})"
-                )
+        if not batch_to_dispatch or not active_sid:
+            return []
+
+        if pool is None:
+            for cam_idx, img_bytes in batch_to_dispatch:
+                plate, status_code = send_frame_to_anpr_server(img_bytes)
+                self.record_anpr_result(active_sid, cam_idx, plate, status_code)
+            return []
+
+        futures = dispatch_anpr_batch(
+            pool,
+            active_sid,
+            batch_to_dispatch,
+            server_url=getattr(config, "anpr_server_url", None),
+            callback=self.record_anpr_result,
+            session=http_sess,
+            sender=send_frame_to_anpr_server,
+        )
+
+        with self._lock:
+            self._pending_anpr_futures.extend(futures)
+
+        if wait and futures:
+            concurrent.futures.wait(
+                futures, timeout=getattr(config, "anpr_server_timeout", 3.0)
+            )
+
+        return futures
 
     def _anpr_loop(self, session_id: str, stop_event: threading.Event):
-        """Background thread executing 1-second multi-camera capture & ANPR requests."""
+        """Background thread executing paced multi-camera capture & async ANPR dispatch."""
         logger.info(f"[Session {session_id}] Multi-camera ANPR capture loop started.")
         while not stop_event.is_set():
             with self._lock:
@@ -151,7 +227,7 @@ class WeighbridgeSessionManager:
 
             loop_start = time.time()
             try:
-                self._capture_and_record_anpr_sample()
+                self._capture_and_record_anpr_sample(wait=False)
             except (requests.RequestException, OSError, ValueError, RuntimeError) as e:
                 logger.error(f"[Session {session_id}] Exception in ANPR loop iteration: {e}")
 
@@ -260,6 +336,13 @@ class WeighbridgeSessionManager:
             self._fleet_snapshot_thread.join(timeout=0.3)
 
         with self._lock:
+            pending = list(self._pending_anpr_futures)
+            self._pending_anpr_futures.clear()
+
+        if pending:
+            concurrent.futures.wait(pending, timeout=0.3)
+
+        with self._lock:
             if self._anpr_plates:
                 final_anpr_plate = get_highest_frequency_plate(self._anpr_plates)
             else:
@@ -305,7 +388,12 @@ class WeighbridgeSessionManager:
             logger.info(f"[Session {self.session_id}] Weight zeroed. Resetting session manager.")
             self._stop_anpr_event.set()
             old_anpr_thread = self._anpr_thread
+            old_pool = self._anpr_pool
+            old_http = self._http_session
             self._anpr_thread = None
+            self._anpr_pool = None
+            self._http_session = None
+            self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
             self._fleet_snapshot_thread = None
             self.phase = SessionPhase.PHASE_IDLE
@@ -318,6 +406,13 @@ class WeighbridgeSessionManager:
 
         if old_anpr_thread and old_anpr_thread.is_alive():
             old_anpr_thread.join(timeout=0.3)
+        if old_pool is not None:
+            old_pool.shutdown(wait=False, cancel_futures=True)
+        if old_http is not None:
+            try:
+                old_http.close()
+            except (OSError, RuntimeError):
+                pass
 
 
 def _record_session_telemetry(

@@ -8,7 +8,6 @@ import requests
 from flask import Blueprint, jsonify, request
 
 from src.config import config
-from src.core import get_spool_stats
 from src.core.telemetry import (
     get_error_counts,
     get_latest_weighment,
@@ -149,7 +148,7 @@ def status():
             "stability_tolerance": config.stability_tolerance,
         },
         "latest_weighment": get_latest_weighment(),
-        "spool": get_spool_stats(),
+        "spool": {},
         "error_counts": get_error_counts(),
         "events": get_system_events(),
     }), 200

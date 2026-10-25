@@ -9,6 +9,7 @@ One transmission per session; resets only when weight returns to zero.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from enum import Enum
 from typing import Any
@@ -128,15 +129,44 @@ class ScaleStabilityMachine:
         self._evaluate_stability_window(parsed_weight, now)
 
     def _trigger_upload(self, session_package: dict[str, Any]) -> str:
-        from src.core.db import spool_weighment
-        from src.core.spool import spool_worker
+        """Transmits session directly to Gluvok Cloud if online; drops if offline."""
+        from src.devices import is_wifi_connected
 
-        session_id = spool_weighment(session_package)
-        spool_worker.notify_new_record()
-        logger.info(
-            f"[Scale Session] Spooled session {session_id} to durable local SQLite queue."
-        )
+        session_id = str(session_package.get("session_id", "UNKNOWN"))
+
+        if not is_wifi_connected():
+            logger.warning(
+                f"[Weighment] Wi-Fi disconnected. Weighment {session_id} "
+                "discarded (offline storage disabled)."
+            )
+            from src.core.telemetry import record_system_event
+            record_system_event(
+                "WEIGHMENT_DISCARDED",
+                f"Session {session_id} discarded: Wi-Fi offline",
+            )
+            return session_id
+
+        logger.info(f"[Weighment] Transmitting session {session_id} directly to cloud...")
+        threading.Thread(
+            target=self._transmit_online_weighment,
+            args=(session_package,),
+            name=f"CloudUpload_{session_id}",
+            daemon=True,
+        ).start()
         return session_id
+
+    def _transmit_online_weighment(self, session_package: dict[str, Any]) -> None:
+        from src.config.constants import LED_CLOUD_SUCCESS_DURATION
+        from src.devices import led_controller
+        from src.integrations.gluvok import post_to_cloud
+
+        session_id = str(session_package.get("session_id", "UNKNOWN"))
+        try:
+            post_to_cloud(session_package)
+            led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
+            logger.info(f"[Weighment] Successfully uploaded session {session_id} to cloud.")
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.error(f"[Weighment] Direct cloud upload error for {session_id}: {exc}")
 
     def reset(self):
         """Manually reset the state machine."""

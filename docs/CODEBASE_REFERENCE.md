@@ -313,8 +313,12 @@ Argus ANPR microservice client and consensus voting algorithm.
   Parses Argus `RecognitionResponse` or flat JSON. Inspects `results[0]` directly (which is pre-sorted by Argus with the highest-ranked plate). If `results` is empty or `results[0]` lacks a valid plate, returns `(None, "NO_PLATE_DETECTED")`.
 - **`_parse_anpr_response(response: requests.Response) -> tuple[str | None, str]`**:
   Extracts plate text and status code from HTTP 200/201 responses.
-- **`send_frame_to_anpr_server(image_bytes: bytes | None, server_url: str | None = None, timeout: float = ANPR_SERVER_TIMEOUT) -> tuple[str | None, str]`**:
-  Submits multipart form (`file: frame.jpg`) to `/recognize` (default timeout 15.0s). Handles `Timeout` and `ConnectionError` cleanly.
+- **`send_frame_to_anpr_server(image_bytes: bytes | None, server_url: str | None = None, timeout: float = ANPR_SERVER_TIMEOUT, session: requests.Session | None = None) -> tuple[str | None, str]`**:
+  Submits multipart form (`file: frame.jpg`) to `/recognize` (default timeout 15.0s). Supports persistent `requests.Session` for HTTP connection pooling. Handles `Timeout` and `ConnectionError` cleanly.
+- **`send_and_record_anpr_frame(session_id: str, cam_idx: int, image_bytes: bytes, server_url: str | None = None, callback: AnprRecordCallback | None = None, session: requests.Session | None = None, sender: Callable | None = None) -> tuple[str | None, str]`**:
+  Worker task executing an individual ANPR request and safely passing the candidate plate/status to the session callback.
+- **`dispatch_anpr_batch(pool: ThreadPoolExecutor, session_id: str, batch: Sequence[tuple[int, bytes]], server_url: str | None = None, callback: AnprRecordCallback | None = None, session: requests.Session | None = None, sender: Callable | None = None) -> list[Future]`**:
+  Asynchronous batch dispatcher submitting camera frames to worker threads concurrently without stalling the session capture loop.
 - **`get_highest_frequency_plate(plate_list: Sequence[str | None]) -> str`**:
   Consensus voting: computes frequency histogram across all samples collected during the session. Returns the most frequent plate candidate, filtering out intermittent OCR noise.
 

@@ -29,10 +29,8 @@ logger = logging.getLogger(__name__)
 from src.config import config
 from src.core import (
     init_db,
-    recover_stranded_leases,
     scale_state_machine,
     session_manager,
-    spool_worker,
 )
 from src.devices import (
     get_uart_reader,
@@ -49,7 +47,6 @@ from src.web import start_web_server, stop_web_server
 def shutdown(signum, frame):
     logger.info("\n[Main] Shutdown signal received. Cleaning up...")
     led_controller.cleanup()
-    spool_worker.stop()
     get_uart_reader().stop()
     stop_web_server()
     stop_wifi_watchdog()
@@ -83,10 +80,8 @@ def setup():
     # Start automatic Wi-Fi watchdog & emergency hotspot monitor
     start_wifi_watchdog(interval=30.0)
 
-    # Initialize SQLite durable outbox spool and start dispatcher
+    # Initialize SQLite database for Wi-Fi credentials and system settings
     init_db()
-    recover_stranded_leases()
-    spool_worker.start()
 
 
     # Log active client settings

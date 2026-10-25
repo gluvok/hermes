@@ -10,7 +10,9 @@ from __future__ import annotations
 import json
 import logging
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
+from typing import Any
 
 import requests
 
@@ -104,10 +106,14 @@ def _parse_anpr_response(response: requests.Response) -> tuple[str | None, str]:
     return None, error_code
 
 
+type AnprRecordCallback = Callable[[str, int, str | None, str], Any]
+
+
 def send_frame_to_anpr_server(
     image_bytes: bytes | None,
     server_url: str | None = None,
     timeout: float = ANPR_SERVER_TIMEOUT,
+    session: requests.Session | None = None,
 ) -> tuple[str | None, str]:
     """
     Sends raw JPEG image bytes to the Argus ANPR FastAPI microservice (/recognize).
@@ -120,7 +126,10 @@ def send_frame_to_anpr_server(
 
     try:
         files = {"file": ("frame.jpg", image_bytes, "image/jpeg")}
-        response = requests.post(target_url, files=files, timeout=timeout)
+        if session is not None:
+            response = session.post(target_url, files=files, timeout=timeout)
+        else:
+            response = requests.post(target_url, files=files, timeout=timeout)
         return _parse_anpr_response(response)
     except requests.exceptions.Timeout:
         logger.warning(f"[ANPR] Timeout ({timeout}s) contacting ANPR server at {target_url}")
@@ -131,6 +140,68 @@ def send_frame_to_anpr_server(
     except requests.RequestException as e:
         logger.error(f"[ANPR] Exception submitting frame to ANPR server ({target_url}): {e}")
         return None, "ANPR_REQUEST_ERROR"
+
+
+def send_and_record_anpr_frame(
+    session_id: str,
+    cam_idx: int,
+    image_bytes: bytes,
+    server_url: str | None = None,
+    callback: AnprRecordCallback | None = None,
+    session: requests.Session | None = None,
+    sender: Callable[..., tuple[str | None, str]] | None = None,
+) -> tuple[str | None, str]:
+    """Execute ANPR request for a single camera frame and invoke record callback."""
+    sender_fn = sender or send_frame_to_anpr_server
+    try:
+        if session is not None or server_url is not None:
+            try:
+                plate, status_code = sender_fn(
+                    image_bytes, server_url=server_url, session=session
+                )
+            except TypeError:
+                plate, status_code = sender_fn(image_bytes)
+        else:
+            plate, status_code = sender_fn(image_bytes)
+    except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
+        logger.error(f"[ANPR] Worker error for session {session_id} cam {cam_idx}: {exc}")
+        plate, status_code = None, "ANPR_WORKER_ERROR"
+
+    if callback is not None:
+        try:
+            callback(session_id, cam_idx, plate, status_code)
+        except (ValueError, KeyError, RuntimeError, TypeError) as exc:
+            logger.error(f"[ANPR] Callback error for session {session_id}: {exc}")
+
+    return plate, status_code
+
+
+def dispatch_anpr_batch(
+    pool: ThreadPoolExecutor,
+    session_id: str,
+    batch: Sequence[tuple[int, bytes]],
+    server_url: str | None = None,
+    callback: AnprRecordCallback | None = None,
+    session: requests.Session | None = None,
+    sender: Callable[..., tuple[str | None, str]] | None = None,
+) -> list[Future[tuple[str | None, str]]]:
+    """Submit a batch of ANPR camera frames concurrently to the worker pool."""
+    futures: list[Future[tuple[str | None, str]]] = []
+    for cam_idx, img_bytes in batch:
+        if not img_bytes:
+            continue
+        future = pool.submit(
+            send_and_record_anpr_frame,
+            session_id,
+            cam_idx,
+            img_bytes,
+            server_url,
+            callback,
+            session,
+            sender,
+        )
+        futures.append(future)
+    return futures
 
 
 def get_highest_frequency_plate(plate_list: Sequence[str | None]) -> str:
@@ -157,7 +228,9 @@ def get_highest_frequency_plate(plate_list: Sequence[str | None]) -> str:
 
 
 __all__ = [
+    "dispatch_anpr_batch",
     "get_highest_frequency_plate",
     "resolve_anpr_endpoint",
+    "send_and_record_anpr_frame",
     "send_frame_to_anpr_server",
 ]

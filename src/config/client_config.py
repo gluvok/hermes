@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 # Cloud credentials (compiled into binary, non-configurable via UI)
-DEVICE_ID: str | int = "pi1"
+DEVICE_ID: str | int = "pi0"
 DEVICE_KEY: str = "hardware123"
-CENTER_ID: int = 5
+CENTER_ID: int = 3
 
 # Weighment & OCR thresholds (compiled into binary, non-configurable via UI)
 MIN_WEIGHT: float = 70.0

@@ -1,6 +1,8 @@
 from src.integrations.anpr import (
+    dispatch_anpr_batch,
     get_highest_frequency_plate,
     resolve_anpr_endpoint,
+    send_and_record_anpr_frame,
     send_frame_to_anpr_server,
 )
 from src.integrations.gluvok import (
@@ -12,9 +14,11 @@ from src.integrations.gluvok import (
 
 __all__ = [
     "GLUVOK_BASE_URL",
+    "dispatch_anpr_batch",
     "get_highest_frequency_plate",
     "post_to_cloud",
     "resolve_anpr_endpoint",
+    "send_and_record_anpr_frame",
     "send_frame_to_anpr_server",
     "transmit_entry_multipart",
     "verify_entry_in_cloud",
