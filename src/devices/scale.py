@@ -38,20 +38,26 @@ def get_current_baudrate() -> int:
 class ScaleUARTReader:
     def __init__(self):
         self._serial: serial.Serial | None = None
-        self._running = False
+        self._serial_lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._stop_event.set()
         self._thread: threading.Thread | None = None
         self._line_buffer = bytearray()
         self._last_char_time = 0.0
+        self._last_reconnect_attempt = 0.0
         self._lock = threading.Lock()
         self.active_port = ""
         self.active_baudrate = 0
+
+    @property
+    def _running(self) -> bool:
+        return not self._stop_event.is_set()
 
     def start(self, port: str | None = None, baudrate: int | None = None):
         target_port = port or get_current_serial_port()
         target_baudrate = baudrate or get_current_baudrate()
 
-        if self._running:
-            # If already running with same settings, do nothing; else restart
+        if self._thread and self._thread.is_alive():
             if self.active_port == target_port and self.active_baudrate == target_baudrate:
                 return
             self.restart(target_port, target_baudrate)
@@ -59,7 +65,7 @@ class ScaleUARTReader:
 
         self.active_port = target_port
         self.active_baudrate = target_baudrate
-        self._running = True
+        self._stop_event.clear()
 
         self._thread = threading.Thread(target=self._read_loop, daemon=True, name="ScaleUART")
         self._thread.start()
@@ -69,72 +75,86 @@ class ScaleUARTReader:
         """Restarts the UART reader thread with updated port and baud rate."""
         logger.info("[Scale] Restarting UART reader with updated serial configuration...")
         self.stop()
-        time.sleep(0.3)
+        time.sleep(0.1)
         self.start(port, baudrate)
 
     def stop(self):
-        self._running = False
-        if self._serial and self._serial.is_open:
-            try:
-                self._serial.close()
-            except (serial.SerialException, OSError) as e:
-                logger.debug(f"[Scale] Error closing serial port: {e}")
-        self._serial = None
+        self._stop_event.set()
+        self._close_serial()
+        if self._thread and self._thread.is_alive() and self._thread != threading.current_thread():
+            self._thread.join(timeout=1.5)
+        self._thread = None
         logger.info("[Scale] UART reader stopped.")
+
+    def _close_serial(self) -> None:
+        with self._serial_lock:
+            if self._serial:
+                try:
+                    if self._serial.is_open:
+                        self._serial.close()
+                except (serial.SerialException, OSError) as e:
+                    logger.debug(f"[Scale] Error closing serial port: {e}")
+                self._serial = None
 
     def _open_serial(self) -> bool:
         port = get_current_serial_port()
         baudrate = get_current_baudrate()
         self.active_port = port
         self.active_baudrate = baudrate
+        self._close_serial()
         try:
-            if self._serial and self._serial.is_open:
-                self._serial.close()
-            self._serial = serial.Serial(port, baudrate, timeout=SCALE_TIMEOUT)
+            try:
+                ser = serial.Serial(port, baudrate, timeout=SCALE_TIMEOUT, exclusive=True)
+            except TypeError:
+                ser = serial.Serial(port, baudrate, timeout=SCALE_TIMEOUT)
+            with self._serial_lock:
+                self._serial = ser
             logger.info(f"[Scale] UART opened: {port} @ {baudrate} baud")
             return True
         except (serial.SerialException, OSError) as e:
             logger.error(f"[Scale] Failed to open UART port '{port}' @ {baudrate} baud: {e}")
-            self._serial = None
+            self._close_serial()
             return False
 
-    def _reconnect_if_needed(self, last_attempt: float) -> float:
+    def _reconnect_if_needed(self) -> None:
         now = time.time()
-        if now - last_attempt >= 5.0:
+        if now - self._last_reconnect_attempt >= 5.0:
+            self._last_reconnect_attempt = now
             logger.info("[Scale] Attempting serial port reconnect...")
             self._open_serial()
-            return now
-        return last_attempt
 
     def _read_incoming_bytes(self) -> None:
-        if self._serial is None or not self._serial.is_open:
+        with self._serial_lock:
+            ser = self._serial
+        if ser is None or not ser.is_open:
             return
+
         try:
-            n = getattr(self._serial, "in_waiting", 1) or 1
-            raw = self._serial.read(max(1, min(n, 64)))
-            if raw:
-                for b in raw:
-                    self.handle_scale_char(b)
-            self._check_timeout_flush()
+            n = getattr(ser, "in_waiting", 1) or 1
+            raw = ser.read(max(1, min(n, 64)))
         except (serial.SerialException, OSError, TypeError) as e:
-            if not self._running:
+            if self._stop_event.is_set():
                 return
             logger.error(f"[Scale] UART connection lost / read error: {e}. Reconnecting in 5s...")
-            if self._serial:
-                try:
-                    self._serial.close()
-                except (OSError, serial.SerialException):
-                    pass
-                self._serial = None
+            self._close_serial()
             time.sleep(1.0)
+            return
+
+        if raw:
+            for b in raw:
+                self.handle_scale_char(b)
+        self._check_timeout_flush()
 
     def _read_loop(self):
         logger.info("[Scale] UART reader loop started listening for weight data...")
-        last_reconnect_attempt = 0.0
+        self._last_reconnect_attempt = 0.0
 
-        while self._running:
-            if self._serial is None or not self._serial.is_open:
-                last_reconnect_attempt = self._reconnect_if_needed(last_reconnect_attempt)
+        while not self._stop_event.is_set():
+            with self._serial_lock:
+                ser_is_ready = self._serial is not None and self._serial.is_open
+
+            if not ser_is_ready:
+                self._reconnect_if_needed()
                 time.sleep(0.5)
                 continue
 

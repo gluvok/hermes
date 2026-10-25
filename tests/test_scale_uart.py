@@ -1,6 +1,6 @@
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from src.devices.scale import ScaleUARTReader
 
@@ -62,6 +62,33 @@ class TestScaleUARTReader(unittest.TestCase):
             # Negative float
             self.reader.handle_scale_char("-12.5\r\n")
             self.assertIn(-12.5, self.parsed_weights)
+
+    def test_lifecycle_and_restart(self):
+        reader = ScaleUARTReader()
+        with patch.object(reader, "_open_serial", return_value=True):
+            reader.start(port="/dev/test0", baudrate=9600)
+            self.assertTrue(reader._running)
+            self.assertIsNotNone(reader._thread)
+            reader.restart(port="/dev/test1", baudrate=1200)
+            self.assertTrue(reader._running)
+            self.assertEqual(reader.active_port, "/dev/test1")
+            reader.stop()
+            self.assertFalse(reader._running)
+            self.assertIsNone(reader._thread)
+
+    def test_read_incoming_bytes_exception_resilience(self):
+        import serial
+        reader = ScaleUARTReader()
+        reader._stop_event.clear()
+        mock_ser = MagicMock()
+        mock_ser.is_open = True
+        mock_ser.read.side_effect = serial.SerialException("device disconnected")
+        with reader._serial_lock:
+            reader._serial = mock_ser
+        with patch("time.sleep"):
+            reader._read_incoming_bytes()
+        self.assertIsNone(reader._serial)
+
 
 if __name__ == '__main__':
     unittest.main()
