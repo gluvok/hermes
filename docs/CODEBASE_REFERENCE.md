@@ -89,7 +89,7 @@ Application lifecycle entry point and process daemon runner.
   Initializes the runtime environment:
   1. Starts `ScaleUARTReader` background thread listening on configured port/baud.
   2. Launches `FallbackWebServer` on port `8080` serving the diagnostics UI.
-  3. Starts `start_wifi_watchdog(interval=30.0)` for emergency hotspot failover.
+  3. Starts `start_wifi_watchdog(interval=1.0)` for emergency hotspot failover.
   4. Validates edge device credentials (`device_id`, `device_key`) in `client_config.py`.
 - **`loop() -> None`**:
   Main execution tick running every 1 second:
@@ -163,7 +163,7 @@ Centralized repository of timing windows, timeouts, buffer boundaries, NetworkMa
   - `HOTSPOT_CON_NAME = "hermes-hotspot"`: NetworkManager emergency profile name.
   - `DEFAULT_HOTSPOT_SSID = "hermes"`: Default hotspot SSID.
   - `DEFAULT_HOTSPOT_PASS = "12345678"`: Default hotspot WPA2 passphrase.
-  - `WIFI_WATCHDOG_INTERVAL = 30.0`: Wi-Fi connectivity poll interval.
+  - `WIFI_WATCHDOG_INTERVAL = 1.0`: Wi-Fi connectivity poll interval.
 - **Regexes & URLs**:
   - `GLUVOK_BASE_URL = "https://gluvok.vercel.app"`: Production cloud backend endpoint.
   - `INDIAN_PLATE_REGEX`: Standard state and Bharat Series vehicle plate pattern.
@@ -281,8 +281,8 @@ Linux NetworkManager (`nmcli`) watchdog and automatic emergency AP recovery.
   - **`start_emergency_hotspot(ssid, password) -> bool`**: Self-healing: if `hermes-hotspot` profile was deleted or inactive, automatically recreates, configures, and brings up the AP on the fly. Allows technicians to connect on-site and configure Wi-Fi via `http://10.42.0.1:8080`.
   - **`stop_emergency_hotspot() -> bool`**: Tears down emergency AP connection.
   - **`connect_to_wifi(ssid: str, password: str) -> tuple[bool, str]`**: Attempts connection to facility router. If profile exists, modifies credentials and activates existing profile to eliminate `Connection already exists` collisions; if new, connects and saves. If connection fails, immediately re-engages the emergency hotspot so technician connectivity is not lost.
-  - **`_watchdog_loop(interval: float) -> None`**: Background thread monitoring connection state every 30 seconds; self-heals by auto-recreating `hermes-hotspot` if Wi-Fi is disconnected and hotspot was deleted.
-  - **`start_wifi_watchdog(interval=30.0) -> None`**: Starts watchdog thread.
+  - **`_watchdog_loop(interval: float) -> None`**: Background thread monitoring connection state every 1.0 second; self-heals by auto-recreating `hermes-hotspot` if Wi-Fi is disconnected and hotspot was deleted.
+  - **`start_wifi_watchdog(interval=1.0) -> None`**: Starts watchdog thread.
   - **`stop_wifi_watchdog() -> None`**: Stops watchdog thread.
 
 ### `src/devices/led/`

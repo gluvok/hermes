@@ -75,7 +75,7 @@ def setup():
     start_web_server(port=8080)
 
     # Start automatic Wi-Fi watchdog & emergency hotspot monitor
-    start_wifi_watchdog(interval=30.0)
+    start_wifi_watchdog(interval=1.0)
 
     # Initialize SQLite database for Wi-Fi credentials and system settings
     init_db()

@@ -42,7 +42,7 @@ def get_wifi_interface() -> str:
     return "wlan0"
 
 
-def is_network_connected(host: str = "1.1.1.1", port: int = 53, timeout: float = 2.0) -> bool:
+def is_network_connected(host: str = "1.1.1.1", port: int = 53, timeout: float = 1.0) -> bool:
     """Robust internet connectivity check via socket connection."""
     if not is_balena_available() and not Path("/sys/class/net").exists():
         return bool(_SIMULATION_STATE["is_connected"])
