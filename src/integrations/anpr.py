@@ -90,10 +90,13 @@ def _parse_anpr_response(
     """Parses HTTP response body from ANPR microservice."""
     raw_body = response.text.strip()
     latency_str = f" in {elapsed_ms:.1f}ms" if elapsed_ms > 0 else ""
-    logger.info(f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}")
     if response.status_code in (200, 201):
         try:
             data = response.json()
+            formatted_json = json.dumps(data, indent=2)
+            logger.info(
+                f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}:\n{formatted_json}"
+            )
             if isinstance(data, dict):
                 return _extract_plate_from_dict(data)
             elif isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
@@ -101,11 +104,18 @@ def _parse_anpr_response(
             elif isinstance(data, str) and data.strip():
                 return data.strip().upper(), "SUCCESS"
         except (ValueError, KeyError, json.JSONDecodeError, TypeError) as parse_err:
+            logger.info(
+                f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}"
+            )
             text = raw_body.upper()
             if text and text != "N/A":
                 logger.info(f"[ANPR] Server returned text response: '{text}'")
                 return text, "SUCCESS"
             logger.warning(f"[ANPR] Failed to parse server response: {parse_err}")
+    else:
+        logger.info(
+            f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}"
+        )
 
     error_code = f"ANPR_HTTP_{response.status_code}"
     logger.warning(f"[ANPR] Server POST status {response.status_code}: {raw_body[:120]}")

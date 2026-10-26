@@ -2,6 +2,10 @@ from src.core.db import (
     get_default_db_path,
     init_db,
 )
+from src.core.logger import (
+    ColoredFormatter,
+    setup_colored_logging,
+)
 from src.core.session import (
     SessionPhase,
     WeighbridgeSessionManager,
@@ -27,6 +31,7 @@ from src.core.telemetry import (
 )
 
 __all__ = [
+    "ColoredFormatter",
     "ScaleStabilityMachine",
     "ScaleState",
     "SessionPhase",
@@ -46,4 +51,5 @@ __all__ = [
     "reset_telemetry",
     "scale_state_machine",
     "session_manager",
+    "setup_colored_logging",
 ]
