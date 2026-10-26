@@ -10,6 +10,7 @@ from src.devices.wifi import (
     get_existing_profile,
     get_target_arch,
     get_wifi_interface,
+    has_hotspot_connected,
     is_balena_available,
     is_hotspot_active,
     is_network_connected,
@@ -133,6 +134,31 @@ class TestWiFiManager(unittest.TestCase):
         from src.devices.wifi.constants import BALENA_BINARY_NAMES
         found = any("scripts/bin/wifi-connect" in name for name in BALENA_BINARY_NAMES)
         self.assertTrue(found)
+
+    def test_balena_has_connected_detection(self) -> None:
+        with patch.object(balena_manager, "has_connected", return_value=True):
+            self.assertTrue(has_hotspot_connected())
+        with patch.object(balena_manager, "has_connected", return_value=False):
+            self.assertFalse(has_hotspot_connected())
+
+    def test_balena_process_manager_poll_code_zero(self) -> None:
+        proc_mock = MagicMock()
+        proc_mock.poll.return_value = 0
+        with patch("src.devices.wifi.process.is_balena_available", return_value=True):
+            balena_manager._process = proc_mock
+            self.assertTrue(balena_manager.has_connected())
+            self.assertFalse(balena_manager.is_running())
+            balena_manager._process = None
+
+    @patch("src.devices.wifi.watchdog.hs.is_hotspot_active", return_value=True)
+    @patch("src.devices.wifi.watchdog.cty.is_network_connected")
+    def test_watchdog_does_not_probe_network_when_hotspot_active(
+        self, mock_net: MagicMock, mock_hotspot: MagicMock
+    ) -> None:
+        from src.devices.wifi.watchdog import _loop, _stop_event
+        _stop_event.set()
+        _loop(interval=0.1)
+        mock_net.assert_not_called()
 
 
 if __name__ == "__main__":

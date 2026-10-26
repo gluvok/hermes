@@ -18,6 +18,7 @@ from src.devices.wifi.constants import (
 )
 from src.devices.wifi.discovery import get_available_networks, get_existing_profile
 from src.devices.wifi.hotspot import (
+    has_hotspot_connected,
     is_hotspot_active,
     start_emergency_hotspot,
     stop_emergency_hotspot,
@@ -36,6 +37,7 @@ __all__ = [
     "get_existing_profile",
     "get_target_arch",
     "get_wifi_interface",
+    "has_hotspot_connected",
     "install_wifi_connect",
     "is_balena_available",
     "is_connecting",

@@ -50,3 +50,8 @@ def stop_emergency_hotspot(timeout: float = 5.0) -> bool:
 def is_hotspot_active() -> bool:
     """Check if balena wifi-connect AP is currently active."""
     return balena_manager.is_running()
+
+
+def has_hotspot_connected() -> bool:
+    """Check if balena wifi-connect exited cleanly with code 0."""
+    return balena_manager.has_connected()
