@@ -34,14 +34,14 @@ def _loop(interval: float) -> None:
     failures = 0
     while not _stop_event.is_set():
         if hs.is_hotspot_active():
-            _stop_event.wait(2.0)
+            pass
         elif hs.has_hotspot_connected():
             logger.info("[Watchdog] Balena Wi-Fi setup succeeded! Restoring network.")
             hs.stop_emergency_hotspot()
             failures = _handle_status(cty.is_network_connected(), 0)
         elif not conn.is_connecting():
             failures = _handle_status(cty.is_network_connected(), failures)
-            _stop_event.wait(interval)
+        _stop_event.wait(interval)
 
 
 def start_wifi_watchdog(interval: float = c.DEFAULT_WIFI_WATCHDOG_INTERVAL) -> None:

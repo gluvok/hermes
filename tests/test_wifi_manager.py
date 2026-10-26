@@ -150,14 +150,20 @@ class TestWiFiManager(unittest.TestCase):
             self.assertFalse(balena_manager.is_running())
             balena_manager._process = None
 
-    @patch("src.devices.wifi.watchdog.hs.is_hotspot_active", return_value=True)
+    @patch("src.devices.wifi.watchdog.hs.is_hotspot_active")
     @patch("src.devices.wifi.watchdog.cty.is_network_connected")
     def test_watchdog_does_not_probe_network_when_hotspot_active(
         self, mock_net: MagicMock, mock_hotspot: MagicMock
     ) -> None:
         from src.devices.wifi.watchdog import _loop, _stop_event
-        _stop_event.set()
-        _loop(interval=0.1)
+
+        def stop_after_active() -> bool:
+            _stop_event.set()
+            return True
+
+        mock_hotspot.side_effect = stop_after_active
+        _stop_event.clear()
+        _loop(interval=0.01)
         mock_net.assert_not_called()
 
 
