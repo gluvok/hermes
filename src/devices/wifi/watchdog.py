@@ -39,10 +39,12 @@ def _loop(interval: float) -> None:
             hs.stop_emergency_hotspot()
             failures = _handle_status(cty.is_network_connected(), 0)
         elif not conn.is_connecting():
-            if (code := hs.get_hotspot_exit_code()) is not None and code != 0:
-                logger.warning(f"[Watchdog] Balena hotspot exited with code {code} (timeout/error).")
+            code, err = hs.get_hotspot_exit_details()
+            if code is not None and code != 0:
+                logger.error(f"[Watchdog] Balena hotspot exited with code {code}: {err or 'unhandled error'}")
                 hs.stop_emergency_hotspot()
-            failures = _handle_status(cty.is_network_connected(), failures)
+                failures = -15
+            failures = _handle_status(cty.is_network_connected(), failures) if failures >= 0 else failures + 1
         _stop_event.wait(interval)
 
 

@@ -166,12 +166,12 @@ class TestWiFiManager(unittest.TestCase):
         _loop(interval=0.01)
         mock_net.assert_not_called()
 
-    @patch("src.devices.wifi.watchdog.hs.get_hotspot_exit_code", return_value=1)
+    @patch("src.devices.wifi.watchdog.hs.get_hotspot_exit_details", return_value=(17, "Address in use"))
     @patch("src.devices.wifi.watchdog.hs.stop_emergency_hotspot")
     @patch("src.devices.wifi.watchdog.hs.is_hotspot_active", return_value=False)
     @patch("src.devices.wifi.watchdog.hs.has_hotspot_connected", return_value=False)
     def test_watchdog_cleans_up_on_error_exit_code(
-        self, mock_connected: MagicMock, mock_active: MagicMock, mock_stop: MagicMock, mock_code: MagicMock
+        self, mock_connected: MagicMock, mock_active: MagicMock, mock_stop: MagicMock, mock_details: MagicMock
     ) -> None:
         from src.devices.wifi.watchdog import _loop, _stop_event
 

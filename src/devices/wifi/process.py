@@ -31,9 +31,12 @@ class BalenaProcessManager:
             avail = is_balena_available()
             return self._process is not None and self._process.poll() == 0 if avail else bool(_SIMULATION_STATE.get("has_connected", False))
 
-    def exit_code(self) -> int | None:
+    def exit_details(self) -> tuple[int | None, str]:
         with self._lock:
-            return self._process.poll() if self._process is not None else None
+            if not self._process: return None, ""
+            code = self._process.poll()
+            out = self._process.stdout.read().strip() if (code and self._process.stdout) else ""
+            return code, out
 
     def start_portal(
         self, ssid: str = c.DEFAULT_HOTSPOT_SSID, password: str = c.DEFAULT_HOTSPOT_PASS, portal_port: int = c.DEFAULT_PORTAL_PORT,

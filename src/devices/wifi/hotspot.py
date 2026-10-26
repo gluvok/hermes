@@ -57,5 +57,5 @@ def has_hotspot_connected() -> bool:
     return balena_manager.has_connected()
 
 
-def get_hotspot_exit_code() -> int | None:
-    return balena_manager.exit_code()
+def get_hotspot_exit_details() -> tuple[int | None, str]:
+    return balena_manager.exit_details()
