@@ -37,7 +37,6 @@ class RGBLedController:
     def _apply_color(self, color: LEDColor) -> None:
         self._current_color = color
         self.driver.set_rgb(*color.value)
-        logger.info(f"[LED] State changed to {color.name}")
 
     def startup_test(self, delay: float = 1.0) -> None:
         """Cycles Green -> Red -> Blue (delay seconds each), then resets to idle."""
