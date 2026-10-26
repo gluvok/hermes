@@ -58,12 +58,22 @@ if [ -n "$TARGET" ]; then
         chmod +x "$DEV_BIN_DIR/wifi-connect"
         echo "Installed wifi-connect to $DEV_BIN_DIR/wifi-connect"
 
-        # Optionally symlink to /usr/local/sbin if root
+        # Configure symlink and passwordless sudoers entry
         if [ "$(id -u)" -eq 0 ]; then
             ln -sf "$BIN_DIR/wifi-connect" /usr/local/sbin/wifi-connect
             echo "Symlinked to /usr/local/sbin/wifi-connect"
+            TARGET_USER="${SUDO_USER:-$(whoami)}"
+            echo "$TARGET_USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/hermes
+            chmod 0440 /etc/sudoers.d/hermes
+            echo "Configured passwordless sudo for $TARGET_USER in /etc/sudoers.d/hermes"
         else
-            echo "Note: Non-root install. Ensure passwordless sudo (sudo -n) is enabled for $(whoami)."
+            if sudo -v 2>/dev/null; then
+                echo "$(whoami) ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/hermes >/dev/null
+                sudo chmod 0440 /etc/sudoers.d/hermes
+                echo "Configured passwordless sudo for $(whoami) in /etc/sudoers.d/hermes"
+            else
+                echo "Note: Run 'echo \"\$USER ALL=(ALL) NOPASSWD: ALL\" | sudo tee /etc/sudoers.d/hermes' to enable passwordless captive portal."
+            fi
         fi
     else
         echo "Failed to extract wifi-connect binary."

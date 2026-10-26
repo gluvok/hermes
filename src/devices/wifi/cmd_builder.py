@@ -42,7 +42,10 @@ def spawn_portal_process(cmd: list[str]) -> subprocess.Popen[str] | None:
         time.sleep(0.5)
         if proc.poll() is not None:
             out = proc.stdout.read().strip() if proc.stdout else ""
-            logger.error(f"[WiFi] wifi-connect exited immediately (code {proc.returncode}): {out}")
+            if "password is required" in out:
+                logger.error('[WiFi] Sudo password required! Run once: echo "$USER ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/hermes')
+            else:
+                logger.error(f"[WiFi] wifi-connect exited immediately (code {proc.returncode}): {out}")
             return None
         return proc
     except (subprocess.SubprocessError, OSError) as e:
