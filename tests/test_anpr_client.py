@@ -82,6 +82,19 @@ class TestANPRClient(unittest.TestCase):
         self.assertEqual(status, "SUCCESS")
 
     @patch("src.integrations.anpr.requests.post")
+    def test_argus_response_is_logged(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = '{"results": [{"plate": "KA01AB9999"}]}'
+        mock_response.json.return_value = {"results": [{"plate": "KA01AB9999"}]}
+        mock_post.return_value = mock_response
+
+        with self.assertLogs("src.integrations.anpr", level="INFO") as cm:
+            plate, _ = send_frame_to_anpr_server(b"fake-bytes")
+            self.assertEqual(plate, "KA01AB9999")
+            self.assertTrue(any("[ANPR] [Argus Response] Status 200:" in msg for msg in cm.output))
+
+    @patch("src.integrations.anpr.requests.post")
     def test_send_frame_timeout(self, mock_post):
         mock_post.side_effect = requests.exceptions.Timeout("Read timeout")
         plate, status = send_frame_to_anpr_server(b"fake-bytes")
