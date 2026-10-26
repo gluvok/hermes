@@ -28,7 +28,7 @@ def is_connecting() -> bool:
 def connect_to_wifi(
     ssid: str, password: str, timeout: float = DEFAULT_WIFI_CONNECT_TIMEOUT
 ) -> tuple[bool, str]:
-    """Connect to a Wi-Fi access point via balena with automatic fallback."""
+    """Connect to Wi-Fi via balena, verifying internet connectivity before resuming."""
     if not ssid or not ssid.strip():
         return False, "SSID cannot be empty."
     ssid = ssid.strip()
@@ -40,20 +40,21 @@ def connect_to_wifi(
                 start_emergency_hotspot()
             led_controller.set_network_status(False)
             return False, msg
-        deadline = time.time() + 10.0
+        deadline = time.time() + 15.0
         while time.time() < deadline:
             if is_network_connected():
+                from src.core import scale_state_machine
                 save_wifi_network(ssid, password)
                 stop_emergency_hotspot()
                 led_controller.set_network_status(True)
+                scale_state_machine.set_network_status(True)
                 return True, f"Successfully connected to Wi-Fi: '{ssid}'."
             time.sleep(0.5)
+        from src.core import scale_state_machine
         if not is_hotspot_active():
-            save_wifi_network(ssid, password)
-            led_controller.set_network_status(True)
-            return True, f"Credentials accepted for '{ssid}'."
-        start_emergency_hotspot()
+            start_emergency_hotspot()
         led_controller.set_network_status(False)
+        scale_state_machine.set_network_status(False)
         return False, f"Connection to '{ssid}' timed out. Hotspot portal restored."
     finally:
         _connection_in_progress.clear()

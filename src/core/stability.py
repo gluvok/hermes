@@ -35,6 +35,26 @@ class ScaleStabilityMachine:
         self._candidate_start_time = 0.0
         self._mid_stability_triggered = False
         self._last_printed_weight = -9999.0
+        self._is_online = True
+
+    @property
+    def is_online(self) -> bool:
+        return self._is_online
+
+    def set_network_status(self, is_online: bool) -> None:
+        """Immediately blocks and cancels active weighment session when offline."""
+        self._is_online = is_online
+        if not is_online:
+            self.abort_offline_session()
+
+    def abort_offline_session(self) -> None:
+        """Aborts active weighment session and resets session manager."""
+        if self.state != ScaleState.SCALE_IDLE:
+            logger.warning("[Scale] Wi-Fi lost. Immediately aborting active weighment session.")
+            self._reset_candidate_state()
+            session_manager.reset_session()
+            from src.devices import led_controller
+            led_controller.set_idle()
 
     def _reset_candidate_state(self):
         self.state = ScaleState.SCALE_IDLE
@@ -99,6 +119,9 @@ class ScaleStabilityMachine:
             self._mid_stability_triggered = False
 
     def process_new_weight(self, parsed_weight: float):
+        if not self._is_online:
+            return
+
         now = time.time()
         self.last_weight = parsed_weight
         self._log_weight_change(parsed_weight)
@@ -134,10 +157,9 @@ class ScaleStabilityMachine:
 
         session_id = str(session_package.get("session_id", "UNKNOWN"))
 
-        if not is_wifi_connected():
+        if not self._is_online or not is_wifi_connected():
             logger.warning(
-                f"[Weighment] Wi-Fi disconnected. Weighment {session_id} "
-                "discarded (offline storage disabled)."
+                f"[Weighment] Wi-Fi offline. Weighment {session_id} discarded."
             )
             from src.core.telemetry import record_system_event
             record_system_event(

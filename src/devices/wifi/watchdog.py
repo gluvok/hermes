@@ -21,7 +21,10 @@ _lock = threading.RLock()
 
 
 def _handle_status(online: bool, consecutive_failures: int, threshold: int = 2) -> int:
+    from src.core import scale_state_machine
+
     led_controller.set_network_status(online)
+    scale_state_machine.set_network_status(online)
     if online:
         if is_hotspot_active():
             logger.info("[Watchdog] Wi-Fi restored. Stopping balena captive portal.")

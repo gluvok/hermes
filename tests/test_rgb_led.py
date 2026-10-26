@@ -7,7 +7,6 @@ import unittest
 from unittest.mock import MagicMock, call, patch
 
 from src.core.stability import ScaleStabilityMachine
-from src.devices.led.blinker import LEDAlternator
 from src.devices.led.colors import LEDColor
 from src.devices.led.controller import RGBLedController
 from src.devices.led.driver import LEDHardwareDriver
@@ -58,6 +57,12 @@ class TestRGBLedController(unittest.TestCase):
         self.assertEqual(self.controller.current_color, LEDColor.RED)
         self.mock_driver.set_rgb.assert_called_with(1, 0, 0)
 
+    def test_active_blocked_when_offline_stays_yellow(self):
+        self.controller.set_network_status(False)
+        self.controller.set_active()
+        self.assertEqual(self.controller.current_color, LEDColor.YELLOW)
+        self.mock_driver.set_rgb.assert_called_with(1, 1, 0)
+
     def test_cloud_success_reverts_to_green_when_idle(self):
         self.controller.set_idle()
         self.controller.trigger_cloud_success(duration=0.05)
@@ -90,13 +95,10 @@ class TestRGBLedController(unittest.TestCase):
         self.controller.trigger_cloud_success(duration=0.08)
         self.assertEqual(self.controller.current_color, LEDColor.BLUE)
 
-        # Vehicle leaves scale while Blue is still active
         self.controller.set_idle()
-        # Should remain blue until timer expires
         self.assertEqual(self.controller.current_color, LEDColor.BLUE)
 
         time.sleep(0.12)
-        # Should now resolve to Green
         self.assertEqual(self.controller.current_color, LEDColor.GREEN)
 
     def test_set_network_status_offline_sets_yellow(self):
@@ -114,43 +116,18 @@ class TestRGBLedController(unittest.TestCase):
         self.assertEqual(self.controller.current_color, LEDColor.GREEN)
         self.mock_driver.set_rgb.assert_called_with(0, 1, 0)
 
-    def test_active_session_alternates_red_yellow_when_offline(self):
-        self.controller.set_network_status(False)
+    def test_network_drop_during_active_weighment_turns_yellow_immediately(self):
+        self.controller.set_network_status(True)
         self.controller.set_active()
-        self.assertTrue(self.controller.alternator.is_running)
         self.assertEqual(self.controller.current_color, LEDColor.RED)
 
-        self.controller.set_idle()
-        self.assertFalse(self.controller.alternator.is_running)
+        self.controller.set_network_status(False)
         self.assertEqual(self.controller.current_color, LEDColor.YELLOW)
         self.mock_driver.set_rgb.assert_called_with(1, 1, 0)
 
-    def test_network_drop_during_active_weighment_starts_alternator(self):
-        self.controller.set_network_status(True)
-        self.controller.set_active()
-        self.assertFalse(self.controller.alternator.is_running)
-        self.assertEqual(self.controller.current_color, LEDColor.RED)
-
-        self.controller.set_network_status(False)
-        self.assertTrue(self.controller.alternator.is_running)
-
-    def test_network_restored_during_active_weighment_restores_solid_red(self):
-        self.controller.set_network_status(False)
-        self.controller.set_active()
-        self.assertTrue(self.controller.alternator.is_running)
-
-        self.controller.set_network_status(True)
-        self.assertFalse(self.controller.alternator.is_running)
-        self.assertEqual(self.controller.current_color, LEDColor.RED)
-        self.mock_driver.set_rgb.assert_called_with(1, 0, 0)
-
     def test_cloud_success_reverts_to_yellow_when_offline(self):
         self.controller.set_network_status(False)
-        self.controller.set_active()
-        self.assertTrue(self.controller.alternator.is_running)
-
         self.controller.trigger_cloud_success(duration=0.05)
-        self.assertFalse(self.controller.alternator.is_running)
         self.assertEqual(self.controller.current_color, LEDColor.BLUE)
 
         time.sleep(0.1)
@@ -165,6 +142,7 @@ class TestStabilityLedIntegration(unittest.TestCase):
     @patch("src.devices.led_controller.set_active")
     @patch("src.devices.led_controller.set_idle")
     def test_stability_triggers_active_and_idle_led(self, mock_idle, mock_active):
+        self.machine.set_network_status(True)
         # Truck arrives: weight exceeds threshold
         self.machine.process_new_weight(500.0)
         mock_active.assert_called()
@@ -175,24 +153,6 @@ class TestStabilityLedIntegration(unittest.TestCase):
         # Truck leaves: weight returns to 0.0
         self.machine.process_new_weight(0.0)
         mock_idle.assert_called()
-
-
-class TestLEDAlternator(unittest.TestCase):
-    def test_alternator_toggles_colors(self):
-        alternator = LEDAlternator()
-        collected: list[LEDColor] = []
-
-        def callback(color: LEDColor) -> None:
-            collected.append(color)
-
-        alternator.start(LEDColor.RED, LEDColor.YELLOW, callback, interval=0.04)
-        self.assertTrue(alternator.is_running)
-        time.sleep(0.15)
-        alternator.stop()
-        self.assertFalse(alternator.is_running)
-        self.assertGreaterEqual(len(collected), 2)
-        self.assertIn(LEDColor.RED, collected)
-        self.assertIn(LEDColor.YELLOW, collected)
 
 
 if __name__ == "__main__":

@@ -87,3 +87,15 @@ class TestOnlineTransmission(unittest.TestCase):
                     conn.execute("SELECT * FROM weighment_spool;")
                 with self.assertRaises(sqlite3.OperationalError):
                     conn.execute("SELECT * FROM spool_images;")
+
+    def test_weighment_blocked_when_offline(self):
+        self.machine.set_network_status(False)
+        self.machine.process_new_weight(500.0)
+        self.assertEqual(self.machine.state.name, "SCALE_IDLE")
+
+    def test_network_drop_during_weighment_aborts_active_session(self):
+        self.machine.set_network_status(True)
+        self.machine.process_new_weight(500.0)
+        self.assertEqual(self.machine.state.name, "SCALE_STABILIZING")
+        self.machine.set_network_status(False)
+        self.assertEqual(self.machine.state.name, "SCALE_IDLE")

@@ -291,15 +291,13 @@ RGB LED hardware driver and operational state indicator on Raspberry Pi GPIO.
 - **Pins & Polarity**: GPIO 17 (Red), GPIO 27 (Green), GPIO 22 (Blue), Common Anode (`active_high=False`).
 - **States & Visual Indicators**:
   - 🟢 **Green (Idle / Online)**: Scale idle at 0.0 kg and connected to Wi-Fi/Internet; ready for next vehicle. Also turns Green after cloud upload success when online.
-  - 🟡 **Yellow / Amber (Idle / Offline / Hotspot Active)**: Scale idle at 0.0 kg but disconnected from Wi-Fi/Internet or emergency hotspot is active.
-  - 🔴 **Solid Red (Active Session / Online)**: First weight encountered above threshold while online; indicates weighment / capture is in progress.
-  - 🔴/🟡 **Alternating Red & Yellow (Active Session / Offline)**: Weight encountered while network is offline, or network dropped during weighing; toggles every 1.0s to alert operator that active weighment cannot sync to cloud.
+  - 🟡 **Yellow / Amber (Offline / Portal Active)**: Disconnected from Wi-Fi / Balena captive portal active; weighment operations are immediately blocked.
+  - 🔴 **Solid Red (Active Session / Online)**: Vehicle detected and actively being weighed on scale (online only).
   - 🔵 **Blue (Cloud Transfer Success)**: Triggered for 10 seconds upon verified weighment transmission to Gluvok Cloud, then transitions back to Green (online) or Yellow (offline).
 - **Classes & Modules**:
   - **`colors.py`**: `LEDColor` enum (`OFF`, `GREEN`, `RED`, `BLUE`, `YELLOW`).
-  - **`blinker.py` (`LEDAlternator`)**: Background daemon thread alternating between two LED colors at a configured interval.
   - **`driver.py` (`LEDHardwareDriver`)**: Controls GPIO pins using `python-periphery` (pure-Python Linux `/dev/gpiochip*` / sysfs) with automatic mock fallback on non-Pi platforms.
-  - **`controller.py` (`RGBLedController`)**: High-level state manager coordinating Green (idle/online), Yellow (idle/offline), Solid Red (active/online), Alternating Red/Yellow (active/offline), and 10s Blue (cloud success) transitions.
+  - **`controller.py` (`RGBLedController`)**: High-level state manager coordinating Green (idle/online), Yellow (offline/blocked), Solid Red (active/online), and 10s Blue (cloud success) transitions.
 - **Global**: `led_controller = RGBLedController()` (Singleton exported via `src.devices`).
 
 ---
