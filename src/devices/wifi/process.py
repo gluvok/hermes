@@ -35,8 +35,7 @@ class BalenaProcessManager:
         with self._lock:
             if not self._process: return None, ""
             code = self._process.poll()
-            out = self._process.stdout.read().strip() if (code and self._process.stdout) else ""
-            return code, out
+            return code, (self._process.stdout.read().strip() if (code and self._process.stdout) else "")
 
     def start_portal(
         self, ssid: str = c.DEFAULT_HOTSPOT_SSID, password: str = c.DEFAULT_HOTSPOT_PASS, portal_port: int = c.DEFAULT_PORTAL_PORT,
@@ -57,7 +56,8 @@ class BalenaProcessManager:
     def stop_portal(self, timeout: float = 5.0) -> bool:
         with self._lock:
             _SIMULATION_STATE["portal_running"] = _SIMULATION_STATE["has_connected"] = False
-            if self._process and self._process.poll() is None: cb.terminate_process(self._process, timeout)
+            if self._process: cb.terminate_process(self._process, timeout)
+            else: cb.clean_stale_portal_services()
             self._process = None
             return True
 

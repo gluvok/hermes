@@ -184,6 +184,21 @@ class TestWiFiManager(unittest.TestCase):
         _loop(interval=0.01)
         mock_stop.assert_called_once()
 
+    @patch("subprocess.run")
+    def test_clean_stale_portal_services(self, mock_run: MagicMock) -> None:
+        from src.devices.wifi.cmd_builder import clean_stale_portal_services
+        clean_stale_portal_services()
+        self.assertGreaterEqual(mock_run.call_count, 2)
+
+    @patch("os.killpg")
+    @patch("os.getpgid", return_value=1234)
+    def test_terminate_process_group(self, mock_getpgid: MagicMock, mock_killpg: MagicMock) -> None:
+        from src.devices.wifi.cmd_builder import terminate_process
+        proc_mock = MagicMock()
+        proc_mock.pid = 1234
+        terminate_process(proc_mock)
+        mock_killpg.assert_called()
+
 
 if __name__ == "__main__":
     unittest.main()

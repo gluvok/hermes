@@ -84,6 +84,11 @@ class TestSessionErrorFallback(unittest.TestCase):
         )
 
         self.sm.start_session()
+        self.sm._stop_anpr_event.set()
+        if self.sm._anpr_thread and self.sm._anpr_thread.is_alive():
+            self.sm._anpr_thread.join(timeout=0.5)
+        self.sm._anpr_plates.clear()
+        self.sm._anpr_statuses.clear()
         self.sm._capture_and_record_anpr_sample()
 
         self.assertEqual(len(self.sm._anpr_plates), 1)
