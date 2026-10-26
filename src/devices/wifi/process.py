@@ -31,14 +31,17 @@ class BalenaProcessManager:
             avail = is_balena_available()
             return self._process is not None and self._process.poll() == 0 if avail else bool(_SIMULATION_STATE.get("has_connected", False))
 
+    def exit_code(self) -> int | None:
+        with self._lock:
+            return self._process.poll() if self._process is not None else None
+
     def start_portal(
         self, ssid: str = c.DEFAULT_HOTSPOT_SSID, password: str = c.DEFAULT_HOTSPOT_PASS, portal_port: int = c.DEFAULT_PORTAL_PORT,
         gateway: str = c.DEFAULT_PORTAL_GATEWAY, dhcp_range: str = c.DEFAULT_PORTAL_DHCP_RANGE, interface: str | None = None,
         ui_dir: Path | None = None, activity_timeout: int = c.DEFAULT_ACTIVITY_TIMEOUT,
     ) -> bool:
         with self._lock:
-            if self.is_running():
-                return True
+            if self.is_running(): return True
             _SIMULATION_STATE["has_connected"] = False
             self.portal_port, self.gateway = portal_port, gateway
             if not (cmd := cb.build_portal_cmd(ssid, password, portal_port, gateway, dhcp_range, interface, ui_dir, activity_timeout)):
@@ -51,8 +54,7 @@ class BalenaProcessManager:
     def stop_portal(self, timeout: float = 5.0) -> bool:
         with self._lock:
             _SIMULATION_STATE["portal_running"] = _SIMULATION_STATE["has_connected"] = False
-            if self._process and self._process.poll() is None:
-                cb.terminate_process(self._process, timeout)
+            if self._process and self._process.poll() is None: cb.terminate_process(self._process, timeout)
             self._process = None
             return True
 

@@ -55,3 +55,7 @@ def is_hotspot_active() -> bool:
 def has_hotspot_connected() -> bool:
     """Check if balena wifi-connect exited cleanly with code 0."""
     return balena_manager.has_connected()
+
+
+def get_hotspot_exit_code() -> int | None:
+    return balena_manager.exit_code()
