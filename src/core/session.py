@@ -191,6 +191,11 @@ class WeighbridgeSessionManager:
         if not batch_to_dispatch or not active_sid:
             return []
 
+        logger.info(
+            f"[ANPR] [Session {active_sid}] Dispatching {len(batch_to_dispatch)} "
+            f"camera frame(s) to Argus..."
+        )
+
         if pool is None:
             for cam_idx, img_bytes in batch_to_dispatch:
                 plate, status_code = send_frame_to_anpr_server(img_bytes)

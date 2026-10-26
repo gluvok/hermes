@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections import Counter
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -83,10 +84,13 @@ def _extract_plate_from_dict(data: dict) -> tuple[str | None, str]:
     return None, "NO_PLATE_DETECTED"
 
 
-def _parse_anpr_response(response: requests.Response) -> tuple[str | None, str]:
+def _parse_anpr_response(
+    response: requests.Response, elapsed_ms: float = 0.0
+) -> tuple[str | None, str]:
     """Parses HTTP response body from ANPR microservice."""
     raw_body = response.text.strip()
-    logger.info(f"[ANPR] [Argus Response] Status {response.status_code}: {raw_body}")
+    latency_str = f" in {elapsed_ms:.1f}ms" if elapsed_ms > 0 else ""
+    logger.info(f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}")
     if response.status_code in (200, 201):
         try:
             data = response.json()
@@ -117,22 +121,24 @@ def send_frame_to_anpr_server(
     timeout: float = ANPR_SERVER_TIMEOUT,
     session: requests.Session | None = None,
 ) -> tuple[str | None, str]:
-    """
-    Sends raw JPEG image bytes to the Argus ANPR FastAPI microservice (/recognize).
-    Returns a tuple of (plate_string | None, status_code).
-    """
+    """Sends raw JPEG image bytes to the Argus ANPR FastAPI microservice (/recognize)."""
     if not image_bytes:
+        logger.warning("[ANPR] Cannot send image to Argus: frame bytes empty/None.")
         return None, "EMPTY_IMAGE"
 
     target_url = resolve_anpr_endpoint(server_url)
-
+    logger.info(
+        f"[ANPR] POST image ({len(image_bytes)} bytes) -> {target_url}"
+    )
+    start_time = time.time()
     try:
         files = {"file": ("frame.jpg", image_bytes, "image/jpeg")}
         if session is not None:
             response = session.post(target_url, files=files, timeout=timeout)
         else:
             response = requests.post(target_url, files=files, timeout=timeout)
-        return _parse_anpr_response(response)
+        elapsed_ms = (time.time() - start_time) * 1000.0
+        return _parse_anpr_response(response, elapsed_ms=elapsed_ms)
     except requests.exceptions.Timeout:
         logger.warning(f"[ANPR] Timeout ({timeout}s) contacting ANPR server at {target_url}")
         return None, "ANPR_TIMEOUT"
@@ -155,6 +161,11 @@ def send_and_record_anpr_frame(
 ) -> tuple[str | None, str]:
     """Execute ANPR request for a single camera frame and invoke record callback."""
     sender_fn = sender or send_frame_to_anpr_server
+    logger.info(
+        f"[ANPR] Camera {cam_idx}: Dispatching image ({len(image_bytes)} bytes) "
+        f"for session {session_id} to Argus..."
+    )
+    t0 = time.time()
     try:
         if session is not None or server_url is not None:
             try:
@@ -168,6 +179,18 @@ def send_and_record_anpr_frame(
     except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
         logger.error(f"[ANPR] Worker error for session {session_id} cam {cam_idx}: {exc}")
         plate, status_code = None, "ANPR_WORKER_ERROR"
+
+    elapsed_ms = (time.time() - t0) * 1000.0
+    if plate:
+        logger.info(
+            f"[ANPR] Camera {cam_idx} (Session {session_id}): Plate detected: '{plate}' "
+            f"(Status={status_code}, Elapsed={elapsed_ms:.1f}ms)"
+        )
+    else:
+        logger.info(
+            f"[ANPR] Camera {cam_idx} (Session {session_id}): No plate detected "
+            f"(Status={status_code}, Elapsed={elapsed_ms:.1f}ms)"
+        )
 
     if callback is not None:
         try:

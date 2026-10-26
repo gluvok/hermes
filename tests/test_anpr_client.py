@@ -92,7 +92,7 @@ class TestANPRClient(unittest.TestCase):
         with self.assertLogs("src.integrations.anpr", level="INFO") as cm:
             plate, _ = send_frame_to_anpr_server(b"fake-bytes")
             self.assertEqual(plate, "KA01AB9999")
-            self.assertTrue(any("[ANPR] [Argus Response] Status 200:" in msg for msg in cm.output))
+            self.assertTrue(any("[ANPR] [Argus Response] Status 200" in msg for msg in cm.output))
 
     @patch("src.integrations.anpr.requests.post")
     def test_send_frame_timeout(self, mock_post):
