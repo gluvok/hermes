@@ -258,7 +258,7 @@ Because Python 3.14 on a multi-core Pi 5 supports free-threaded CPython (PEP 703
 | :--- | :--- | :--- | :--- |
 | **`ScaleUART`** | Dedicated Daemon Thread | Continuous (50ms read, 300ms flush) | Reads `/dev/ttyAMA0` serial bytes; never blocks on network or camera I/O. |
 | **`FallbackWebServer`** | Werkzeug WSGI Daemon Thread | Persistent on port `:8080` | Serves web UI and REST API asynchronously without delaying scale operations. |
-| **`WiFiWatchdog`** | Dedicated Daemon Thread | Every 10.0s (1.0s during hotspot, with process group cleanup and 15s crash backoff) | Runs network checks, prevents hotspot collision, cleans orphaned dnsmasq ports, detects balena `wifi-connect` exit code 0, and unblocks weighment upon restored connectivity. |
+| **`WiFiWatchdog`** | Dedicated Daemon Thread | Every 1.0s (pauses probing when hotspot AP is active, process group cleanup and backoff) | Runs network checks, prevents hotspot collision, cleans orphaned dnsmasq ports, detects balena `wifi-connect` exit code 0, and unblocks weighment upon restored connectivity. |
 | **`ANPRLoop_<id>`** | Ephemeral Session Thread | Every 1.0s during weighing | Fetches ANPR snapshots and dispatches async recognition tasks to ThreadPoolExecutor. |
 | **`AuxCapture_<id>`** | Ephemeral Session Worker | Triggered upon 10s stability | Fetches overview angles (Cams 2..N) via `ThreadPoolExecutor(4)` without stalling serial reads. |
 | **`CloudUpload_<id>`** | Ephemeral Daemon Thread | On session finalization (when online) | Directly transmits weighment package and camera snapshots to Gluvok API via multipart POST; non-blocking to scale UART. |
