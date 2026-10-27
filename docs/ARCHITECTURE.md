@@ -9,7 +9,7 @@
 ```mermaid
 graph TD
     subgraph Hardware Layer
-        Scale[Indicator Serial Stream /dev/ttyAMA0 @ 1200 Baud]
+        Scale[Indicator Serial Stream /dev/ttyUSB0 @ 1200 Baud]
         CamANPR[ANPR Cameras 1..N: License Plate Snapshots]
         CamAux[Auxiliary Cameras 1..M: Overview Snapshots]
     end
@@ -256,7 +256,7 @@ Because Python 3.14 on a multi-core Pi 5 supports free-threaded CPython (PEP 703
 
 | Thread Name | Type / Lifecycle | Execution Frequency / Trigger | Non-Blocking Guarantee |
 | :--- | :--- | :--- | :--- |
-| **`ScaleUART`** | Dedicated Daemon Thread | Continuous (50ms read, 300ms flush) | Reads `/dev/ttyAMA0` serial bytes; never blocks on network or camera I/O. |
+| **`ScaleUART`** | Dedicated Daemon Thread | Continuous (50ms read, 300ms flush) | Reads `/dev/ttyUSB0` serial bytes; never blocks on network or camera I/O. |
 | **`FallbackWebServer`** | Werkzeug WSGI Daemon Thread | Persistent on port `:8080` | Serves web UI and REST API asynchronously without delaying scale operations. |
 | **`WiFiWatchdog`** | Dedicated Daemon Thread | Every 1.0s (pauses probing when hotspot AP is active, process group cleanup and backoff) | Runs network checks, prevents hotspot collision, cleans orphaned dnsmasq ports, detects balena `wifi-connect` exit code 0, and unblocks weighment upon restored connectivity. |
 | **`ANPRLoop_<id>`** | Ephemeral Session Thread | Every 1.0s during weighing | Fetches ANPR snapshots and dispatches async recognition tasks to ThreadPoolExecutor. |
