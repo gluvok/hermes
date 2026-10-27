@@ -11,7 +11,7 @@ MIN_WEIGHT: float = 70.0
 ANPR_SERVER_URL: str = "http://127.0.0.1:8000/recognize"
 
 # Baseline hardware settings (overridable via Web UI, stored in SQLite)
-SERIAL_PORT: str = "/dev/ttyUSB0"
+SERIAL_PORT: str = "/dev/ttyAMA0"
 SERIAL_BAUDRATE: int = 1200
 STABILITY_DURATION: float = 10.0
 STABILITY_TOLERANCE: float = 2.0

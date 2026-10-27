@@ -287,7 +287,7 @@
             </div>
             <div>
               <div id="ov-weight" class="text-3xl font-extrabold font-mono text-emerald-400">0.000 <span class="text-sm font-normal text-muted-foreground">kg</span></div>
-              <p id="ov-scale-port" class="text-xs font-mono text-muted-foreground mt-1">/dev/ttyUSB0 @ 1200 baud</p>
+              <p id="ov-scale-port" class="text-xs font-mono text-muted-foreground mt-1">/dev/ttyAMA0 @ 1200 baud</p>
             </div>
             <div class="text-xs text-muted-foreground flex items-center justify-between border-t border-border pt-2">
               <span id="ov-stability-label">10s Stability Machine</span>
@@ -390,7 +390,7 @@
               </div>
               <div>
                 <h2 class="text-base font-semibold text-foreground">Weighing Scale Indicator</h2>
-                <p id="scale-subtitle-port" class="text-xs text-muted-foreground">UART stream reader (/dev/ttyUSB0 @ 1200 baud) with 10s stability state machine</p>
+                <p id="scale-subtitle-port" class="text-xs text-muted-foreground">UART stream reader (/dev/ttyAMA0 @ 1200 baud) with 10s stability state machine</p>
               </div>
             </div>
             <span id="scale-state-detail" class="px-2.5 py-1 rounded-full text-xs font-bold bg-secondary text-foreground">STATE: IDLE</span>
@@ -591,7 +591,7 @@
               </div>
               <div class="space-y-1.5">
                 <label class="text-xs font-medium text-foreground">Serial Port Path</label>
-                <input id="cfg-serial-port" type="text" placeholder="/dev/ttyUSB0" class="w-full px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
+                <input id="cfg-serial-port" type="text" placeholder="/dev/ttyAMA0" class="w-full px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
                 <p class="text-xs text-muted-foreground">UART hardware device path</p>
               </div>
               <div class="space-y-1.5">
@@ -998,7 +998,7 @@
         const data = await res.json();
 
         document.getElementById('cfg-min-weight').value = data.min_weight ?? 50.0;
-        document.getElementById('cfg-serial-port').value = data.serial_port ?? '/dev/ttyUSB0';
+        document.getElementById('cfg-serial-port').value = data.serial_port ?? '/dev/ttyAMA0';
         document.getElementById('cfg-serial-baudrate').value = String(data.serial_baudrate ?? 1200);
         document.getElementById('cfg-stability-duration').value = data.stability_duration ?? 10.0;
         document.getElementById('cfg-stability-tolerance').value = data.stability_tolerance ?? 2.0;
@@ -1358,7 +1358,7 @@
         if (ovCenter) ovCenter.textContent = `Center ID: ${centerId}`;
         if (cloudCenter) cloudCenter.textContent = centerId;
 
-        const port = data.config.serial_port || "/dev/ttyUSB0";
+        const port = data.config.serial_port || "/dev/ttyAMA0";
         const baud = data.config.serial_baudrate || 1200;
         const dur = (data.config.stability_duration != null) ? data.config.stability_duration : 10.0;
         const tol = (data.config.stability_tolerance != null) ? data.config.stability_tolerance : 2.0;
