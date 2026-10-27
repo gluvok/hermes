@@ -1,0 +1,82 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-26.04-arm
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v7.0.1
+
+      - name: Install System Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang patchelf
+
+      - name: Setup uv Package Manager
+        uses: astral-sh/setup-uv@v10.3.1
+        with:
+          enable-cache: false
+
+      - name: Setup Python Runtime
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install Dependencies
+        run: uv sync
+
+      - name: Run Nuitka Build (Application Code Only)
+        run: |
+          uv run python -m nuitka \
+            --module \
+            --include-package=src \
+            --nofollow-imports \
+            --remove-output \
+            --lto=yes \
+            --python-flag=no_docstrings \
+            --output-dir=compiled_dist \
+            src
+
+      - name: Deploy to release Branch
+        run: |
+          git config user.name "dheereshag"
+          git config user.email "da11@iitbbs.ac.in"
+
+          # Stage release artifacts to a temporary location outside the repository
+          RELEASE_DIR=$(mktemp -d)
+          cp compiled_dist/src.*.so "${RELEASE_DIR}/"
+          cp pyproject.toml uv.lock README.md .python-version main.py run.sh "${RELEASE_DIR}/"
+          [ -f yolo26n.onnx ] && cp yolo26n.onnx "${RELEASE_DIR}/"
+          [ -d scripts ] && cp -r scripts "${RELEASE_DIR}/"
+          mkdir -p "${RELEASE_DIR}/src/web" "${RELEASE_DIR}/src/devices/wifi"
+          [ -d src/web/templates ] && cp -r src/web/templates "${RELEASE_DIR}/src/web/"
+          [ -d src/web/static ] && cp -r src/web/static "${RELEASE_DIR}/src/web/"
+          [ -d src/devices/wifi/ui ] && cp -r src/devices/wifi/ui "${RELEASE_DIR}/src/devices/wifi/"
+
+          # Switch to orphan deployment branch and wipe tracked and untracked files
+          git branch -D release 2>/dev/null || true
+          git checkout --orphan release
+          git rm -rf .
+          git clean -fdx
+
+          # Restore only the release distribution files
+          cp -a "${RELEASE_DIR}/." ./
+          rm -rf "${RELEASE_DIR}"
+
+          # Stage files (force add compiled .so in case .gitignore has *.so)
+          git add -f src.*.so
+          git add .
+
+          # Commit and force push to release branch
+          git commit -m "build(arm64): release compiled binary for ${GITHUB_SHA:0:7} [skip ci]"
+          git push -f origin release
