@@ -1,23 +1,20 @@
 # Hermes Architecture Reference
 
-Hermes is an asynchronous, paced, multithreaded vehicle image streaming client that preloads image assets into memory, streams them in parallel batches to an upstream recognition server, and records detections in a thread-safe SQLite database.
+Hermes is an asynchronous, paced vehicle image streaming client that preloads image assets into memory, streams them in parallel batches to an upstream recognition server using native `asyncio` and `httpx.AsyncClient`, and logs vehicle plate detections.
 
 ## System Topology & Dataflow
 
 ```mermaid
 flowchart TD
-    CLI["CLI (src/cli.py)"] --> MAIN["Main Entrypoint (main.py)"]
-    MAIN --> LOAD["Image Loader (src/image_loader.py)"]
-    MAIN --> DB["Database Manager (src/database.py)"]
-    MAIN --> STR["Streamer Engine (src/streamer.py)"]
+    MAIN["Main Async Entrypoint (main.py)\n[StreamerConfig]"] --> LOAD["Image Loader (src/image_loader.py)"]
+    MAIN --> STR["Async Streamer Engine (src/streamer.py)"]
     
     LOAD -->|Preload RAM| RAM[("InMemoryImage Buffer")]
     STR -->|Slice Batches| RAM
-    STR -->|Submit to ThreadPool| CLT["HTTP Client (src/client.py)"]
-    CLT -->|POST /recognize| API["FastAPI Recognition Server"]
+    STR -->|Semaphore Guard (max 8)| CLT["Async HTTP Client (src/client.py)"]
+    CLT -->|POST /recognize (httpx.AsyncClient)| API["FastAPI Recognition Server"]
     API -->|JSON Result| CLT
-    CLT -->|Save Detection| DB
-    DB -->|WAL SQLite| DISK[("vehicles.db")]
+    CLT -->|Log Detection| LOG["Console / Loguru"]
 ```
 
 ## NASA JPL Rule 4 Adherence (Single Sheet of Paper)
@@ -26,20 +23,18 @@ Every file and function is designed to fit on a single printed sheet of standard
 
 | Component | Responsibility | Lines | Hard Limit |
 |:---|:---|:---:|:---:|
-| `main.py` | Process entrypoint and signal handling | ~30 | ≤ 60 |
-| `src/cli.py` | Command line argument parsing | ~26 | ≤ 60 |
+| `main.py` | Process entrypoint and signal handling | ~37 | ≤ 60 |
 | `src/config.py` | Immutable configuration dataclass | ~15 | ≤ 60 |
-| `src/database.py` | Thread-safe SQLite persistence (WAL mode) | ~37 | ≤ 60 |
-| `src/image_loader.py` | RAM preloading & natural order sorting | ~41 | ≤ 60 |
-| `src/client.py` | Recognition HTTP posting & plate extraction | ~39 | ≤ 60 |
-| `src/streamer.py` | Paced batch dispatch & lifecycle control | ~54 | ≤ 60 |
+| `src/image_loader.py` | RAM preloading & natural order sorting | ~42 | ≤ 60 |
+| `src/client.py` | Async HTTP posting & plate extraction | ~39 | ≤ 60 |
+| `src/streamer.py` | Paced batch dispatch & task lifecycle | ~58 | ≤ 60 |
 
-## Concurrency & Thread Safety
+## Concurrency & Resource Management
 
 1. **Preloading in RAM**: All images are loaded into RAM once as immutable `InMemoryImage` dataclasses, eliminating disk I/O bottlenecks during streaming.
-2. **Parallel Multithreaded Dispatch**: `ThreadPoolExecutor` dispatches image recognition requests concurrently, decoupling network latency from scheduling intervals.
-3. **Database Concurrency**: `DatabaseManager` synchronizes writes using an internal `threading.Lock` and operates SQLite with `PRAGMA journal_mode=WAL;` for concurrent reading and writing.
-4. **Cooperative Cancellation**: Graceful shutdown on `SIGINT` / `SIGTERM` signals coordinated via `threading.Event`.
+2. **Native AsyncIO Dispatch**: Dispatches image recognition requests concurrently via `asyncio.create_task` and `httpx.AsyncClient`, decoupling network latency from scheduling intervals.
+3. **Semaphore Throttling**: An `asyncio.Semaphore` guards active requests against upstream latency spikes, preventing excessive memory consumption from 2K (2.5MB) images.
+4. **Instant Cooperative Cancellation**: Clean shutdown on `SIGINT` / `SIGTERM` signals coordinated via `asyncio.Event`, immediately cancelling all in-flight tasks.
 
 ## Python 3.14 Standards
 

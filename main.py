@@ -1,29 +1,35 @@
 """Entrypoint for vehicle image streaming pipeline."""
+import asyncio
 import signal
-from threading import Event
 
 from loguru import logger
 
-from src.cli import parse_args
-from src.database import DatabaseManager
+from src.config import StreamerConfig
 from src.image_loader import load_images_to_memory
 from src.streamer import run_streamer
 
 
-def main() -> None:
-    cfg = parse_args()
-    db = DatabaseManager(cfg.db_path)
-    stop_event = Event()
+async def async_main() -> None:
+    cfg = StreamerConfig()
+    stop_event = asyncio.Event()
 
-    def handle_signal(_signum: int, _frame: object) -> None:
+    def handle_signal() -> None:
         logger.info("Shutdown signal received. Stopping streamer...")
         stop_event.set()
 
-    signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, handle_signal)
 
     images = load_images_to_memory(cfg.data_dir)
-    run_streamer(images, cfg, db, stop_event)
+    await run_streamer(images, cfg, stop_event)
+
+
+def main() -> None:
+    try:
+        asyncio.run(async_main())
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
 
 
 if __name__ == "__main__":
