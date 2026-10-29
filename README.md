@@ -10,7 +10,7 @@ Asynchronous, non-blocking vehicle image streaming client that preloads images f
 - **Concurrency Throttling**: Protects system and network memory with an `asyncio.Semaphore` (default: 8).
 - **First Plate Rule**: Automatically extracts strictly the first recognized license plate (`results[0]["plate"]`), ignoring secondary plates.
 - **Barebones Loguru**: Clean, colorful console logging via `loguru`.
-- **Instant Cooperative Cancellation**: Immediate cancellation of in-flight tasks and clean shutdown on `SIGINT` / `SIGTERM` (`Ctrl+C`) via `asyncio.Event`.
+- **Instant Ctrl+C Termination**: Native `KeyboardInterrupt` handling in `main()` for instant terminal exit with zero traceback.
 - **NASA JPL Rule 4 Architecture**: Every module and function strictly ≤ 60 lines. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full architectural patterns and topology.
 
 ## Requirements

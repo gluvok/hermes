@@ -23,18 +23,18 @@ Every file and function is designed to fit on a single printed sheet of standard
 
 | Component | Responsibility | Lines | Hard Limit |
 |:---|:---|:---:|:---:|
-| `main.py` | Process entrypoint and signal handling | ~37 | ≤ 60 |
+| `main.py` | Process entrypoint and KeyboardInterrupt handling | ~23 | ≤ 60 |
 | `src/config.py` | Immutable configuration dataclass | ~15 | ≤ 60 |
 | `src/image_loader.py` | RAM preloading & natural order sorting | ~42 | ≤ 60 |
 | `src/client.py` | Async HTTP posting & plate extraction | ~39 | ≤ 60 |
-| `src/streamer.py` | Paced batch dispatch & task lifecycle | ~58 | ≤ 60 |
+| `src/streamer.py` | Paced batch dispatch & async loop | ~41 | ≤ 60 |
 
 ## Concurrency & Resource Management
 
 1. **Preloading in RAM**: All images are loaded into RAM once as immutable `InMemoryImage` dataclasses, eliminating disk I/O bottlenecks during streaming.
 2. **Native AsyncIO Dispatch**: Dispatches image recognition requests concurrently via `asyncio.create_task` and `httpx.AsyncClient`, decoupling network latency from scheduling intervals.
 3. **Semaphore Throttling**: An `asyncio.Semaphore` guards active requests against upstream latency spikes, preventing excessive memory consumption from 2K (2.5MB) images.
-4. **Instant Cooperative Cancellation**: Clean shutdown on `SIGINT` / `SIGTERM` signals coordinated via `asyncio.Event`, immediately cancelling all in-flight tasks.
+4. **Instant Ctrl+C Termination**: Clean process exit on `KeyboardInterrupt` caught in `main()`, halting immediately without shutdown delays or tracebacks.
 
 ## Python 3.14 Standards
 
