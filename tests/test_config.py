@@ -13,7 +13,6 @@ def test_streamer_config_defaults() -> None:
     assert cfg.data_dir == Path("data")
     assert cfg.batch_size == 2
     assert cfg.interval_sec == 0.5
-    assert cfg.loop is False
     assert cfg.max_concurrency == 8
     assert cfg.timeout_sec == 10.0
 

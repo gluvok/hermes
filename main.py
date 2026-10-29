@@ -12,12 +12,5 @@ async def async_main() -> None:
     await run_streamer(images, cfg)
 
 
-def main() -> None:
-    try:
-        asyncio.run(async_main())
-    except KeyboardInterrupt:
-        pass
+asyncio.run(async_main())
 
-
-if __name__ == "__main__":
-    main()

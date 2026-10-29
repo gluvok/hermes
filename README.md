@@ -9,6 +9,7 @@ Asynchronous, non-blocking vehicle image streaming client that preloads images f
 - **Native AsyncIO & httpx.AsyncClient**: Fully asynchronous network I/O with concurrent task dispatching via `asyncio.create_task`.
 - **Concurrency Throttling**: Protects system and network memory with an `asyncio.Semaphore` (default: 8).
 - **First Plate Rule**: Automatically extracts strictly the first recognized license plate (`results[0]["plate"]`), ignoring secondary plates.
+- **Dedicated Benchmarking**: Separate `benchmark.py` entrypoint collects server `execution_time_ms`, displays summary stats (Total, Success, Failed, Min, Max, Mean, P50, P95).
 - **Barebones Loguru**: Clean, colorful console logging via `loguru`.
 - **Instant Ctrl+C Termination**: Native `KeyboardInterrupt` handling in `main()` for instant terminal exit with zero traceback.
 - **NASA JPL Rule 4 Architecture**: Every module and function strictly ≤ 60 lines. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full architectural patterns and topology.
@@ -29,6 +30,12 @@ uv sync
 Streams images once (single-pass) from RAM to `http://127.0.0.1:8000/recognize`:
 ```bash
 uv run python main.py
+```
+
+### 3. Run Benchmark
+Runs image streaming and logs the execution latency summary report:
+```bash
+uv run python benchmark.py
 ```
 
 ## Running Tests & Quality Gates

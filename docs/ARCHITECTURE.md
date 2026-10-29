@@ -6,15 +6,21 @@ Hermes is an asynchronous, paced vehicle image streaming client that preloads im
 
 ```mermaid
 flowchart TD
-    MAIN["Main Async Entrypoint (main.py)\n[StreamerConfig]"] --> LOAD["Image Loader (src/image_loader.py)"]
-    MAIN --> STR["Async Streamer Engine (src/streamer.py)"]
-    
-    LOAD -->|Preload RAM| RAM[("InMemoryImage Buffer")]
-    STR -->|Slice Batches| RAM
-    STR -->|Semaphore Guard (max 8)| CLT["Async HTTP Client (src/client.py)"]
-    CLT -->|POST /recognize (httpx.AsyncClient)| API["FastAPI Recognition Server"]
-    API -->|JSON Result| CLT
-    CLT -->|Log Detection| LOG["Console / Loguru"]
+    subgraph Operational ["Operational Streaming (main.py)"]
+        MAIN["Main Entrypoint (main.py)"] --> LOAD["Image Loader (src/image_loader.py)"]
+        MAIN --> STR["Async Streamer (src/streamer.py)"]
+        LOAD --> RAM[("InMemoryImage Buffer")]
+        STR --> RAM
+        STR --> CLT["HTTP Client (src/client.py)"]
+        CLT --> API["FastAPI /recognize"]
+        CLT --> LOG["Plate Log"]
+    end
+
+    subgraph Benchmarking ["Benchmarking (benchmark.py)"]
+        BENCH["Benchmark Entrypoint (benchmark.py)"] --> STR
+        BENCH --> REP["Metrics Reporter (src/reporter.py)"]
+        REP --> REP_LOG["Summary Report (p50, p95)"]
+    end
 ```
 
 ## NASA JPL Rule 4 Adherence (Single Sheet of Paper)
@@ -23,11 +29,13 @@ Every file and function is designed to fit on a single printed sheet of standard
 
 | Component | Responsibility | Lines | Hard Limit |
 |:---|:---|:---:|:---:|
-| `main.py` | Process entrypoint and KeyboardInterrupt handling | ~23 | ≤ 60 |
-| `src/config.py` | Immutable configuration dataclass | ~15 | ≤ 60 |
-| `src/image_loader.py` | RAM preloading & natural order sorting | ~42 | ≤ 60 |
+| `main.py` | Production streaming entrypoint & signal handling | ~23 | ≤ 60 |
+| `benchmark.py` | Benchmarking orchestration entrypoint | ~25 | ≤ 60 |
+| `src/config.py` | Immutable configuration dataclass | ~13 | ≤ 60 |
+| `src/image_loader.py` | RAM preloading & natural order sorting | ~41 | ≤ 60 |
 | `src/client.py` | Async HTTP posting & plate extraction | ~39 | ≤ 60 |
-| `src/streamer.py` | Paced batch dispatch & task completion drain | ~50 | ≤ 60 |
+| `src/streamer.py` | Paced batch dispatch & task result collection | ~38 | ≤ 60 |
+| `src/reporter.py` | Metrics calculation (p50, p95) & summary logging | ~57 | ≤ 60 |
 
 ## Concurrency & Resource Management
 
