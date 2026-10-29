@@ -26,7 +26,7 @@ uv sync
 ```
 
 ### 2. Start Streaming
-Streams images repeatedly from RAM to `http://127.0.0.1:8000/recognize`:
+Streams images once (single-pass) from RAM to `http://127.0.0.1:8000/recognize`:
 ```bash
 uv run python main.py
 ```

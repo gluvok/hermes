@@ -27,7 +27,7 @@ Every file and function is designed to fit on a single printed sheet of standard
 | `src/config.py` | Immutable configuration dataclass | ~15 | ≤ 60 |
 | `src/image_loader.py` | RAM preloading & natural order sorting | ~42 | ≤ 60 |
 | `src/client.py` | Async HTTP posting & plate extraction | ~39 | ≤ 60 |
-| `src/streamer.py` | Paced batch dispatch & async loop | ~41 | ≤ 60 |
+| `src/streamer.py` | Paced batch dispatch & task completion drain | ~50 | ≤ 60 |
 
 ## Concurrency & Resource Management
 

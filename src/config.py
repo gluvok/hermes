@@ -9,6 +9,6 @@ class StreamerConfig:
     data_dir: Path = Path("data")
     batch_size: int = 2
     interval_sec: float = 0.5
-    loop: bool = True
+    loop: bool = False
     max_concurrency: int = 8
     timeout_sec: float = 10.0
