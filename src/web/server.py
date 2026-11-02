@@ -59,7 +59,7 @@ class FallbackWebServer:
             logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
             self._server = make_server(
-                self.host, self.port, flask_app, request_handler=HermesWSGIRequestHandler
+                self.host, self.port, flask_app, threaded=True, request_handler=HermesWSGIRequestHandler
             )
             self._is_running = True
             self._thread = threading.Thread(

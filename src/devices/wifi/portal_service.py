@@ -31,10 +31,10 @@ class PortalService:
     def start(self, ip: str = DEFAULT_GATEWAY_IP, http_port: int = DEFAULT_PORTAL_PORT, dns_port: int = DEFAULT_DNS_PORT, iface: str = "wlan0") -> bool:
         if self._active: return True
         ensure_local_domain("hermes.local")
-        setup_nm_capport_config(ip)
         self._dns = CaptiveDNSServer(ip=ip, port=dns_port)
         self._http = CaptiveHTTPServer(port=http_port, iface=iface, dns_port=dns_port)
         dns_ok, http_ok = self._dns.start(), self._http.start()
+        setup_nm_capport_config(ip, self._http.port if (not self._http._redirected and self._http.port != 80) else 80)
         self._active = http_ok
         logger.info("Captive portal status: HTTP=%s, DNS=%s", http_ok, dns_ok)
         return self._active

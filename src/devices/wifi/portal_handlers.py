@@ -21,15 +21,17 @@ class CaptivePortalHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
-        host = self.headers.get("Host", "").split(":")[0].strip().lower()
+        raw_h = self.headers.get("Host", "").strip()
+        host = raw_h.split(":")[0].strip().lower()
+        loc = f"http://{raw_h}/wifi" if raw_h and ":" in raw_h else "http://10.42.0.1/wifi"
         if path == "/.well-known/captive-portal":
-            payload = {"captive": True, "user-portal-url": "http://10.42.0.1/wifi"}
+            payload = {"captive": True, "user-portal-url": loc}
             self.send_response(200); self.send_header("Content-Type", "application/captive+json"); self.send_header("Cache-Control", "no-store"); self.end_headers()
             self.wfile.write(json.dumps(payload).encode("utf-8")); return
         if path in {"/config", "/admin"}:
             self.send_response(302); self.send_header("Location", "http://10.42.0.1:8080/config"); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path not in {"/networks", "/saved", "/status"} and (path in _PROBES or (host and host not in _LOCAL_HOSTS)):
-            self.send_response(302); self.send_header("Location", "http://10.42.0.1/wifi"); self.send_header("Content-Length", "0"); self.end_headers(); return
+            self.send_response(302); self.send_header("Location", loc); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path == "/networks": self._send_json(scan_networks()); return
         if path == "/saved": self._send_json(get_saved_wifi_networks()); return
         if path == "/status": self._send_json({"hotspot": is_hotspot_active(), "active_ssid": get_active_wifi_ssid()}); return

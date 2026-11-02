@@ -31,7 +31,7 @@ class CaptiveDNSServer:
 
     def start(self) -> bool:
         if self._running: return True
-        for p in (self.port, 53):
+        for p in (53, self.port):
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -41,7 +41,7 @@ class CaptiveDNSServer:
         if not self._sock: return False
         self._thread = threading.Thread(target=self._serve, name="CaptiveDNS", daemon=True)
         self._thread.start()
-        logger.info("Captive DNS server listening on UDP %s:%d", self.ip, self.port)
+        logger.info("[DNS] Captive DNS responder active on UDP :%d (queries -> %s)", self.port, self.ip)
         return True
 
     def _serve(self) -> None:

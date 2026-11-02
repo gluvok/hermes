@@ -17,8 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class PortalThreadingHTTPServer(http.server.ThreadingHTTPServer):
-    allow_reuse_address = True
-    daemon_threads = True
+    allow_reuse_address, daemon_threads = True, True
 
 
 class CaptiveHTTPServer:
@@ -48,7 +47,8 @@ class CaptiveHTTPServer:
         self._redirected = setup_port_forwarding(self.iface, self.port, self.dns_port)
         self._thread = threading.Thread(target=self._server.serve_forever, name="CaptiveHTTP", daemon=True)
         self._thread.start()
-        logger.info("Captive HTTP server running on port %d (iptables redirect=%s)", self.port, self._redirected)
+        url = "http://10.42.0.1" if (self.port == 80 or self._redirected) else f"http://10.42.0.1:{self.port}"
+        logger.info("[WiFi] Captive HTTP portal active at %s (iptables redirect=%s)", url, self._redirected)
         return True
 
     def stop(self) -> None:

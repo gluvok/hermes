@@ -12,10 +12,11 @@ NM_DNSMASQ_DIR = Path("/etc/NetworkManager/dnsmasq-shared.d")
 NM_CAPPORT_FILE = NM_DNSMASQ_DIR / "hermes-captive.conf"
 
 
-def setup_nm_capport_config(gateway_ip: str = "10.42.0.1") -> bool:
+def setup_nm_capport_config(gateway_ip: str = "10.42.0.1", http_port: int = 80) -> bool:
     """Configures NetworkManager shared dnsmasq for wildcard DNS and RFC 8910 Option 114."""
     try:
-        content = f"address=/#/{gateway_ip}\ndhcp-option=114,http://{gateway_ip}/.well-known/captive-portal\n"
+        p_sfx = f":{http_port}" if http_port != 80 else ""
+        content = f"address=/#/{gateway_ip}\ndhcp-option=114,http://{gateway_ip}{p_sfx}/.well-known/captive-portal\n"
         if NM_CAPPORT_FILE.exists() and NM_CAPPORT_FILE.read_text(encoding="utf-8") == content: return True
         try:
             NM_DNSMASQ_DIR.mkdir(parents=True, exist_ok=True); NM_CAPPORT_FILE.write_text(content, encoding="utf-8")
