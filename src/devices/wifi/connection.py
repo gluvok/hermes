@@ -47,12 +47,13 @@ def connect_wifi(ssid: str, password: str = "", iface: str | None = None) -> tup
 
 
 def connect_to_wifi(ssid: str, password: str = "", iface: str | None = None) -> tuple[bool, str]:
-    was_hotspot = hotspot.is_hotspot_active()
-    ok, msg = connect_wifi(ssid, password, iface)
+    from src.devices.wifi.watchdog import notify_network_status
+    was_hotspot = hotspot.is_hotspot_active(); ok, msg = connect_wifi(ssid, password, iface)
     if ok:
         try: save_wifi_network(ssid, password)
         except (sqlite3.Error, OSError) as e: logger.warning("Failed to save to vault: %s", e)
-        hotspot.stop_emergency_hotspot()
-        return True, msg
+        hotspot.stop_emergency_hotspot(); notify_network_status(True); return True, msg
+    notify_network_status(False)
     if was_hotspot: hotspot.start_emergency_hotspot()
     return False, msg
+

@@ -16,13 +16,12 @@ from src.devices.wifi.runner import SIMULATION_STATE
 
 
 class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req: urllib.request.Request, fp: object, code: int, msg: str, headers: object, newurl: str) -> None:
-        return None
+    def redirect_request(self, req: urllib.request.Request, fp: object, code: int, msg: str, headers: object, newurl: str) -> None: return None
 
 
 class TestWiFiPortal(unittest.TestCase):
-    def setUp(self) -> None:
-        SIMULATION_STATE["enabled"] = True
+    def setUp(self) -> None: SIMULATION_STATE["enabled"] = True
+
 
     def test_dns_packet_builder(self) -> None:
         dummy_a = b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x07example\x03com\x00\x00\x01\x00\x01"
@@ -44,6 +43,8 @@ class TestWiFiPortal(unittest.TestCase):
             req = urllib.request.Request(f"{base}/generate_204", headers={"Host": "connectivitycheck.gstatic.com"})
             try: opener.open(req, timeout=3.0)
             except urllib.error.HTTPError as e: self.assertEqual(e.code, 302)
+            try: opener.open(urllib.request.Request(f"{base}/config"), timeout=3.0)
+            except urllib.error.HTTPError as e: self.assertEqual(e.code, 302); self.assertIn("8080/config", e.headers.get("Location", ""))
         finally: http_srv.stop()
 
     def test_ensure_local_domain(self) -> None:
@@ -54,6 +55,6 @@ class TestWiFiPortal(unittest.TestCase):
             self.assertIn("127.0.0.1\thermes.local", p.read_text())
         finally: p.unlink(missing_ok=True)
 
-
 if __name__ == "__main__":
     unittest.main()
+
