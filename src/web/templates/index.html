@@ -1521,6 +1521,9 @@
       if (["scale", "anpr", "cloud", "wifi", "telemetry", "config", "admin"].includes(path)) {
         return path === "admin" ? "config" : path;
       }
+      if (window.location.hostname.includes("config")) {
+        return "config";
+      }
       return "overview";
     }
 

@@ -12,7 +12,7 @@ from src.devices.wifi.hotspot import is_hotspot_active
 from src.devices.wifi.scanner import scan_networks
 
 _PROBES = {"/generate_204", "/gen_204", "/hotspot-detect.html", "/canonicalizer.ucs.ed.ac.uk", "/connecttest.txt", "/ncsi.txt", "/success.txt"}
-_LOCAL_HOSTS = {"10.42.0.1", "192.168.42.1", "hermes.local", "localhost", "127.0.0.1"}
+_LOCAL_HOSTS = {"10.42.0.1", "192.168.42.1", "hermes.local", "hermes.config", "localhost", "127.0.0.1"}
 
 
 class CaptivePortalHandler(http.server.BaseHTTPRequestHandler):
@@ -28,8 +28,9 @@ class CaptivePortalHandler(http.server.BaseHTTPRequestHandler):
             payload = {"captive": True, "user-portal-url": loc}
             self.send_response(200); self.send_header("Content-Type", "application/captive+json"); self.send_header("Cache-Control", "no-store"); self.end_headers()
             self.wfile.write(json.dumps(payload).encode("utf-8")); return
-        if path in {"/config", "/admin"}:
-            self.send_response(302); self.send_header("Location", "http://10.42.0.1:8080/config"); self.send_header("Content-Length", "0"); self.end_headers(); return
+        if host == "hermes.config" or path in {"/config", "/admin"}:
+            dst = "http://hermes.config:8080/config" if host == "hermes.config" else "http://10.42.0.1:8080/config"
+            self.send_response(302); self.send_header("Location", dst); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path not in {"/networks", "/saved", "/status"} and (path in _PROBES or (host and host not in _LOCAL_HOSTS)):
             self.send_response(302); self.send_header("Location", loc); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path == "/networks": self._send_json(scan_networks()); return
@@ -55,6 +56,5 @@ class CaptivePortalHandler(http.server.BaseHTTPRequestHandler):
         raw = json.dumps(data).encode("utf-8")
         self.send_response(status); self.send_header("Content-Type", "application/json"); self.send_header("Cache-Control", "no-cache"); self.end_headers()
         self.wfile.write(raw)
-
 
 __all__ = ["CaptivePortalHandler"]

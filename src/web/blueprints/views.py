@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Blueprint, jsonify, redirect, render_template
+from flask import Blueprint, jsonify, redirect, render_template, request
 
 from src.devices.wifi import get_available_networks, is_wifi_connected
 
 views_bp = Blueprint("views", __name__)
+
+
+@views_bp.before_request
+def auto_redirect_config_domain() -> Any:
+    if request.host.split(":")[0].lower() == "hermes.config" and request.path in {"/", "/index"}:
+        return redirect("/config", code=302)
 
 PAGE_ROUTES = (
     "/", "/index", "/scale", "/anpr", "/cloud",
