@@ -5,4 +5,10 @@ cd "$DIR"
 if [ -d ".venv" ]; then
     source .venv/bin/activate
 fi
-exec "$DIR/bin/hermes" "$@"
+if [ -x "$DIR/bin/hermes" ]; then
+    exec "$DIR/bin/hermes" "$@"
+elif command -v uv >/dev/null 2>&1; then
+    exec uv run python main.py "$@"
+else
+    exec python3 main.py "$@"
+fi
