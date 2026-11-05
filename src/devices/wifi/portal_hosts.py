@@ -17,7 +17,13 @@ def ensure_local_domain(domain: str = "hermes.local", ips: tuple[str, ...] = ("1
         if not needed: return True
         lines = [line for line in content.splitlines() if line.strip()]
         lines.extend(needed)
-        hosts_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        payload = ("\n".join(lines) + "\n").encode("utf-8")
+        try:
+            hosts_path.write_bytes(payload)
+        except PermissionError:
+            import subprocess
+            res = subprocess.run(["sudo", "tee", str(hosts_path)], input=payload, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            if res.returncode != 0: raise
         logger.info("[Hosts] Configured %s in %s: %s", domain, hosts_path, ", ".join(ips))
         return True
     except (OSError, PermissionError) as e:
