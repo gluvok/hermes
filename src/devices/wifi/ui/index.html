@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gluvok Hermes — Wi-Fi Setup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif; }
+    body { background-color: #09090b; color: #fafafa; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 20px 16px; -webkit-font-smoothing: antialiased; }
+    .container { width: 100%; max-width: 440px; }
+    .header-bar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid #27272a; margin-bottom: 20px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo-box { width: 40px; height: 40px; border-radius: 12px; background: #18181b; border: 1px solid #27272a; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+    .brand-title { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.02em; color: #fff; display: flex; align-items: center; gap: 6px; }
+    .brand-sub { font-size: 0.72rem; color: #71717a; font-family: ui-monospace, monospace; }
+    .badge-nmcli { font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); }
+    .panel { background: #121215; border: 1px solid #27272a; border-radius: 16px; padding: 22px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .panel-title { font-size: 0.98rem; font-weight: 700; color: #fafafa; }
+    .panel-desc { font-size: 0.75rem; color: #71717a; margin-top: 2px; }
+    .status-badge { padding: 4px 10px; border-radius: 999px; font-size: 0.68rem; font-weight: 800; background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .status-badge.online { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3); }
+    
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 0.78rem; font-weight: 600; color: #e4e4e7; }
+    .refresh-btn { background: none; border: none; color: #38bdf8; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 4px; font-weight: 600; }
+    .refresh-btn:hover { text-decoration: underline; }
+    .networks-list { max-height: 180px; overflow-y: auto; background: #09090b; border: 1px solid #27272a; border-radius: 10px; margin-bottom: 16px; }
+    .network-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #1f1f23; cursor: pointer; transition: background 0.15s; font-size: 0.85rem; }
+    .network-item:last-child { border-bottom: none; }
+    .network-item:hover { background: #1a1a20; }
+    .network-item.selected { background: #1e293b; border-color: #38bdf8; }
+    .net-ssid { font-weight: 600; color: #f4f4f5; display: flex; align-items: center; gap: 6px; }
+    .net-meta { font-size: 0.72rem; color: #71717a; display: flex; align-items: center; gap: 6px; }
+    
+    /* Saved Networks */
+    .saved-box { margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid #27272a; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { background: #18181b; border: 1px solid #27272a; border-radius: 999px; padding: 4px 10px; font-size: 0.72rem; color: #d4d4d8; cursor: pointer; transition: all 0.2s; }
+    .chip:hover { border-color: #38bdf8; color: #38bdf8; }
+
+    /* Form */
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 0.78rem; font-weight: 600; color: #a1a1aa; margin-bottom: 6px; }
+    .input-wrap { position: relative; }
+    input { width: 100%; padding: 11px 14px; background: #09090b; border: 1px solid #27272a; border-radius: 10px; color: #fafafa; font-size: 0.88rem; outline: none; }
+    input:focus { border-color: #38bdf8; }
+    .eye-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #71717a; cursor: pointer; font-size: 0.78rem; font-weight: 600; }
+    .btn { width: 100%; padding: 12px; background: #38bdf8; color: #09090b; border: none; border-radius: 10px; font-size: 0.88rem; font-weight: 700; cursor: pointer; margin-top: 10px; transition: opacity 0.2s; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .alert { padding: 12px 14px; border-radius: 10px; font-size: 0.8rem; line-height: 1.4; margin-top: 14px; display: none; }
+    .alert.info { background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); display: block; }
+    .alert.success { background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); display: block; }
+    .alert.error { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); display: block; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-bar">
+      <div class="brand">
+        <div class="logo-box">
+          <svg viewBox="0 0 200 200" fill="none" style="width:24px;height:24px">
+            <circle cx="100" cy="28" r="16" fill="#38bdf8"/>
+            <path d="M100 50 L100 70" stroke="#38bdf8" stroke-width="12" stroke-linecap="round"/>
+            <path d="M56 160 L100 60 L144 160" stroke="#38bdf8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M42 160 L100 40 L158 160" stroke="#38bdf8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <rect x="36" y="155" width="128" height="14" rx="7" fill="#38bdf8"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">GLUVOK <span class="badge-nmcli">NMCLI WIFI</span></div>
+          <div class="brand-sub">Hermes NetworkManager Portal</div>
+        </div>
+      </div>
+      <span id="status-pill" class="status-badge">HOTSPOT ACTIVE</span>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Connect to Wi-Fi</h2>
+          <p class="panel-desc">Select an available network or enter facility credentials</p>
+        </div>
+      </div>
+
+      <!-- Scanned Networks -->
+      <div class="section-header">
+        <span>Available Wi-Fi Networks</span>
+        <button type="button" class="refresh-btn" onclick="loadNetworks()">Scan</button>
+      </div>
+      <div id="networks" class="networks-list">
+        <div style="padding:12px;font-size:0.75rem;color:#71717a;text-align:center">Scanning networks...</div>
+      </div>
+
+      <!-- Saved Networks -->
+      <div id="saved-section" class="saved-box" style="display:none">
+        <div class="section-header"><span>Known Networks</span></div>
+        <div id="saved-chips" class="chips"></div>
+      </div>
+
+      <!-- Connect Form -->
+      <form onsubmit="handleSubmit(event)">
+        <div class="form-group">
+          <label for="ssid">Network Name (SSID)</label>
+          <input type="text" id="ssid" placeholder="Network Name" required autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="passphrase">Passphrase</label>
+          <div class="input-wrap">
+            <input type="password" id="passphrase" placeholder="••••••••" autocomplete="current-password" />
+            <button type="button" class="eye-btn" onclick="togglePass()">Show</button>
+          </div>
+        </div>
+        <button type="submit" id="submit-btn" class="btn">Connect</button>
+      </form>
+      <div id="status-alert" class="alert"></div>
+    </div>
+
+    <div style="margin-top:16px; text-align:center;">
+      <a href="http://10.42.0.1:8080/config" style="display:inline-flex; align-items:center; gap:6px; font-size:0.75rem; color:#a1a1aa; text-decoration:none; padding:8px 14px; border:1px solid #27272a; border-radius:8px; background:#18181b; font-weight:600;">
+        Hardware & System Configuration (:8080) &rarr;
+      </a>
+    </div>
+  </div>
+
+  <script>
+
+    function togglePass() {
+      const p = document.getElementById('passphrase');
+      const btn = event.target;
+      if (p.type === 'password') {
+        p.type = 'text';
+        btn.textContent = 'Hide';
+      } else {
+        p.type = 'password';
+        btn.textContent = 'Show';
+      }
+    }
+
+    async function loadNetworks() {
+      const box = document.getElementById('networks');
+      box.innerHTML = '<div style="padding:12px;font-size:0.75rem;color:#71717a;text-align:center">Scanning for networks...</div>';
+      try {
+        const res = await fetch('/networks');
+        const list = await res.json();
+        if (!list || list.length === 0) {
+          box.innerHTML = '<div style="padding:12px;font-size:0.75rem;color:#71717a;text-align:center">No networks found</div>';
+          return;
+        }
+        box.innerHTML = '';
+        list.forEach(net => {
+          const div = document.createElement('div');
+          div.className = 'network-item';
+          const sig = net.signal ? `${net.signal}%` : '';
+          const bars = net.bars || '';
+          div.innerHTML = `<span class="net-ssid"><strong>${net.ssid}</strong></span><span class="net-meta">${bars} ${sig}</span>`;
+          div.onclick = () => {
+            document.querySelectorAll('.network-item').forEach(el => el.classList.remove('selected'));
+            div.classList.add('selected');
+            document.getElementById('ssid').value = net.ssid;
+            document.getElementById('passphrase').focus();
+          };
+          box.appendChild(div);
+        });
+      } catch (e) {
+        box.innerHTML = '<div style="padding:12px;font-size:0.75rem;color:#71717a;text-align:center">Manual network entry available</div>';
+      }
+    }
+
+    async function loadSaved() {
+      try {
+        const res = await fetch('/saved');
+        const list = await res.json();
+        if (list && list.length > 0) {
+          const sec = document.getElementById('saved-section');
+          const chips = document.getElementById('saved-chips');
+          sec.style.display = 'block';
+          chips.innerHTML = '';
+          list.forEach(item => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'chip';
+            btn.textContent = item.ssid;
+            btn.onclick = () => {
+              document.getElementById('ssid').value = item.ssid;
+              document.getElementById('passphrase').focus();
+            };
+            chips.appendChild(btn);
+          });
+        }
+      } catch (e) {}
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      const ssid = document.getElementById('ssid').value.trim();
+      const passphrase = document.getElementById('passphrase').value;
+      const btn = document.getElementById('submit-btn');
+      const alert = document.getElementById('status-alert');
+
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      alert.className = 'alert info';
+      alert.textContent = `Connecting to '${ssid}' via NetworkManager...`;
+
+      try {
+        const res = await fetch('/connect', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ ssid: ssid, password: passphrase, passphrase: passphrase })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success !== false) {
+          alert.className = 'alert success';
+          alert.innerHTML = `<strong>Connected!</strong> Successfully joined <em>${ssid}</em>. Reconnecting your phone to your local Wi-Fi.`;
+          document.getElementById('status-pill').textContent = 'ONLINE';
+          document.getElementById('status-pill').className = 'status-badge online';
+        } else {
+          alert.className = 'alert error';
+          alert.textContent = `Connection failed: ${data.message || 'Please check password and retry.'}`;
+          btn.disabled = false;
+          btn.textContent = 'Connect';
+        }
+      } catch (err) {
+        alert.className = 'alert success';
+        alert.innerHTML = `<strong>Handshake Sent!</strong> The device is switching to client mode on <em>${ssid}</em>.`;
+      }
+    }
+
+    loadNetworks();
+    loadSaved();
+  </script>
+</body>
+</html>
