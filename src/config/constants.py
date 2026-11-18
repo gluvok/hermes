@@ -1,6 +1,7 @@
 """constants.py — Centralized System & Hardware Constants."""
 from __future__ import annotations
 
+import os
 import re
 
 INTER_CHAR_TIMEOUT_S = 0.3
@@ -33,7 +34,7 @@ DEFAULT_WIFI_WATCHDOG_INTERVAL = 1.0
 GLUVOK_BASE_URL = "https://gluvok.vercel.app"
 CLOUD_POST_TIMEOUT = 20.0
 DEFAULT_DEVICE_ID = "pi1"
-DEFAULT_DEVICE_KEY = "hardware123"
+DEFAULT_DEVICE_KEY = os.getenv("DEVICE_KEY", "")
 DEFAULT_CENTER_ID = 1
 
 INDIAN_PLATE_REGEX = re.compile(

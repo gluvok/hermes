@@ -11,7 +11,7 @@ from typing import Any
 from flask import jsonify, request
 
 SUPERADMIN_USER = os.getenv("SUPERADMIN_USER", "superadmin")
-SUPERADMIN_PASS = os.getenv("SUPERADMIN_PASS", "Gluvok@241821")
+SUPERADMIN_PASS = os.getenv("SUPERADMIN_PASS")
 SESSION_LIFETIME_SECONDS = 7200.0  # 2 hours
 RATE_LIMIT_WINDOW_SECONDS = 60.0
 MAX_FAILED_LOGIN_ATTEMPTS = 5
@@ -68,8 +68,11 @@ def record_failed_login() -> None:
 
 def verify_credentials(userid: str, password: str) -> bool:
     """Constant-time verification of superadmin credentials."""
+    expected_pass = os.getenv("SUPERADMIN_PASS")
+    if not expected_pass or not password:
+        return False
     user_ok = secrets.compare_digest(userid.strip(), SUPERADMIN_USER)
-    pass_ok = secrets.compare_digest(password, SUPERADMIN_PASS)
+    pass_ok = secrets.compare_digest(password, expected_pass)
     return user_ok and pass_ok
 
 

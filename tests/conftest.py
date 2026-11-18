@@ -4,6 +4,10 @@ import subprocess
 import pytest
 from unittest.mock import patch, MagicMock
 
+# Ensure test credentials are set in environment
+os.environ.setdefault("SUPERADMIN_PASS", "Gluvok@241821")
+os.environ.setdefault("DEVICE_KEY", "hardware123")
+
 _SANDBOX_ACTIVE = True
 
 def assert_sandbox_active():
