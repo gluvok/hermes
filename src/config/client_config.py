@@ -29,3 +29,9 @@ AUXILIARY_CAMERA_URLS: list[str] = [
 # Baseline Wi-Fi credentials (overridable via Web UI, stored in SQLite)
 WIFI_SSID: str = os.getenv("WIFI_SSID", "")
 WIFI_PASSWORD: str = os.getenv("WIFI_PASSWORD", "")
+
+# Vehicle crop padding percentages (overridable via Web UI, stored in SQLite)
+CROP_PAD_TOP: float = float(os.getenv("CROP_PAD_TOP", "10.0"))
+CROP_PAD_BOTTOM: float = float(os.getenv("CROP_PAD_BOTTOM", "10.0"))
+CROP_PAD_LEFT: float = float(os.getenv("CROP_PAD_LEFT", "15.0"))
+CROP_PAD_RIGHT: float = float(os.getenv("CROP_PAD_RIGHT", "15.0"))

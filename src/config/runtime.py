@@ -31,6 +31,10 @@ class RuntimeConfig:
                 "stability_duration",
                 "stability_tolerance",
                 "auxiliary_camera_urls",
+                "crop_pad_top",
+                "crop_pad_bottom",
+                "crop_pad_left",
+                "crop_pad_right",
             ):
                 if kwargs.get(k) is not None:
                     set_override(k, kwargs[k], self.db_path)

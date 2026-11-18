@@ -85,6 +85,22 @@ class ConfigManager:
     def auxiliary_camera_urls(self) -> list[str]:
         return list(self.runtime.get("auxiliary_camera_urls", cc.AUXILIARY_CAMERA_URLS))
 
+    @property
+    def crop_pad_top(self) -> float:
+        return float(self.runtime.get("crop_pad_top", cc.CROP_PAD_TOP))
+
+    @property
+    def crop_pad_bottom(self) -> float:
+        return float(self.runtime.get("crop_pad_bottom", cc.CROP_PAD_BOTTOM))
+
+    @property
+    def crop_pad_left(self) -> float:
+        return float(self.runtime.get("crop_pad_left", cc.CROP_PAD_LEFT))
+
+    @property
+    def crop_pad_right(self) -> float:
+        return float(self.runtime.get("crop_pad_right", cc.CROP_PAD_RIGHT))
+
     def update_system_config(self, **kwargs: Any) -> None:
         self.runtime.update_system(**kwargs)
 
@@ -109,4 +125,8 @@ class ConfigManager:
             "auxiliary_camera_urls": self.auxiliary_camera_urls,
             "stability_duration": self.stability_duration,
             "stability_tolerance": self.stability_tolerance,
+            "crop_pad_top": self.crop_pad_top,
+            "crop_pad_bottom": self.crop_pad_bottom,
+            "crop_pad_left": self.crop_pad_left,
+            "crop_pad_right": self.crop_pad_right,
         }
