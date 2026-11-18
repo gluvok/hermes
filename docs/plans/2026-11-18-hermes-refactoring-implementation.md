@@ -10,7 +10,20 @@
 
 ---
 
-## Task Breakdown (XP Micro-Iterations)
+## Complete Skill Matrix (Mapped by Iteration & Step)
+
+| Iteration / Task | Primary Skills | Step-Level Skills | Purpose & Guardrail |
+| :--- | :--- | :--- | :--- |
+| **Iteration 1: Test Sandbox** | `@skills/test-driven-development`<br>`@skills/systematic-debugging` | • Step 1: `@skills/test-driven-development`<br>• Step 2: `@skills/systematic-debugging`<br>• Step 3: `@skills/ponytail`, `@skills/python-testing`<br>• Step 4: `@skills/verification-before-completion`<br>• Step 5: `@skills/git-commit-helper` | Eliminate unmocked sudo/serial leaks into macOS host machine during test runs. |
+| **Iteration 2: Wi-Fi Consolidation** | `@skills/architecture`<br>`@skills/clean-code`<br>`@skills/deslop` | • Step 1: `@skills/test-driven-development`<br>• Step 2: `@skills/verification-before-completion`<br>• Step 3: `@skills/clean-code`, `@skills/deslop`<br>• Step 4: `@skills/verification-loop`<br>• Step 5: `@skills/ponytail`, `@skills/git-commit-helper` | Collapse 17 micro-files (806 LOC) into 3 modules; eliminate semicolons and circular imports. |
+| **Iteration 3: Subsystem Clean-up** | `@skills/clean-code`<br>`@skills/ponytail` | • Step 1: `@skills/python-testing`<br>• Step 2: `@skills/ponytail`, `@skills/deslop`<br>• Step 3: `@skills/verification-before-completion`<br>• Step 4: `@skills/git-commit-helper` | Fold single-function 40-line `image_compressor` into `camera.py`; move `wifi_setup.py` to `scripts/`. |
+| **Iteration 4: SQLite Store-Forward** | `@skills/architecture`<br>`@skills/database-design`<br>`@skills/test-driven-development` | • Step 1: `@skills/test-driven-development`<br>• Step 2: `@skills/systematic-debugging`<br>• Step 3: `@skills/database-design`, `@skills/clean-code`<br>• Step 4: `@skills/verification-before-completion`<br>• Step 5: `@skills/git-commit-helper` | Replace destructive "offline discard" with SQLite WAL queue table and FIFO dispatcher. |
+| **Iteration 5: Secrets Sanitization** | `@skills/security-audit`<br>`@skills/secrets-management`<br>`@skills/find-bugs` | • Step 1: `@skills/secrets-management`, `@skills/credentials`<br>• Step 2: `@skills/security-review`<br>• Step 3: `@skills/find-bugs`<br>• Step 4: `@skills/systematic-debugging`, `@skills/ponytail`<br>• Step 5: `@skills/git-commit-helper` | Strip hardcoded RTSP credentials from git; eliminate destructive `find ... -delete` in deploy script. |
+| **Iteration 6: Ground-Truth Docs & ECC** | `@skills/writing-clearly-and-concisely`<br>`@skills/no-ai-slop`<br>`@skills/verification-loop` | • Step 1: `@skills/writing-clearly-and-concisely`, `@skills/no-ai-slop`<br>• Step 2: `@skills/documentation-templates`<br>• Step 3: `@skills/verification-loop`<br>• Step 4: `@skills/verification-before-completion`<br>• Step 5: `@skills/git-commit-helper` | Rewrite `ARCHITECTURE.md` into factual engineering spec; execute 5-phase ECC verification gate. |
+
+---
+
+## Detailed Task Breakdown (XP Micro-Iterations)
 
 ### Iteration 1: Global Test Sandbox & Hardware Decoupling (TDD)
 
@@ -18,8 +31,14 @@
 - Create: `hermes/tests/conftest.py`
 - Modify: `hermes/tests/test_wifi_hotspot.py`
 - Modify: `hermes/tests/test_web_server.py`
+- Create: `hermes/tests/test_sandbox_isolation.py`
 
-**Step 1: Write failing test verifying hardware guard isolation**
+**Applicable Skills:**
+- Primary: `@skills/test-driven-development`, `@skills/systematic-debugging`
+- Secondary: `@skills/ponytail`, `@skills/python-testing`, `@skills/verification-before-completion`, `@skills/git-commit-helper`
+
+**Step 1: Write failing test verifying hardware guard isolation**  
+*Skill:* `@skills/test-driven-development` (Phase 4.1: Write minimal reproduction test)
 
 Create `hermes/tests/test_sandbox_isolation.py`:
 ```python
@@ -29,26 +48,25 @@ import pytest
 
 def test_unmocked_sudo_is_blocked():
     with pytest.raises(RuntimeError, match="Direct system execution blocked in test suite"):
-        # Simulated unmocked host call
         from tests.conftest import assert_sandbox_active
         assert_sandbox_active()
-        subprocess.run(["sudo", "whoami"], check=False)
+        subprocess.run(["sudo", "whoami"], check=True)
 ```
 
-**Step 2: Run test to verify it fails**
+**Step 2: Run test to verify it fails**  
+*Skill:* `@skills/systematic-debugging` (Phase 1: Verify reproduction before attempting fix)
 
 Run: `cd hermes && uv run pytest tests/test_sandbox_isolation.py`  
-Expected: FAIL (conftest not yet created).
+Expected: FAIL (`conftest` not found or sandbox inactive).
 
-**Step 3: Implement global sandbox in `tests/conftest.py` and fix test mocks**
+**Step 3: Implement global sandbox in `tests/conftest.py` and fix test mocks**  
+*Skills:* `@skills/ponytail` (Simplest hook without extra dependencies), `@skills/python-testing`
 
 Create `hermes/tests/conftest.py`:
 ```python
 """Global pytest fixtures sandboxing hardware, serial, and subprocess execution."""
-import os
 import subprocess
 import pytest
-from unittest.mock import patch, MagicMock
 
 _SANDBOX_ACTIVE = True
 
@@ -65,7 +83,6 @@ def guard_host_execution(monkeypatch):
     orig_run = subprocess.run
     def safe_subprocess_run(cmd, *args, **kwargs):
         if isinstance(cmd, list) and any(arg in cmd for arg in ["sudo", "iptables", "fuser"]):
-            # Allow simulated runs if check=False, but prohibit real OS invocation
             if kwargs.get("check"):
                 raise RuntimeError("Direct system execution blocked in test suite")
             return subprocess.CompletedProcess(cmd, returncode=0, stdout=b"", stderr=b"")
@@ -76,12 +93,14 @@ def guard_host_execution(monkeypatch):
 
 Modify `hermes/tests/test_wifi_hotspot.py` and `hermes/tests/test_web_server.py` to patch `setup_nm_capport_config` and `ScaleUARTReader.restart`.
 
-**Step 4: Run test suite to verify all tests pass without prompts or errors**
+**Step 4: Run test suite to verify all tests pass without prompts or errors**  
+*Skill:* `@skills/verification-before-completion` (Gate: Run full command, inspect exit code and stderr)
 
-Run: `cd hermes && uv run pytest`  
+Run: `cd hermes && uv run pytest -s`  
 Expected: 100% PASS with 0 `Password:` prompts and 0 `[Errno 2]` serial port logs.
 
-**Step 5: Commit Iteration 1**
+**Step 5: Commit Iteration 1**  
+*Skill:* `@skills/git-commit-helper` (Conventional commit formatting)
 
 ```bash
 git add hermes/tests/conftest.py hermes/tests/test_sandbox_isolation.py hermes/tests/test_wifi_hotspot.py hermes/tests/test_web_server.py
@@ -90,7 +109,7 @@ git commit -m "fix(test): implement global pytest sandbox preventing host and ha
 
 ---
 
-### Iteration 2: Consolidate Wi-Fi Subsystem (Clean Code & YAGNI)
+### Iteration 2: Consolidate Wi-Fi Subsystem (Clean Code, YAGNI & Deslop)
 
 **Files:**
 - Create: `hermes/src/devices/wifi/manager.py` (Unified NMCLI connection, scanning, hotspot, watchdog)
@@ -98,7 +117,12 @@ git commit -m "fix(test): implement global pytest sandbox preventing host and ha
 - Modify: `hermes/src/devices/wifi/__init__.py` (Public API facade preserving backward compatibility)
 - Delete: 14 fragmented files (`activity.py`, `connection.py`, `connectivity.py`, `constants.py`, `hotspot.py`, `ip.py`, `portal_capport.py`, `portal_dns.py`, `portal_handlers.py`, `portal_hosts.py`, `portal_http.py`, `portal_redirect.py`, `portal_service.py`, `runner.py`, `scanner.py`, `watchdog.py`)
 
-**Step 1: Write integration test covering Wi-Fi public API**
+**Applicable Skills:**
+- Primary: `@skills/architecture`, `@skills/clean-code`, `@skills/deslop`
+- Secondary: `@skills/test-driven-development`, `@skills/ponytail`, `@skills/verification-loop`, `@skills/git-commit-helper`
+
+**Step 1: Write integration test covering Wi-Fi public API**  
+*Skill:* `@skills/test-driven-development` (Establish contract baseline)
 
 Create `hermes/tests/test_wifi_facade.py`:
 ```python
@@ -123,24 +147,28 @@ class TestWiFiFacade(unittest.TestCase):
         self.assertTrue(callable(stop_emergency_hotspot))
 ```
 
-**Step 2: Run test to verify initial state**
+**Step 2: Run test to verify initial state**  
+*Skill:* `@skills/verification-before-completion`
 
 Run: `cd hermes && uv run pytest tests/test_wifi_facade.py`  
 Expected: PASS.
 
-**Step 3: Implement consolidated `manager.py`, `portal.py`, and `__init__.py`**
+**Step 3: Implement consolidated `manager.py`, `portal.py`, and `__init__.py`**  
+*Skills:* `@skills/clean-code` (SRP, DRY, max 20 lines functions), `@skills/ponytail` (Boring over clever, fewest files possible), `@skills/deslop` (Remove inline imports, remove compressed semicolon lines)
 
 - Group all NMCLI interaction, interface discovery, scanning, connection state, and watchdog loop into `manager.py`.
 - Group all DNS packet interception, HTTP captive portal routes, and RFC 8910 Option 114 endpoints into `portal.py`.
 - Remove all semicolon line compression and in-function circular imports.
 - Update `src/devices/wifi/__init__.py` to re-export the unified functions.
 
-**Step 4: Run test suite to verify 0 regressions**
+**Step 4: Run test suite to verify 0 regressions**  
+*Skill:* `@skills/verification-loop` (Full test pass verification)
 
 Run: `cd hermes && uv run pytest tests/test_wifi*.py`  
 Expected: 100% PASS.
 
-**Step 5: Delete legacy fragmented micro-files and commit**
+**Step 5: Delete legacy fragmented micro-files and commit**  
+*Skills:* `@skills/ponytail` (Deletion over addition), `@skills/git-commit-helper`
 
 ```bash
 git rm hermes/src/devices/wifi/portal_*.py hermes/src/devices/wifi/activity.py hermes/src/devices/wifi/hotspot.py hermes/src/devices/wifi/runner.py hermes/src/devices/wifi/scanner.py hermes/src/devices/wifi/ip.py hermes/src/devices/wifi/constants.py hermes/src/devices/wifi/connectivity.py hermes/src/devices/wifi/connection.py hermes/src/devices/wifi/watchdog.py
@@ -158,9 +186,14 @@ git commit -m "refactor(wifi): consolidate 17 fragmented micro-files into cohesi
 - Move: `hermes/wifi_setup.py` -> `hermes/scripts/wifi_setup.py`
 - Modify: `hermes/src/core/session.py`, `hermes/src/integrations/gluvok.py` (Update image compression imports)
 
-**Step 1: Write test for camera image compression**
+**Applicable Skills:**
+- Primary: `@skills/clean-code`, `@skills/ponytail`
+- Secondary: `@skills/deslop`, `@skills/python-testing`, `@skills/verification-before-completion`, `@skills/git-commit-helper`
 
-Create test in `hermes/tests/test_camera.py`:
+**Step 1: Write test for camera image compression**  
+*Skill:* `@skills/python-testing`
+
+Add test in `hermes/tests/test_camera.py`:
 ```python
 def test_camera_compress_image_bytes():
     from src.devices.camera import compress_image_bytes
@@ -169,18 +202,21 @@ def test_camera_compress_image_bytes():
     assert res is not None or res == dummy_jpeg
 ```
 
-**Step 2: Fold `compress_image_bytes` into `src/devices/camera.py` and delete `src/services/`**
+**Step 2: Fold `compress_image_bytes` into `src/devices/camera.py` and delete `src/services/`**  
+*Skills:* `@skills/ponytail` (YAGNI, prune single-function packages), `@skills/deslop`
 
 - Move `compress_image_bytes` directly into `src/devices/camera.py`.
 - Update imports in `src/core/session.py` and `src/integrations/gluvok.py`.
 - Relocate root `wifi_setup.py` to `scripts/wifi_setup.py`.
 
-**Step 3: Run test suite to verify zero broken imports**
+**Step 3: Run test suite to verify zero broken imports**  
+*Skill:* `@skills/verification-before-completion`
 
 Run: `cd hermes && uv run pytest`  
 Expected: 100% PASS.
 
-**Step 4: Commit cleanup**
+**Step 4: Commit cleanup**  
+*Skill:* `@skills/git-commit-helper`
 
 ```bash
 git rm -r hermes/src/services hermes/wifi_setup.py
@@ -190,7 +226,7 @@ git commit -m "refactor(layout): fold image compressor into camera module and mo
 
 ---
 
-### Iteration 4: SQLite Store-and-Forward Weighment Durability (TDD)
+### Iteration 4: SQLite Store-and-Forward Weighment Durability (TDD & Database Architecture)
 
 **Files:**
 - Modify: `hermes/src/core/db.py`
@@ -198,7 +234,12 @@ git commit -m "refactor(layout): fold image compressor into camera module and mo
 - Modify: `hermes/src/core/stability.py:154-180`
 - Test: `hermes/tests/test_spool_queue.py`
 
-**Step 1: Write failing test for offline store-and-forward queue**
+**Applicable Skills:**
+- Primary: `@skills/architecture`, `@skills/database-design`, `@skills/test-driven-development`
+- Secondary: `@skills/systematic-debugging`, `@skills/clean-code`, `@skills/verification-before-completion`, `@skills/git-commit-helper`
+
+**Step 1: Write failing test for offline store-and-forward queue**  
+*Skill:* `@skills/test-driven-development` (RED phase: Write failing test verifying zero weighment loss)
 
 Create `hermes/tests/test_spool_queue.py`:
 ```python
@@ -223,12 +264,14 @@ class TestSpoolQueue(unittest.TestCase):
         self.assertEqual(len(get_pending_weighments()), 0)
 ```
 
-**Step 2: Run test to verify it fails**
+**Step 2: Run test to verify it fails**  
+*Skill:* `@skills/systematic-debugging` (Verify reproduction before implementation)
 
 Run: `cd hermes && uv run pytest tests/test_spool_queue.py`  
-Expected: FAIL (module `src.core.spool` does not exist).
+Expected: FAIL (`src.core.spool` does not exist).
 
-**Step 3: Implement `weighment_queue` in `db.py` and spool manager in `spool.py`**
+**Step 3: Implement `weighment_queue` in `db.py` and spool manager in `spool.py`**  
+*Skills:* `@skills/database-design` (WAL mode, FIFO queue indexing, atomic row updates), `@skills/clean-code`
 
 - Add schema to `src/core/db.py`:
 ```sql
@@ -244,12 +287,14 @@ CREATE INDEX IF NOT EXISTS idx_weighment_queue_status ON weighment_queue(status,
 - Implement `src/core/spool.py` with `enqueue_weighment()`, `get_pending_weighments()`, and background queue drain worker.
 - Update `src/core/stability.py:_trigger_upload()` to call `enqueue_weighment()` when offline instead of discarding.
 
-**Step 4: Run test to verify it passes**
+**Step 4: Run test to verify it passes**  
+*Skill:* `@skills/verification-before-completion` (GREEN phase: Ensure full test suite passes)
 
 Run: `cd hermes && uv run pytest tests/test_spool_queue.py`  
 Expected: PASS.
 
-**Step 5: Commit store-and-forward implementation**
+**Step 5: Commit store-and-forward implementation**  
+*Skill:* `@skills/git-commit-helper`
 
 ```bash
 git add hermes/src/core/db.py hermes/src/core/spool.py hermes/src/core/stability.py hermes/tests/test_spool_queue.py
@@ -267,22 +312,30 @@ git commit -m "feat(core): implement SQLite store-and-forward queue to eliminate
 - Create: `hermes/.env.example`
 - Modify: `hermes/scripts/deploy.py`
 
-**Step 1: Sanitize hardcoded production RTSP passwords and default credentials**
+**Applicable Skills:**
+- Primary: `@skills/security-audit`, `@skills/secrets-management`, `@skills/find-bugs`
+- Secondary: `@skills/credentials`, `@skills/systematic-debugging`, `@skills/ponytail`, `@skills/verification-before-completion`, `@skills/git-commit-helper`
+
+**Step 1: Sanitize hardcoded production RTSP passwords and default credentials**  
+*Skills:* `@skills/secrets-management`, `@skills/credentials` (Never commit secrets to source control)
 
 - Replace credentials in `src/config/client_config.py` with environment-driven placeholders.
 - Remove hardcoded password fallback in `src/web/auth.py`, enforcing an environment variable or randomized session token.
 - Update `scripts/deploy.py` to remove `find {target} -name '*.py' -delete`.
 
-**Step 2: Create `.env.example` documenting configuration keys**
+**Step 2: Create `.env.example` documenting configuration keys**  
+*Skill:* `@skills/security-review` (Audit environment boundary parameters)
 
 Create `hermes/.env.example` with documented keys (`SUPERADMIN_PASS`, `DEVICE_ID`, `DEVICE_KEY`, `CENTER_ID`, `ANPR_CAMERA_URLS`).
 
-**Step 3: Run security scan script to confirm 0 exposed credentials**
+**Step 3: Run security scan script to confirm 0 exposed credentials**  
+*Skills:* `@skills/find-bugs`, `@skills/verification-before-completion`
 
 Run: `cd hermes && uv run python scripts/audit_credentials.py`  
 Expected: 0 production credentials flagged.
 
-**Step 4: Commit sanitization**
+**Step 4: Commit sanitization**  
+*Skill:* `@skills/git-commit-helper`
 
 ```bash
 git add hermes/src/config/client_config.py hermes/src/config/constants.py hermes/src/web/auth.py hermes/.env.example hermes/scripts/deploy.py
@@ -298,7 +351,12 @@ git commit -m "security(config): sanitize hardcoded credentials and fix destruct
 - Update: `hermes/README.md`
 - Update: `hermes/docs/CODEBASE_REFERENCE.md`
 
-**Step 1: Rewrite `ARCHITECTURE.md` into a zero-slop factual specification**
+**Applicable Skills:**
+- Primary: `@skills/writing-clearly-and-concisely`, `@skills/no-ai-slop`, `@skills/verification-loop`
+- Secondary: `@skills/documentation-templates`, `@skills/verification-before-completion`, `@skills/git-commit-helper`
+
+**Step 1: Rewrite `ARCHITECTURE.md` into a zero-slop factual specification**  
+*Skills:* `@skills/writing-clearly-and-concisely`, `@skills/no-ai-slop` (Zero corporate buzzwords, show don't tell, eliminate colon reveals, factual state machines and thread topologies)
 
 Document:
 - Validated state machine flow.
@@ -307,7 +365,8 @@ Document:
 - Thread topology and free-threaded Python 3.14 safety guarantees.
 - Remove all artificial "60 lines per file" claims and offline discard contradictions.
 
-**Step 2: Update `README.md` with operational runbook**
+**Step 2: Update `README.md` with operational runbook**  
+*Skill:* `@skills/documentation-templates` (Clear runbook and setup guidelines)
 
 Clear instructions for:
 - Environment setup: `uv sync`
@@ -315,7 +374,8 @@ Clear instructions for:
 - Starting controller: `uv run python main.py`
 - Wi-Fi CLI setup: `uv run python scripts/wifi_setup.py`
 
-**Step 3: Run ECC Final Verification Gate**
+**Step 3: Run ECC Final Verification Gate**  
+*Skill:* `@skills/verification-loop` (Comprehensive 5-Phase verification system)
 
 Run:
 ```bash
@@ -329,7 +389,11 @@ git status --porcelain
 ```
 Expected: All checks pass, 0 type errors, 0 lint warnings, 100% tests passing, clean working tree.
 
-**Step 4: Commit documentation and complete refactoring**
+**Step 4: Final gate assertion**  
+*Skill:* `@skills/verification-before-completion` (No success claims without fresh evidence)
+
+**Step 5: Commit documentation and complete refactoring**  
+*Skill:* `@skills/git-commit-helper`
 
 ```bash
 git add hermes/docs/ARCHITECTURE.md hermes/README.md hermes/docs/CODEBASE_REFERENCE.md
