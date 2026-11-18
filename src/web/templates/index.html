@@ -302,6 +302,126 @@
             <!-- Populated via JS with error catalog -->
           </div>
         </div>
+
+        <!-- Vehicle Crop & Bounding Box Framing Card -->
+        <div class="p-6 rounded-xl border border-border bg-card text-card-foreground shadow-sm space-y-6">
+          <div class="flex items-center justify-between pb-4 border-b border-border">
+            <div class="flex items-center gap-3">
+              <div class="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <i data-lucide="crop" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h2 class="text-base font-semibold text-foreground">Vehicle Crop & Bounding Box Framing</h2>
+                <p class="text-xs text-muted-foreground">Dynamic percentage padding expansion for primary ANPR snapshots before cloud upload</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">OKLCH ZINC DESIGN</span>
+              <button type="button" onclick="saveCropPaddingFromAnprTab()" id="btn-save-crop-padding" class="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition shadow-sm flex items-center gap-1.5 cursor-pointer">
+                <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                <span>Save Padding</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Interactive Wireframe Stage & Preview -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <!-- Visual Framing Box (Aspect Ratio 16:10) -->
+            <div class="lg:col-span-7 bg-zinc-950 border border-zinc-900 rounded-xl p-4 flex flex-col items-center justify-center relative overflow-hidden min-h-[300px]">
+              <div class="text-[11px] font-mono text-zinc-500 uppercase tracking-widest absolute top-3 left-4 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Live Crop Simulation Wireframe
+              </div>
+
+              <!-- Simulated Camera Frame Canvas -->
+              <div id="crop-preview-frame" class="relative w-full max-w-[420px] aspect-[16/10] bg-zinc-900/60 border border-zinc-800 rounded-lg flex items-center justify-center overflow-hidden shadow-inner">
+                <!-- Center Vehicle Representation -->
+                <div id="crop-preview-vehicle" class="absolute w-[180px] h-[100px] bg-secondary/80 border border-sky-400/60 rounded flex flex-col items-center justify-center text-center p-1 z-10 shadow-md">
+                  <i data-lucide="truck" class="w-6 h-6 text-sky-400 mb-1"></i>
+                  <span class="text-[10px] font-mono text-zinc-300 font-semibold">VEHICLE DETECTED</span>
+                  <span class="text-[9px] font-mono text-zinc-500">Argus [x1, y1, x2, y2]</span>
+                </div>
+
+                <!-- Dynamic Crop Expansion Box -->
+                <div id="crop-preview-bounding-box" class="absolute border-2 border-dashed border-emerald-400 bg-emerald-500/10 rounded transition-all duration-150 pointer-events-none z-20 flex items-start justify-end p-1">
+                  <span class="text-[9px] font-mono font-bold text-emerald-400 bg-black/75 px-1 rounded">CROP OUTPUT</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between w-full max-w-[420px] pt-3 text-[11px] font-mono text-zinc-500">
+                <span>Frame: 100% Full Resolution</span>
+                <span id="crop-calculated-dim" class="text-emerald-400 font-bold">Padding: +10% T/B, +15% L/R</span>
+              </div>
+            </div>
+
+            <!-- Sliders Column -->
+            <div class="lg:col-span-5 space-y-4">
+              <div class="p-4 rounded-lg bg-secondary/40 border border-border space-y-3">
+                <!-- Top Slider -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <label for="crop_pad_top_slider" class="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <i data-lucide="arrow-up-to-line" class="w-3.5 h-3.5 text-sky-400"></i>
+                      Top Padding
+                    </label>
+                    <span id="crop_pad_top_val" class="text-xs font-mono text-sky-400 font-bold">10%</span>
+                  </div>
+                  <input id="crop_pad_top_slider" type="range" min="0" max="50" step="1" value="10"
+                    oninput="updateCropPaddingLive('top', this.value)"
+                    class="w-full accent-sky-400 cursor-pointer" />
+                  <p class="text-[11px] text-muted-foreground">Roof clearance expansion above detected vehicle</p>
+                </div>
+
+                <!-- Bottom Slider -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <label for="crop_pad_bottom_slider" class="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5 text-sky-400"></i>
+                      Bottom Padding
+                    </label>
+                    <span id="crop_pad_bottom_val" class="text-xs font-mono text-sky-400 font-bold">10%</span>
+                  </div>
+                  <input id="crop_pad_bottom_slider" type="range" min="0" max="50" step="1" value="10"
+                    oninput="updateCropPaddingLive('bottom', this.value)"
+                    class="w-full accent-sky-400 cursor-pointer" />
+                  <p class="text-[11px] text-muted-foreground">Tire & road margin expansion below vehicle</p>
+                </div>
+
+                <!-- Left Slider -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <label for="crop_pad_left_slider" class="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <i data-lucide="arrow-left-to-line" class="w-3.5 h-3.5 text-sky-400"></i>
+                      Left Padding
+                    </label>
+                    <span id="crop_pad_left_val" class="text-xs font-mono text-sky-400 font-bold">15%</span>
+                  </div>
+                  <input id="crop_pad_left_slider" type="range" min="0" max="50" step="1" value="15"
+                    oninput="updateCropPaddingLive('left', this.value)"
+                    class="w-full accent-sky-400 cursor-pointer" />
+                  <p class="text-[11px] text-muted-foreground">Lateral margin expansion for left vehicle side</p>
+                </div>
+
+                <!-- Right Slider -->
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between">
+                    <label for="crop_pad_right_slider" class="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <i data-lucide="arrow-right-to-line" class="w-3.5 h-3.5 text-sky-400"></i>
+                      Right Padding
+                    </label>
+                    <span id="crop_pad_right_val" class="text-xs font-mono text-sky-400 font-bold">15%</span>
+                  </div>
+                  <input id="crop_pad_right_slider" type="range" min="0" max="50" step="1" value="15"
+                    oninput="updateCropPaddingLive('right', this.value)"
+                    class="w-full accent-sky-400 cursor-pointer" />
+                  <p class="text-[11px] text-muted-foreground">Lateral margin expansion for right vehicle side</p>
+                </div>
+              </div>
+              <div id="crop-anpr-feedback" class="hidden text-xs p-2.5 rounded-lg font-medium"></div>
+            </div>
+          </div>
+        </div>
+        </div>
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -591,7 +711,7 @@
                   <span id="cfg-crop-pad-top-val" class="text-xs font-mono text-sky-400 font-bold">10%</span>
                 </div>
                 <input id="cfg-crop-pad-top" type="range" min="0" max="50" step="1" value="10"
-                  oninput="document.getElementById('cfg-crop-pad-top-val').textContent = this.value + '%'"
+                  oninput="updateCropPaddingLive('top', this.value)"
                   class="w-full accent-sky-400 cursor-pointer" />
                 <p class="text-xs text-muted-foreground">Expansion above vehicle roof</p>
               </div>
@@ -602,7 +722,7 @@
                   <span id="cfg-crop-pad-bottom-val" class="text-xs font-mono text-sky-400 font-bold">10%</span>
                 </div>
                 <input id="cfg-crop-pad-bottom" type="range" min="0" max="50" step="1" value="10"
-                  oninput="document.getElementById('cfg-crop-pad-bottom-val').textContent = this.value + '%'"
+                  oninput="updateCropPaddingLive('bottom', this.value)"
                   class="w-full accent-sky-400 cursor-pointer" />
                 <p class="text-xs text-muted-foreground">Expansion below tires & road</p>
               </div>
@@ -613,7 +733,7 @@
                   <span id="cfg-crop-pad-left-val" class="text-xs font-mono text-sky-400 font-bold">15%</span>
                 </div>
                 <input id="cfg-crop-pad-left" type="range" min="0" max="50" step="1" value="15"
-                  oninput="document.getElementById('cfg-crop-pad-left-val').textContent = this.value + '%'"
+                  oninput="updateCropPaddingLive('left', this.value)"
                   class="w-full accent-sky-400 cursor-pointer" />
                 <p class="text-xs text-muted-foreground">Expansion toward left side</p>
               </div>
@@ -624,7 +744,7 @@
                   <span id="cfg-crop-pad-right-val" class="text-xs font-mono text-sky-400 font-bold">15%</span>
                 </div>
                 <input id="cfg-crop-pad-right" type="range" min="0" max="50" step="1" value="15"
-                  oninput="document.getElementById('cfg-crop-pad-right-val').textContent = this.value + '%'"
+                  oninput="updateCropPaddingLive('right', this.value)"
                   class="w-full accent-sky-400 cursor-pointer" />
                 <p class="text-xs text-muted-foreground">Expansion toward right side</p>
               </div>
@@ -936,6 +1056,17 @@
         const elRight = document.getElementById('cfg-crop-pad-right');
         if (elRight) { elRight.value = padRight; document.getElementById('cfg-crop-pad-right-val').textContent = padRight + '%'; }
 
+        // Populate ANPR Tab Crop Sliders & Wireframe
+        const sliderTop = document.getElementById('crop_pad_top_slider');
+        if (sliderTop) { sliderTop.value = padTop; document.getElementById('crop_pad_top_val').textContent = padTop + '%'; }
+        const sliderBottom = document.getElementById('crop_pad_bottom_slider');
+        if (sliderBottom) { sliderBottom.value = padBottom; document.getElementById('crop_pad_bottom_val').textContent = padBottom + '%'; }
+        const sliderLeft = document.getElementById('crop_pad_left_slider');
+        if (sliderLeft) { sliderLeft.value = padLeft; document.getElementById('crop_pad_left_val').textContent = padLeft + '%'; }
+        const sliderRight = document.getElementById('crop_pad_right_slider');
+        if (sliderRight) { sliderRight.value = padRight; document.getElementById('crop_pad_right_val').textContent = padRight + '%'; }
+        updateCropWireframeVisual(padTop, padBottom, padLeft, padRight);
+
         // Populate ANPR Cameras
         const anprContainer = document.getElementById('cfg-anpr-cameras-container');
         anprContainer.innerHTML = '';
@@ -1076,6 +1207,95 @@
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Save Configuration';
         lucide.createIcons();
+      }
+    }
+
+    function updateCropPaddingLive(side, value) {
+      const valEl = document.getElementById('crop_pad_' + side + '_val');
+      if (valEl) valEl.textContent = value + '%';
+      const cfgInput = document.getElementById('cfg-crop-pad-' + side);
+      if (cfgInput) {
+        cfgInput.value = value;
+        const cfgValEl = document.getElementById('cfg-crop-pad-' + side + '-val');
+        if (cfgValEl) cfgValEl.textContent = value + '%';
+      }
+      const slider = document.getElementById('crop_pad_' + side + '_slider');
+      if (slider && slider.value !== value) slider.value = value;
+
+      const top = parseFloat(document.getElementById('crop_pad_top_slider')?.value || 10);
+      const bottom = parseFloat(document.getElementById('crop_pad_bottom_slider')?.value || 10);
+      const left = parseFloat(document.getElementById('crop_pad_left_slider')?.value || 15);
+      const right = parseFloat(document.getElementById('crop_pad_right_slider')?.value || 15);
+      updateCropWireframeVisual(top, bottom, left, right);
+    }
+
+    function updateCropWireframeVisual(top, bottom, left, right) {
+      const box = document.getElementById('crop-preview-bounding-box');
+      const dim = document.getElementById('crop-calculated-dim');
+      if (!box) return;
+      const baseW = 180;
+      const baseH = 100;
+      const padL = baseW * (left / 100);
+      const padR = baseW * (right / 100);
+      const padT = baseH * (top / 100);
+      const padB = baseH * (bottom / 100);
+      box.style.width = Math.min(380, baseW + padL + padR) + 'px';
+      box.style.height = Math.min(220, baseH + padT + padB) + 'px';
+      if (dim) {
+        dim.textContent = `Padding: +${top}% T, +${bottom}% B, +${left}% L, +${right}% R`;
+      }
+    }
+
+    async function saveCropPaddingFromAnprTab() {
+      const btn = document.getElementById('btn-save-crop-padding');
+      const fb = document.getElementById('crop-anpr-feedback');
+      const top = parseFloat(document.getElementById('crop_pad_top_slider')?.value || 10);
+      const bottom = parseFloat(document.getElementById('crop_pad_bottom_slider')?.value || 10);
+      const left = parseFloat(document.getElementById('crop_pad_left_slider')?.value || 15);
+      const right = parseFloat(document.getElementById('crop_pad_right_slider')?.value || 15);
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Saving...';
+        lucide.createIcons();
+      }
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            crop_pad_top: top,
+            crop_pad_bottom: bottom,
+            crop_pad_left: left,
+            crop_pad_right: right
+          })
+        });
+        const data = await res.json();
+        if (fb) {
+          fb.classList.remove('hidden');
+          if (res.ok && data.success) {
+            fb.className = 'text-xs p-2.5 rounded-lg font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 block';
+            fb.textContent = 'Crop padding saved successfully to SQLite runtime config.';
+          } else {
+            fb.className = 'text-xs p-2.5 rounded-lg font-medium bg-destructive/10 border border-destructive/20 text-destructive block';
+            fb.textContent = data.error || 'Failed to save crop padding.';
+          }
+          setTimeout(() => fb.classList.add('hidden'), 4000);
+        }
+      } catch (err) {
+        if (fb) {
+          fb.classList.remove('hidden');
+          fb.className = 'text-xs p-2.5 rounded-lg font-medium bg-destructive/10 border border-destructive/20 text-destructive block';
+          fb.textContent = 'Network error saving padding.';
+          setTimeout(() => fb.classList.add('hidden'), 4000);
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="save" class="w-3.5 h-3.5"></i> Save Padding';
+          lucide.createIcons();
+        }
       }
     }
 
