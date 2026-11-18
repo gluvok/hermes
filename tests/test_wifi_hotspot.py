@@ -23,9 +23,10 @@ class TestWiFiHotspot(unittest.TestCase):
         self.assertTrue(hotspot.stop_hotspot()); self.assertTrue(hotspot.stop_hotspot())
         self.assertFalse(hotspot.is_hotspot_active())
 
+    @patch("src.devices.wifi.hotspot.setup_nm_capport_config", return_value=True)
     @patch("src.devices.wifi.portal_service.portal_service.start", return_value=True)
     @patch("src.devices.wifi.portal_service.portal_service.stop", return_value=None)
-    def test_emergency_hotspot_lifecycle(self, mock_stop: MagicMock, mock_start: MagicMock) -> None:
+    def test_emergency_hotspot_lifecycle(self, mock_stop: MagicMock, mock_start: MagicMock, mock_capport: MagicMock) -> None:
         self.assertTrue(hotspot.start_emergency_hotspot("hermes", "12345678"))
         self.assertTrue(hotspot.is_hotspot_active())
         self.assertTrue(hotspot.stop_emergency_hotspot()); self.assertTrue(hotspot.stop_emergency_hotspot())
