@@ -20,5 +20,11 @@ build_tmp/
 hermes
 hermes.sh
 
+# Test & coverage caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.log
+
 # Virtual environments
 .venv/
