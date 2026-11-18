@@ -52,7 +52,8 @@ class TestSpoolQueue(unittest.TestCase):
         self.assertEqual(pending[0]["last_error"], "Timeout connecting to cloud")
 
     @patch(
-        "src.integrations.gluvok.post_to_cloud", return_value=(True, "CLOUD_ENTRY_999")
+        "src.integrations.gluvok.post_to_cloud",
+        return_value=(True, "CLOUD_ENTRY_999", None, False),
     )
     @patch("src.devices.is_wifi_connected", return_value=True)
     def test_drain_spool_queue_success(self, mock_wifi, mock_post):

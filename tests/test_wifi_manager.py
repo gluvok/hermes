@@ -5,7 +5,12 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.devices.wifi import connection, connectivity, runner, scanner
+from src.devices.wifi import manager
+
+connection = manager
+connectivity = manager
+runner = manager
+scanner = manager
 
 
 class TestWiFiManager(unittest.TestCase):

@@ -6,7 +6,12 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.devices.wifi import activity, hotspot, runner, watchdog
+from src.devices.wifi import manager
+
+activity = manager
+hotspot = manager
+runner = manager
+watchdog = manager
 
 
 class TestWiFiHotspot(unittest.TestCase):

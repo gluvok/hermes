@@ -229,9 +229,11 @@ def verify_entry_in_cloud(
     return None
 
 
-def post_to_cloud(session_payload: dict[str, Any]) -> None:
-    """
-    Bridge function: transmits entry from session dictionary and updates telemetry.
+def post_to_cloud(
+    session_payload: dict[str, Any],
+) -> tuple[bool, str | None, str | None, bool]:
+    """Bridge function: transmits entry from session dictionary and updates telemetry.
+
     Preserved for direct callers; does NOT wipe session_payload on completion.
     """
     center_id = int(config.center_id)
@@ -254,7 +256,7 @@ def post_to_cloud(session_payload: dict[str, Any]) -> None:
             if b and isinstance(b, bytes):
                 images_to_send.append((f"truck_{cam_name}.jpg", b))
 
-    transmit_entry_multipart(
+    return transmit_entry_multipart(
         center_id=center_id,
         detected_vehicle_number=plate,
         weight=weight,

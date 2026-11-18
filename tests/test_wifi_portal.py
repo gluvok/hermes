@@ -10,10 +10,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from src.devices.wifi.portal_dns import _build_response
-from src.devices.wifi.portal_hosts import ensure_local_domain
-from src.devices.wifi.portal_http import CaptiveHTTPServer
-from src.devices.wifi.runner import SIMULATION_STATE
+from src.devices.wifi import (
+    SIMULATION_STATE,
+    CaptiveHTTPServer,
+    _build_response,
+    ensure_local_domain,
+)
 
 
 class NoRedirectHandler(urllib.request.HTTPRedirectHandler):

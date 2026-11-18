@@ -152,12 +152,12 @@ def drain_spool_queue() -> int:
         sid = item["session_id"]
         pkg = item["payload"]
         try:
-            success, entry_id = post_to_cloud(pkg)
-            if success:
+            success, _entry_id, err, dup = post_to_cloud(pkg)
+            if success or dup:
                 mark_weighment_completed(sid)
                 transmitted += 1
             else:
-                mark_weighment_failed(sid, f"Cloud upload returned entry_id={entry_id}")
+                mark_weighment_failed(sid, f"Cloud upload returned error={err}")
         except Exception as e:  # noqa: BLE001
             mark_weighment_failed(sid, str(e))
 

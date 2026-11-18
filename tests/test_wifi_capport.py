@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.devices.wifi import portal_capport
+from src.devices.wifi import portal as portal_capport
 
 
 class TestWiFiCapport(unittest.TestCase):

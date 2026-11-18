@@ -100,6 +100,8 @@ class CaptiveDNSServer:
 
     def _listen_loop(self) -> None:
         while not self._stop_event.is_set():
+            if not self._sock:
+                break
             try:
                 data, addr = self._sock.recvfrom(512)
                 resp = _build_response(data, self.ip)

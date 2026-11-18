@@ -21,7 +21,7 @@ def assert_sandbox_active():
 @pytest.fixture(autouse=True)
 def guard_host_execution(monkeypatch):
     """Enforces simulation state and blocks raw sudo / iptables executions."""
-    from src.devices.wifi.runner import SIMULATION_STATE
+    from src.devices.wifi import SIMULATION_STATE
 
     SIMULATION_STATE["enabled"] = True
 
