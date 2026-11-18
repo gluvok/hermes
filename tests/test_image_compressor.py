@@ -6,7 +6,7 @@ import numpy as np
 from src.config.constants import ANPR_CAPTURE_INTERVAL, POST_STABILITY_DURATION
 from src.core.session import WeighbridgeSessionManager
 from src.core.stability import ScaleStabilityMachine, ScaleState
-from src.services.image_compressor import compress_image_bytes
+from src.devices.camera import compress_image_bytes
 
 
 class TestImageCompressor(unittest.TestCase):

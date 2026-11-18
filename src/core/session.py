@@ -27,6 +27,7 @@ from src.core.telemetry import record_system_event, record_weighment_result
 from src.devices.camera import (
     capture_all_camera_snapshots,
     capture_anpr_snapshots,
+    compress_image_bytes,
     fetch_image_bytes,
 )
 from src.integrations.anpr import (
@@ -34,7 +35,6 @@ from src.integrations.anpr import (
     get_highest_frequency_plate,
     send_frame_to_anpr_server,
 )
-from src.services.image_compressor import compress_image_bytes
 
 logger = logging.getLogger(__name__)
 

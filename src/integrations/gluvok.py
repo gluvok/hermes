@@ -16,7 +16,7 @@ import requests
 from src.config import config
 from src.config.constants import CLOUD_POST_TIMEOUT, GLUVOK_BASE_URL
 from src.core.telemetry import record_error_event, record_system_event
-from src.services.image_compressor import compress_image_bytes
+from src.devices.camera import compress_image_bytes
 
 logger = logging.getLogger(__name__)
 

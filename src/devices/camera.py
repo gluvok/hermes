@@ -224,10 +224,49 @@ def log_camera_fleet() -> None:
         logger.info("  └── Auxiliary Cameras: (None configured)")
 
 
+def compress_image_bytes(
+    image_bytes: bytes | None,
+    max_dim: int = 1920,
+    quality: int = 75,
+) -> bytes | None:
+    """Downscale to max_dim if larger and compress as high-clarity JPEG."""
+    if not image_bytes:
+        return None
+    try:
+        import cv2
+        import numpy as np
+
+        buf = np.frombuffer(image_bytes, dtype=np.uint8)
+        img = cv2.imdecode(buf, cv2.IMREAD_COLOR)
+        if img is None:
+            return image_bytes
+
+        h, w = img.shape[:2]
+        if max(h, w) > max_dim:
+            scale = max_dim / float(max(h, w))
+            new_w = max(1, round(w * scale))
+            new_h = max(1, round(h * scale))
+            img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        params = [
+            int(cv2.IMWRITE_JPEG_QUALITY),
+            int(quality),
+            int(cv2.IMWRITE_JPEG_OPTIMIZE),
+            1,
+        ]
+        ok, encoded = cv2.imencode(".jpg", img, params)
+        if ok and encoded is not None:
+            return encoded.tobytes()
+        return image_bytes
+    except (cv2.error, ValueError, TypeError, OSError):
+        return image_bytes
+
+
 __all__ = [
     "capture_all_camera_snapshots",
     "capture_anpr_snapshots",
     "capture_auxiliary_snapshots",
+    "compress_image_bytes",
     "fetch_image_bytes",
     "log_camera_fleet",
 ]
