@@ -11,7 +11,10 @@ class TestScaleNoiseAndJitter(unittest.TestCase):
         self.parsed = []
 
     def test_split_packets_and_noise_bytes_reconstruction(self):
-        with patch("src.devices.scale.handle_scale_char_processed", side_effect=lambda w: self.parsed.append(w)):
+        with patch(
+            "src.devices.scale.handle_scale_char_processed",
+            side_effect=lambda w: self.parsed.append(w),
+        ):
             # Fragmented packet across buffer boundaries with framing noise
             self.reader.handle_scale_char("\x02NOISE_")
             self.reader.handle_scale_char("28450")

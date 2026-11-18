@@ -291,7 +291,7 @@ def compress_image_bytes(
         if ok and encoded is not None:
             return encoded.tobytes()
         return image_bytes
-    except cv2.error, ValueError, TypeError, OSError:
+    except (cv2.error, ValueError, TypeError, OSError):
         return image_bytes
 
 

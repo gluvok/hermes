@@ -17,6 +17,7 @@ class TestCameraMemoryLeak(unittest.TestCase):
 
         compressed = compress_image_bytes(raw_buffer, max_dim=1920, quality=75)
         self.assertIsNotNone(compressed)
+        assert compressed is not None
         # Ensure compressed size is significantly bounded (under 500 KB)
         self.assertLessEqual(len(compressed), 500 * 1024)
 

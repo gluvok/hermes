@@ -31,7 +31,12 @@ class TestPartitionResilience(unittest.TestCase):
             self.assertEqual(spool_queue_count(), 2)
 
         # Connected: Drain transmits both in FIFO order with 4-tuple return
-        with patch("src.devices.is_wifi_connected", return_value=True), \
-             patch("src.integrations.gluvok.post_to_cloud", return_value=(True, "ENTRY_999", None, False)):
+        with (
+            patch("src.devices.is_wifi_connected", return_value=True),
+            patch(
+                "src.integrations.gluvok.post_to_cloud",
+                return_value=(True, "ENTRY_999", None, False),
+            ),
+        ):
             self.assertEqual(drain_spool_queue(), 2)
             self.assertEqual(spool_queue_count(), 0)

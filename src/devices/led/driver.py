@@ -26,7 +26,7 @@ def _open_gpio(pin: int) -> Any:
         if os.path.exists(chip):
             try:
                 return GPIO(chip, pin, "out")
-            except GPIOError, LookupError, OSError:
+            except (GPIOError, LookupError, OSError):
                 logger.debug("Failed opening GPIO %d on chip %s", pin, chip)
     return GPIO(pin, "out")
 

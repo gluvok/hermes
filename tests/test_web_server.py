@@ -79,7 +79,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
     def test_static_stylesheet_linked_offline(self):
         res = self.client.get("/")
         html = res.get_data(as_text=True)
-        self.assertIn('/static/style.css', html)
+        self.assertIn("/static/style.css", html)
         self.assertNotIn("tailwindcss.com", html)
         self.assertNotIn("unpkg.com", html)
         self.assertNotIn("cdn.jsdelivr.net", html)

@@ -13,7 +13,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Any
+from typing import Any, Literal, overload
 
 import requests
 
@@ -66,8 +66,8 @@ def _extract_plate_from_dict(
             if isinstance(first, dict):
                 plate_clean = _normalize_plate_value(first.get("plate"))
                 raw_box = first.get("vehicle_box")
-                vbox = (
-                    tuple(int(v) for v in raw_box)
+                vbox: tuple[int, int, int, int] | None = (
+                    (int(raw_box[0]), int(raw_box[1]), int(raw_box[2]), int(raw_box[3]))
                     if raw_box and len(raw_box) >= 4
                     else None
                 )
@@ -132,7 +132,27 @@ def _parse_anpr_response(
     return None, error_code, None
 
 
-type AnprRecordCallback = Callable[..., Any]
+AnprRecordCallback = Callable[..., Any]
+
+
+@overload
+def send_frame_to_anpr_server(
+    image_bytes: bytes | None,
+    server_url: str | None = None,
+    timeout: float = ANPR_SERVER_TIMEOUT,
+    session: requests.Session | None = None,
+    return_details: Literal[False] = False,
+) -> tuple[str | None, str]: ...
+
+
+@overload
+def send_frame_to_anpr_server(
+    image_bytes: bytes | None,
+    server_url: str | None = None,
+    timeout: float = ANPR_SERVER_TIMEOUT,
+    session: requests.Session | None = None,
+    return_details: Literal[True] = True,
+) -> tuple[str | None, str, tuple[int, int, int, int] | None]: ...
 
 
 def send_frame_to_anpr_server(
@@ -157,18 +177,14 @@ def send_frame_to_anpr_server(
         else:
             response = requests.post(target_url, files=files, timeout=timeout)
         elapsed_ms = (time.time() - start_time) * 1000.0
-        plate, status_code, vbox = _parse_anpr_response(
-            response, elapsed_ms=elapsed_ms
-        )
+        plate, status_code, vbox = _parse_anpr_response(response, elapsed_ms=elapsed_ms)
         return (plate, status_code, vbox) if return_details else (plate, status_code)
     except requests.exceptions.Timeout:
         logger.warning(
             f"[ANPR] Timeout ({timeout}s) contacting ANPR server at {target_url}"
         )
         return (
-            (None, "ANPR_TIMEOUT", None)
-            if return_details
-            else (None, "ANPR_TIMEOUT")
+            (None, "ANPR_TIMEOUT", None) if return_details else (None, "ANPR_TIMEOUT")
         )
     except requests.exceptions.ConnectionError:
         logger.warning(
@@ -219,9 +235,7 @@ def send_and_record_anpr_frame(
                 )
             except TypeError:
                 try:
-                    res = sender_fn(
-                        image_bytes, server_url=server_url, session=session
-                    )
+                    res = sender_fn(image_bytes, server_url=server_url, session=session)
                 except TypeError:
                     res = sender_fn(image_bytes)
         else:

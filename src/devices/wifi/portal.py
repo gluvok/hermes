@@ -107,7 +107,7 @@ class CaptiveDNSServer:
                 resp = _build_response(data, self.ip)
                 if resp:
                     self._sock.sendto(resp, addr)
-            except TimeoutError, OSError:
+            except (TimeoutError, OSError):
                 continue
 
     def stop(self) -> None:
@@ -264,7 +264,7 @@ def setup_nm_capport_config(
             dir_path.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content, encoding="utf-8")
             return True
-        except OSError, PermissionError:
+        except (OSError, PermissionError):
             pass
         pfx = (
             ["sudo", "-n"]
@@ -277,7 +277,7 @@ def setup_nm_capport_config(
             cmd, input=content.encode("utf-8"), capture_output=True, check=False
         )
         return proc.returncode == 0
-    except subprocess.SubprocessError, OSError:
+    except (subprocess.SubprocessError, OSError):
         return False
 
 
@@ -293,7 +293,7 @@ def teardown_nm_capport_config() -> None:
             try:
                 file_path.unlink(missing_ok=True)
                 return
-            except OSError, PermissionError:
+            except (OSError, PermissionError):
                 pass
             pfx = (
                 ["sudo", "-n"]
@@ -301,7 +301,7 @@ def teardown_nm_capport_config() -> None:
                 else []
             )
             subprocess.run(pfx + ["rm", "-f", str(file_path)], check=False)
-    except subprocess.SubprocessError, OSError:
+    except (subprocess.SubprocessError, OSError):
         pass
 
 
@@ -353,7 +353,7 @@ def ensure_local_domain(
             if res.returncode != 0:
                 raise
         return True
-    except OSError, PermissionError:
+    except (OSError, PermissionError):
         return False
 
 

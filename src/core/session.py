@@ -94,7 +94,7 @@ class WeighbridgeSessionManager:
             if self._http_session is not None:
                 try:
                     self._http_session.close()
-                except OSError, RuntimeError:
+                except (OSError, RuntimeError):
                     pass
 
             self.session_id = f"SESS_{int(time.time())}_{uuid.uuid4().hex[:6]}"
@@ -207,9 +207,7 @@ class WeighbridgeSessionManager:
         if pool is None:
             for cam_idx, img_bytes in batch_to_dispatch:
                 try:
-                    res = send_frame_to_anpr_server(
-                        img_bytes, return_details=True
-                    )
+                    res = send_frame_to_anpr_server(img_bytes, return_details=True)
                 except TypeError:
                     res = send_frame_to_anpr_server(img_bytes)
                 if isinstance(res, tuple) and len(res) >= 3:
@@ -392,11 +390,12 @@ class WeighbridgeSessionManager:
                 if not fleet_copy.get(label) and frames:
                     fleet_copy[label] = compress_image_bytes(frames[-1])
 
-            if self._last_vehicle_box and fleet_copy.get("anpr_1"):
+            raw_anpr_bytes = fleet_copy.get("anpr_1")
+            if self._last_vehicle_box and raw_anpr_bytes is not None:
                 from src.devices.crop import crop_vehicle_frame
 
                 fleet_copy["anpr_1"] = crop_vehicle_frame(
-                    fleet_copy["anpr_1"],
+                    raw_anpr_bytes,
                     self._last_vehicle_box,
                     pad_top_pct=getattr(config, "crop_pad_top", 10.0) / 100.0,
                     pad_bottom_pct=getattr(config, "crop_pad_bottom", 10.0) / 100.0,
@@ -466,7 +465,7 @@ class WeighbridgeSessionManager:
         if old_http is not None:
             try:
                 old_http.close()
-            except OSError, RuntimeError:
+            except (OSError, RuntimeError):
                 pass
 
 

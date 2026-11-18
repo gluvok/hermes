@@ -15,7 +15,9 @@ class TestDbCrashDurability(unittest.TestCase):
         try:
             init_db(db_path)
             # Enqueue session before crash
-            enqueue_weighment("CRASH_TEST_01", {"weight": 14200.0, "plate": "DL01AB1234"})
+            enqueue_weighment(
+                "CRASH_TEST_01", {"weight": 14200.0, "plate": "DL01AB1234"}
+            )
 
             # Simulate abrupt process termination without graceful close
             # Verify WAL journal integrity upon re-opening

@@ -61,7 +61,7 @@ def get_pending_weighments(limit: int = 20) -> list[dict[str, Any]]:
             for row in rows:
                 try:
                     payload = json.loads(row[1])
-                except json.JSONDecodeError, TypeError:
+                except (json.JSONDecodeError, TypeError):
                     payload = {}
                 results.append(
                     {
@@ -129,7 +129,7 @@ def spool_queue_count() -> int:
             )
             row = cursor.fetchone()
             return int(row[0]) if row else 0
-        except sqlite3.Error, OSError:
+        except (sqlite3.Error, OSError):
             return 0
 
 

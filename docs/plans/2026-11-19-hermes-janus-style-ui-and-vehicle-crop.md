@@ -172,9 +172,7 @@ def crop_vehicle_frame(
             return image_bytes
 
         cropped = frame[crop_y1:crop_y2, crop_x1:crop_x2]
-        success, encoded = cv2.imencode(
-            ".jpg", cropped, [cv2.IMWRITE_JPEG_QUALITY, 85]
-        )
+        success, encoded = cv2.imencode(".jpg", cropped, [cv2.IMWRITE_JPEG_QUALITY, 85])
         if success:
             return encoded.tobytes()
         return image_bytes
@@ -271,13 +269,16 @@ DEFAULT_CROP_PAD_RIGHT: float = 15.0
 def crop_pad_top(self) -> float:
     return float(self.get("crop_pad_top", 10.0))
 
+
 @property
 def crop_pad_bottom(self) -> float:
     return float(self.get("crop_pad_bottom", 10.0))
 
+
 @property
 def crop_pad_left(self) -> float:
     return float(self.get("crop_pad_left", 15.0))
+
 
 @property
 def crop_pad_right(self) -> float:
@@ -290,13 +291,16 @@ def crop_pad_right(self) -> float:
 def crop_pad_top(self) -> float:
     return float(self.runtime.crop_pad_top)
 
+
 @property
 def crop_pad_bottom(self) -> float:
     return float(self.runtime.crop_pad_bottom)
 
+
 @property
 def crop_pad_left(self) -> float:
     return float(self.runtime.crop_pad_left)
+
 
 @property
 def crop_pad_right(self) -> float:
@@ -439,7 +443,12 @@ And propagate `vehicle_box` through `on_plate_detected(session_id, camera_index,
 2. In `src/core/session.py`, update `record_anpr_result` and `_finalize_session_package`:
 ```python
 def record_anpr_result(
-    self, session_id: str, camera_index: int, plate: str, status: str, vehicle_box: Sequence[int | float] | None = None
+    self,
+    session_id: str,
+    camera_index: int,
+    plate: str,
+    status: str,
+    vehicle_box: Sequence[int | float] | None = None,
 ) -> None:
     ...
     if vehicle_box is not None:

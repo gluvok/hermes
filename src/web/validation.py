@@ -30,7 +30,7 @@ def _validate_serial(port: Any, baud: Any) -> tuple[bool, str | None]:
         try:
             if int(baud) not in VALID_BAUDRATES:
                 return False, "Invalid baud rate value."
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return False, "Invalid baud rate value."
     if port is not None and not SERIAL_PORT_PATTERN.match(str(port).strip()):
         return False, "Invalid serial port path character set."
@@ -52,13 +52,13 @@ def _validate_stability(duration: Any, tolerance: Any) -> tuple[bool, str | None
         try:
             if not (1.0 <= float(duration) <= 60.0):
                 return False, "Stability duration must be between 1.0 and 60.0 seconds."
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return False, "Invalid stability duration value."
     if tolerance is not None:
         try:
             if not (0.1 <= float(tolerance) <= 50.0):
                 return False, "Stability tolerance must be between 0.1 and 50.0 kg."
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return False, "Invalid stability tolerance value."
     return True, None
 

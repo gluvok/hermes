@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import cv2
 import numpy as np
@@ -62,9 +62,7 @@ def crop_vehicle_frame(
             return image_bytes
 
         cropped = frame[crop_y1:crop_y2, crop_x1:crop_x2]
-        success, encoded = cv2.imencode(
-            ".jpg", cropped, [cv2.IMWRITE_JPEG_QUALITY, 85]
-        )
+        success, encoded = cv2.imencode(".jpg", cropped, [cv2.IMWRITE_JPEG_QUALITY, 85])
         if success:
             return encoded.tobytes()
         return image_bytes

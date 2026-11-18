@@ -104,7 +104,7 @@ def get_hotspot_ip(iface: str | None = None) -> str:
             line = line.strip()
             if line.startswith("inet "):
                 return line.split()[1].split("/")[0]
-    except subprocess.SubprocessError, OSError:
+    except (subprocess.SubprocessError, OSError):
         pass
     return DEFAULT_GATEWAY_IP
 
@@ -114,7 +114,7 @@ def is_network_connected(timeout: float = 2.0) -> bool:
         try:
             with socket.create_connection((host, port), timeout=timeout):
                 return True
-        except OSError, TimeoutError:
+        except (OSError, TimeoutError):
             continue
     return False
 

@@ -1,7 +1,7 @@
 import unittest
-from unittest.mock import patch
-from src.web.app import create_app
+
 from src.config import config
+from src.web.app import create_app
 from src.web.auth import create_session_token
 
 

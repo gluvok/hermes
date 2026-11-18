@@ -1,10 +1,10 @@
 import unittest
-from unittest.mock import MagicMock, patch
+
 import cv2
 import numpy as np
 
-from src.core.session import WeighbridgeSessionManager, SessionPhase
 from src.config import config
+from src.core.session import SessionPhase, WeighbridgeSessionManager
 
 
 class TestCropSessionIntegration(unittest.TestCase):
@@ -59,6 +59,7 @@ class TestCropSessionIntegration(unittest.TestCase):
         # Decode cropped image and assert its shape matches cropped box
         arr = np.frombuffer(cropped_bytes, dtype=np.uint8)
         dec = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        assert dec is not None
         h, w = dec.shape[:2]
         self.assertEqual((w, h), (200, 200))
 
@@ -77,6 +78,7 @@ class TestCropSessionIntegration(unittest.TestCase):
 
         arr = np.frombuffer(out_bytes, dtype=np.uint8)
         dec = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        assert dec is not None
         h, w = dec.shape[:2]
         # Should remain full original dimensions
         self.assertEqual((w, h), (400, 400))
