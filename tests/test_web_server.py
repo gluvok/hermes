@@ -76,6 +76,31 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn("hashchange", html)
         self.assertIn("popstate", html)
 
+    def test_static_stylesheet_linked_offline(self):
+        res = self.client.get("/")
+        html = res.get_data(as_text=True)
+        self.assertIn('/static/style.css', html)
+        self.assertNotIn("tailwindcss.com", html)
+        self.assertNotIn("unpkg.com", html)
+        self.assertNotIn("cdn.jsdelivr.net", html)
+
+        css_res = self.client.get("/static/style.css")
+        self.assertEqual(css_res.status_code, 200)
+        self.assertIn("--bg-base: #09090b", css_res.get_data(as_text=True))
+
+    def test_janus_navigation_elements_present_and_sidebar_removed(self):
+        res = self.client.get("/")
+        html = res.get_data(as_text=True)
+        self.assertNotIn('id="main-sidebar"', html)
+        self.assertIn('class="top-nav"', html)
+        self.assertIn('id="nav-item-overview"', html)
+        self.assertIn('id="nav-item-anpr"', html)
+        self.assertIn('id="nav-item-scale"', html)
+        self.assertIn('id="cfg-crop-pad-top"', html)
+        self.assertIn('id="cfg-crop-pad-bottom"', html)
+        self.assertIn('id="cfg-crop-pad-left"', html)
+        self.assertIn('id="cfg-crop-pad-right"', html)
+
     def test_static_assets_served(self):
         res_tw = self.client.get("/static/tailwindcss.js")
         self.assertEqual(res_tw.status_code, 200)
