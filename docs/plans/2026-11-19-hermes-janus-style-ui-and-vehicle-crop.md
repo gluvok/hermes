@@ -586,7 +586,14 @@ git -C hermes commit -m "feat(api): expose and validate crop padding in /api/con
 ---
 
 ### Task 5: Janus Design System CSS Architecture (Zero-Dependency Offline Static Stylesheet)
-**Skill:** `@senior-frontend`
+**Skill:** `@ui-ux-pro-max`
+
+**Design System Principles (@ui-ux-pro-max):**
+- **Domain:** Smart Home / IoT Real-Time Monitoring Dashboard (`Dark Mode + Data-Dense`).
+- **Color Palette:** Surface Zinc-950 (`#09090b`), Card Zinc-900 (`#121215`), Border Zinc-800 (`#27272a`), Primary Emerald (`#34d399`), Telemetry Sky (`#38bdf8`), Warning Amber (`#fbbf24`), Danger Rose (`#f87171`).
+- **Ergonomics & Touch:** Minimum 44x44px touch targets on navigation items, buttons, and range slider controls for field touchscreens and glove operation.
+- **Accessibility & Contrast:** Strictly adhere to WCAG AA > 4.5:1 contrast ratios on all text and status pills; 2px visible focus rings on interactive elements.
+- **Micro-Interactions:** Transition times capped at 150ms (`ease-out`) to prevent sluggishness on low-power ARM devices (Raspberry Pi 4/5).
 
 **Files:**
 - Create: `src/web/static/style.css`
