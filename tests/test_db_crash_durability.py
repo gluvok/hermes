@@ -1,9 +1,11 @@
-import unittest
+import os
 import sqlite3
 import tempfile
-import os
+import unittest
+
 from src.core.db import init_db
 from src.core.spool import enqueue_weighment
+
 
 class TestDbCrashDurability(unittest.TestCase):
     def test_unclean_reboot_preserves_pending_queue(self):

@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import patch
-from src.devices.scale import ScaleUARTReader
+
 from src.core.stability import ScaleStabilityMachine
+from src.devices.scale import ScaleUARTReader
+
 
 class TestScaleNoiseAndJitter(unittest.TestCase):
     def setUp(self):

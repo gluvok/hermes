@@ -1,8 +1,11 @@
-import unittest
 import threading
+import unittest
+
 import cv2
 import numpy as np
+
 from src.devices.camera import compress_image_bytes
+
 
 class TestCameraMemoryLeak(unittest.TestCase):
     def test_ram_compression_bounds(self):

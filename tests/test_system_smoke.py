@@ -1,7 +1,8 @@
 import unittest
 from unittest.mock import patch
-from src.devices.scale import ScaleUARTReader
+
 from src.core.stability import ScaleStabilityMachine, ScaleState
+from src.devices.scale import ScaleUARTReader
 
 
 class TestSystemSmoke(unittest.TestCase):

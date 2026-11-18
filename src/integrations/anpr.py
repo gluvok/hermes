@@ -53,13 +53,11 @@ def _plate_from_flat_keys(data: dict) -> tuple[str, str] | None:
     return None
 
 
-def _extract_plate_from_dict(data: dict) -> tuple[str | None, str]:
+def _extract_plate_from_dict(
+    data: dict,
+) -> tuple[str | None, str, tuple[int, int, int, int] | None]:
     """
-    Extract plate string and status code from Argus RecognitionResponse or flat JSON.
-
-    Argus sorts the `results` array with the best candidate plate at index 0.
-    Therefore, we only inspect results[0].
-    If results is empty or results[0] contains no valid plate, returns (None, "NO_PLATE_DETECTED").
+    Extract plate string, status code, and vehicle bounding box from Argus response.
     """
     if "results" in data:
         results = data.get("results")
@@ -67,6 +65,12 @@ def _extract_plate_from_dict(data: dict) -> tuple[str | None, str]:
             first = results[0]
             if isinstance(first, dict):
                 plate_clean = _normalize_plate_value(first.get("plate"))
+                raw_box = first.get("vehicle_box")
+                vbox = (
+                    tuple(int(v) for v in raw_box)
+                    if raw_box and len(raw_box) >= 4
+                    else None
+                )
                 if plate_clean:
                     vtype = first.get("vehicle_type") or "vehicle"
                     conf = first.get("confidence")
@@ -76,21 +80,21 @@ def _extract_plate_from_dict(data: dict) -> tuple[str | None, str]:
                     logger.info(
                         f"[ANPR] Argus best plate: '{plate_clean}' ({vtype}{conf_str})"
                     )
-                    return plate_clean, "SUCCESS"
+                    return plate_clean, "SUCCESS", vbox
         logger.info("[ANPR] Argus returned empty or unreadable results list.")
-        return None, "NO_PLATE_DETECTED"
+        return None, "NO_PLATE_DETECTED", None
 
     # Fallback for generic/flat JSON endpoints: {"plate": "..."}
     from_flat = _plate_from_flat_keys(data)
     if from_flat is not None:
-        return from_flat
+        return from_flat[0], from_flat[1], None
 
-    return None, "NO_PLATE_DETECTED"
+    return None, "NO_PLATE_DETECTED", None
 
 
 def _parse_anpr_response(
     response: requests.Response, elapsed_ms: float = 0.0
-) -> tuple[str | None, str]:
+) -> tuple[str | None, str, tuple[int, int, int, int] | None]:
     """Parses HTTP response body from ANPR microservice."""
     raw_body = response.text.strip()
     latency_str = f" in {elapsed_ms:.1f}ms" if elapsed_ms > 0 else ""
@@ -106,7 +110,7 @@ def _parse_anpr_response(
             elif isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
                 return _extract_plate_from_dict(data[0])
             elif isinstance(data, str) and data.strip():
-                return data.strip().upper(), "SUCCESS"
+                return data.strip().upper(), "SUCCESS", None
         except (ValueError, KeyError, json.JSONDecodeError, TypeError) as parse_err:
             logger.info(
                 f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}"
@@ -114,7 +118,7 @@ def _parse_anpr_response(
             text = raw_body.upper()
             if text and text != "N/A":
                 logger.info(f"[ANPR] Server returned text response: '{text}'")
-                return text, "SUCCESS"
+                return text, "SUCCESS", None
             logger.warning(f"[ANPR] Failed to parse server response: {parse_err}")
     else:
         logger.info(
@@ -125,10 +129,10 @@ def _parse_anpr_response(
     logger.warning(
         f"[ANPR] Server POST status {response.status_code}: {raw_body[:120]}"
     )
-    return None, error_code
+    return None, error_code, None
 
 
-type AnprRecordCallback = Callable[[str, int, str | None, str], Any]
+type AnprRecordCallback = Callable[..., Any]
 
 
 def send_frame_to_anpr_server(
@@ -136,11 +140,12 @@ def send_frame_to_anpr_server(
     server_url: str | None = None,
     timeout: float = ANPR_SERVER_TIMEOUT,
     session: requests.Session | None = None,
-) -> tuple[str | None, str]:
+    return_details: bool = False,
+) -> tuple[str | None, str] | tuple[str | None, str, tuple[int, int, int, int] | None]:
     """Sends raw JPEG image bytes to the Argus ANPR FastAPI microservice (/recognize)."""
     if not image_bytes:
         logger.warning("[ANPR] Cannot send image to Argus: frame bytes empty/None.")
-        return None, "EMPTY_IMAGE"
+        return (None, "EMPTY_IMAGE", None) if return_details else (None, "EMPTY_IMAGE")
 
     target_url = resolve_anpr_endpoint(server_url)
     logger.info(f"[ANPR] POST image ({len(image_bytes)} bytes) -> {target_url}")
@@ -152,22 +157,37 @@ def send_frame_to_anpr_server(
         else:
             response = requests.post(target_url, files=files, timeout=timeout)
         elapsed_ms = (time.time() - start_time) * 1000.0
-        return _parse_anpr_response(response, elapsed_ms=elapsed_ms)
+        plate, status_code, vbox = _parse_anpr_response(
+            response, elapsed_ms=elapsed_ms
+        )
+        return (plate, status_code, vbox) if return_details else (plate, status_code)
     except requests.exceptions.Timeout:
         logger.warning(
             f"[ANPR] Timeout ({timeout}s) contacting ANPR server at {target_url}"
         )
-        return None, "ANPR_TIMEOUT"
+        return (
+            (None, "ANPR_TIMEOUT", None)
+            if return_details
+            else (None, "ANPR_TIMEOUT")
+        )
     except requests.exceptions.ConnectionError:
         logger.warning(
             f"[ANPR] Failed to connect to ANPR server at {target_url}. Is Argus running?"
         )
-        return None, "ANPR_CONNECTION_ERROR"
+        return (
+            (None, "ANPR_CONNECTION_ERROR", None)
+            if return_details
+            else (None, "ANPR_CONNECTION_ERROR")
+        )
     except requests.RequestException as e:
         logger.error(
             f"[ANPR] Exception submitting frame to ANPR server ({target_url}): {e}"
         )
-        return None, "ANPR_REQUEST_ERROR"
+        return (
+            (None, "ANPR_REQUEST_ERROR", None)
+            if return_details
+            else (None, "ANPR_REQUEST_ERROR")
+        )
 
 
 def send_and_record_anpr_frame(
@@ -177,7 +197,7 @@ def send_and_record_anpr_frame(
     server_url: str | None = None,
     callback: AnprRecordCallback | None = None,
     session: requests.Session | None = None,
-    sender: Callable[..., tuple[str | None, str]] | None = None,
+    sender: Callable[..., Any] | None = None,
 ) -> tuple[str | None, str]:
     """Execute ANPR request for a single camera frame and invoke record callback."""
     sender_fn = sender or send_frame_to_anpr_server
@@ -186,21 +206,41 @@ def send_and_record_anpr_frame(
         f"for session {session_id} to Argus..."
     )
     t0 = time.time()
+    vehicle_box = None
     try:
+        res = None
         if session is not None or server_url is not None:
             try:
-                plate, status_code = sender_fn(
-                    image_bytes, server_url=server_url, session=session
+                res = sender_fn(
+                    image_bytes,
+                    server_url=server_url,
+                    session=session,
+                    return_details=True,
                 )
             except TypeError:
-                plate, status_code = sender_fn(image_bytes)
+                try:
+                    res = sender_fn(
+                        image_bytes, server_url=server_url, session=session
+                    )
+                except TypeError:
+                    res = sender_fn(image_bytes)
         else:
-            plate, status_code = sender_fn(image_bytes)
+            try:
+                res = sender_fn(image_bytes, return_details=True)
+            except TypeError:
+                res = sender_fn(image_bytes)
+
+        if isinstance(res, tuple) and len(res) >= 3:
+            plate, status_code, vehicle_box = res[0], res[1], res[2]
+        elif isinstance(res, tuple) and len(res) >= 2:
+            plate, status_code = res[0], res[1]
+        else:
+            plate, status_code = None, "ANPR_RESPONSE_ERROR"
     except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
         logger.error(
             f"[ANPR] Worker error for session {session_id} cam {cam_idx}: {exc}"
         )
-        plate, status_code = None, "ANPR_WORKER_ERROR"
+        plate, status_code, vehicle_box = None, "ANPR_WORKER_ERROR", None
 
     elapsed_ms = (time.time() - t0) * 1000.0
     if plate:
@@ -216,7 +256,16 @@ def send_and_record_anpr_frame(
 
     if callback is not None:
         try:
-            callback(session_id, cam_idx, plate, status_code)
+            try:
+                callback(
+                    session_id,
+                    cam_idx,
+                    plate,
+                    status_code,
+                    vehicle_box=vehicle_box,
+                )
+            except TypeError:
+                callback(session_id, cam_idx, plate, status_code)
         except (ValueError, KeyError, RuntimeError, TypeError) as exc:
             logger.error(f"[ANPR] Callback error for session {session_id}: {exc}")
 

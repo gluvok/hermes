@@ -1,6 +1,8 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from src.integrations.anpr import send_frame_to_anpr_server
+
 
 class TestArgusContract(unittest.TestCase):
     def setUp(self):

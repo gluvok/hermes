@@ -1,9 +1,11 @@
+import os
+import tempfile
 import unittest
 from unittest.mock import patch
-import tempfile
-import os
+
 from src.core.db import init_db
-from src.core.spool import enqueue_weighment, spool_queue_count, drain_spool_queue
+from src.core.spool import drain_spool_queue, enqueue_weighment, spool_queue_count
+
 
 class TestPartitionResilience(unittest.TestCase):
     def setUp(self):

@@ -73,6 +73,7 @@ class WeighbridgeSessionManager:
         self._pending_anpr_futures: list[Future[tuple[str | None, str]]] = []
 
         self._post_stability_start_time: float = 0.0
+        self._last_vehicle_box: tuple[int, int, int, int] | None = None
         self._lock = threading.Lock()
 
     def start_session(self):
@@ -105,6 +106,7 @@ class WeighbridgeSessionManager:
             self._fleet_snapshots.clear()
             self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
+            self._last_vehicle_box = None
 
             workers = getattr(config, "max_parallel_camera_workers", 4)
             self._anpr_pool = ThreadPoolExecutor(
@@ -135,6 +137,7 @@ class WeighbridgeSessionManager:
         cam_idx: int,
         plate: str | None,
         status_code: str,
+        vehicle_box: tuple[int, int, int, int] | None = None,
     ) -> bool:
         """Record candidate plate from async worker if session still matches active truck."""
         with self._lock:
@@ -148,6 +151,8 @@ class WeighbridgeSessionManager:
             if plate:
                 self._anpr_plates.append(plate)
             self._anpr_statuses.append(status_code)
+            if vehicle_box is not None:
+                self._last_vehicle_box = vehicle_box
             sample_count = len(self._anpr_plates)
 
         if plate:
@@ -201,8 +206,15 @@ class WeighbridgeSessionManager:
 
         if pool is None:
             for cam_idx, img_bytes in batch_to_dispatch:
-                plate, status_code = send_frame_to_anpr_server(img_bytes)
-                self.record_anpr_result(active_sid, cam_idx, plate, status_code)
+                res = send_frame_to_anpr_server(img_bytes, return_details=True)
+                if isinstance(res, tuple) and len(res) >= 3:
+                    plate, status_code, vbox = res[0], res[1], res[2]
+                else:
+                    plate, status_code = res[:2]
+                    vbox = None
+                self.record_anpr_result(
+                    active_sid, cam_idx, plate, status_code, vehicle_box=vbox
+                )
             return []
 
         futures = dispatch_anpr_batch(
@@ -375,6 +387,18 @@ class WeighbridgeSessionManager:
                 if not fleet_copy.get(label) and frames:
                     fleet_copy[label] = compress_image_bytes(frames[-1])
 
+            if self._last_vehicle_box and fleet_copy.get("anpr_1"):
+                from src.devices.crop import crop_vehicle_frame
+
+                fleet_copy["anpr_1"] = crop_vehicle_frame(
+                    fleet_copy["anpr_1"],
+                    self._last_vehicle_box,
+                    pad_top_pct=getattr(config, "crop_pad_top", 10.0) / 100.0,
+                    pad_bottom_pct=getattr(config, "crop_pad_bottom", 10.0) / 100.0,
+                    pad_left_pct=getattr(config, "crop_pad_left", 15.0) / 100.0,
+                    pad_right_pct=getattr(config, "crop_pad_right", 15.0) / 100.0,
+                )
+
             total_samples = len(self._anpr_plates)
             total_frames = sum(len(f) for f in self._anpr_frame_buffers.values())
 
@@ -420,6 +444,7 @@ class WeighbridgeSessionManager:
             self._http_session = None
             self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
+            self._last_vehicle_box = None
             self._fleet_snapshot_thread = None
             self.phase = SessionPhase.PHASE_IDLE
             self.session_id = None
