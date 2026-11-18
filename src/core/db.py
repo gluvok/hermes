@@ -22,7 +22,9 @@ _db_path: str | None = None
 
 def get_default_db_path() -> str:
     """Computes the absolute path to the default SQLite database."""
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    base_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
     return os.path.join(base_dir, DEFAULT_DB_PATH)
 
 

@@ -70,8 +70,12 @@ def _extract_plate_from_dict(data: dict) -> tuple[str | None, str]:
                 if plate_clean:
                     vtype = first.get("vehicle_type") or "vehicle"
                     conf = first.get("confidence")
-                    conf_str = f", conf={conf:.4f}" if isinstance(conf, (int, float)) else ""
-                    logger.info(f"[ANPR] Argus best plate: '{plate_clean}' ({vtype}{conf_str})")
+                    conf_str = (
+                        f", conf={conf:.4f}" if isinstance(conf, (int, float)) else ""
+                    )
+                    logger.info(
+                        f"[ANPR] Argus best plate: '{plate_clean}' ({vtype}{conf_str})"
+                    )
                     return plate_clean, "SUCCESS"
         logger.info("[ANPR] Argus returned empty or unreadable results list.")
         return None, "NO_PLATE_DETECTED"
@@ -118,7 +122,9 @@ def _parse_anpr_response(
         )
 
     error_code = f"ANPR_HTTP_{response.status_code}"
-    logger.warning(f"[ANPR] Server POST status {response.status_code}: {raw_body[:120]}")
+    logger.warning(
+        f"[ANPR] Server POST status {response.status_code}: {raw_body[:120]}"
+    )
     return None, error_code
 
 
@@ -137,9 +143,7 @@ def send_frame_to_anpr_server(
         return None, "EMPTY_IMAGE"
 
     target_url = resolve_anpr_endpoint(server_url)
-    logger.info(
-        f"[ANPR] POST image ({len(image_bytes)} bytes) -> {target_url}"
-    )
+    logger.info(f"[ANPR] POST image ({len(image_bytes)} bytes) -> {target_url}")
     start_time = time.time()
     try:
         files = {"file": ("frame.jpg", image_bytes, "image/jpeg")}
@@ -150,13 +154,19 @@ def send_frame_to_anpr_server(
         elapsed_ms = (time.time() - start_time) * 1000.0
         return _parse_anpr_response(response, elapsed_ms=elapsed_ms)
     except requests.exceptions.Timeout:
-        logger.warning(f"[ANPR] Timeout ({timeout}s) contacting ANPR server at {target_url}")
+        logger.warning(
+            f"[ANPR] Timeout ({timeout}s) contacting ANPR server at {target_url}"
+        )
         return None, "ANPR_TIMEOUT"
     except requests.exceptions.ConnectionError:
-        logger.warning(f"[ANPR] Failed to connect to ANPR server at {target_url}. Is Argus running?")
+        logger.warning(
+            f"[ANPR] Failed to connect to ANPR server at {target_url}. Is Argus running?"
+        )
         return None, "ANPR_CONNECTION_ERROR"
     except requests.RequestException as e:
-        logger.error(f"[ANPR] Exception submitting frame to ANPR server ({target_url}): {e}")
+        logger.error(
+            f"[ANPR] Exception submitting frame to ANPR server ({target_url}): {e}"
+        )
         return None, "ANPR_REQUEST_ERROR"
 
 
@@ -187,7 +197,9 @@ def send_and_record_anpr_frame(
         else:
             plate, status_code = sender_fn(image_bytes)
     except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
-        logger.error(f"[ANPR] Worker error for session {session_id} cam {cam_idx}: {exc}")
+        logger.error(
+            f"[ANPR] Worker error for session {session_id} cam {cam_idx}: {exc}"
+        )
         plate, status_code = None, "ANPR_WORKER_ERROR"
 
     elapsed_ms = (time.time() - t0) * 1000.0
@@ -245,7 +257,9 @@ def get_highest_frequency_plate(plate_list: Sequence[str | None]) -> str:
     the string with the highest frequency.
     Returns 'NO_PLATE_DETECTED' if no valid plate was recognized.
     """
-    valid_plates = [p.strip().upper() for p in plate_list if p and isinstance(p, str) and p.strip()]
+    valid_plates = [
+        p.strip().upper() for p in plate_list if p and isinstance(p, str) and p.strip()
+    ]
 
     if not valid_plates:
         logger.warning("[ANPR Voting] No valid plates recorded during session.")

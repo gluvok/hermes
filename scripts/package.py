@@ -1,4 +1,5 @@
 """package.py — Build generic native binary and package release tarball."""
+
 from __future__ import annotations
 
 import argparse
@@ -25,8 +26,13 @@ def create_release_package(
     if (code := build_binary(staging)) != 0:
         return code
 
-    for src, rel in (("src/web/templates", "src/web/templates"), ("src/web/static", "src/web/static"), ("src/devices/wifi/ui", "src/devices/wifi/ui")):
-        if os.path.exists(src): shutil.copytree(src, os.path.join(staging, rel), dirs_exist_ok=True)
+    for src, rel in (
+        ("src/web/templates", "src/web/templates"),
+        ("src/web/static", "src/web/static"),
+        ("src/devices/wifi/ui", "src/devices/wifi/ui"),
+    ):
+        if os.path.exists(src):
+            shutil.copytree(src, os.path.join(staging, rel), dirs_exist_ok=True)
 
     os.makedirs(os.path.join(staging, "data"), exist_ok=True)
     shutil.copy("pyproject.toml", os.path.join(staging, "pyproject.toml"))
@@ -48,8 +54,12 @@ def create_release_package(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Hermes release packager")
-    parser.add_argument("--output", default="dist/hermes-release.tar.gz", help="Output tar")
-    parser.add_argument("--install", default=None, help="Direct install destination directory")
+    parser.add_argument(
+        "--output", default="dist/hermes-release.tar.gz", help="Output tar"
+    )
+    parser.add_argument(
+        "--install", default=None, help="Direct install destination directory"
+    )
     args = parser.parse_args()
     sys.exit(create_release_package(args.output, args.install))
 

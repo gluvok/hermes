@@ -56,9 +56,9 @@ def shutdown(signum, frame):
     sys.exit(0)
 
 
-
-signal.signal(signal.SIGINT,  shutdown)
+signal.signal(signal.SIGINT, shutdown)
 signal.signal(signal.SIGTERM, shutdown)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  SETUP
@@ -86,7 +86,6 @@ def setup():
     init_db()
     start_spool_worker(interval=10.0)
 
-
     # Log active client settings
     logger.info(
         f"[Config] Device ID: {config.device_id} | "
@@ -99,9 +98,13 @@ def setup():
 
     # Verify Gluvok Cloud device credentials
     if config.device_id and config.device_key:
-        logger.info(f"[Auth] Gluvok device authentication configured for Device ID: {config.device_id}")
+        logger.info(
+            f"[Auth] Gluvok device authentication configured for Device ID: {config.device_id}"
+        )
     else:
-        logger.warning("[Auth] Gluvok device credentials (device_id, device_key) not configured in client_config.py.")
+        logger.warning(
+            "[Auth] Gluvok device credentials (device_id, device_key) not configured in client_config.py."
+        )
 
 
 def loop():
@@ -109,6 +112,7 @@ def loop():
     if completed_package:
         scale_state_machine._trigger_upload(completed_package)
     time.sleep(1)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Entry point

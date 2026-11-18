@@ -46,7 +46,9 @@ def _fetch_http_snapshot(url: str, timeout: float) -> bytes | None:
         if response.status_code == 200 and response.content:
             return response.content
         else:
-            logger.warning(f"[Camera] HTTP fetch failed for {url}: Status {response.status_code}")
+            logger.warning(
+                f"[Camera] HTTP fetch failed for {url}: Status {response.status_code}"
+            )
             return None
     except requests.RequestException as e:
         logger.error(f"[Camera] Exception fetching snapshot from {url}: {e}")
@@ -70,7 +72,9 @@ def _fetch_rtsp_frame(rtsp_url: str, timeout: float) -> bytes | None:
 
         if ret and frame is not None:
             # Encode frame to JPEG byte buffer in RAM
-            success, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            success, buffer = cv2.imencode(
+                ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85]
+            )
             if success:
                 return buffer.tobytes()
         logger.warning(f"[Camera] Failed to read frame from RTSP stream: {rtsp_url}")
@@ -91,10 +95,14 @@ def capture_auxiliary_snapshots(
     results: dict[int, bytes | None] = {}
 
     if not urls:
-        logger.info("[Camera] No auxiliary cameras configured. Skipping parallel capture.")
+        logger.info(
+            "[Camera] No auxiliary cameras configured. Skipping parallel capture."
+        )
         return results
 
-    logger.info(f"[Camera] Triggering parallel snapshot capture for {len(urls)} auxiliary cameras...")
+    logger.info(
+        f"[Camera] Triggering parallel snapshot capture for {len(urls)} auxiliary cameras..."
+    )
     start_time = time.time()
 
     workers = min(len(urls), MAX_PARALLEL_CAMERA_WORKERS)
@@ -112,8 +120,15 @@ def capture_auxiliary_snapshots(
                 results[cam_idx] = img_bytes
                 status = "SUCCESS" if img_bytes else "FAILED"
                 logger.info(f"[Camera] Camera {cam_idx} snapshot capture: {status}")
-            except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
-                logger.error(f"[Camera] Camera {cam_idx} snapshot generated exception: {exc}")
+            except (
+                requests.RequestException,
+                OSError,
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                logger.error(
+                    f"[Camera] Camera {cam_idx} snapshot generated exception: {exc}"
+                )
                 results[cam_idx] = None
 
     elapsed = time.time() - start_time
@@ -148,8 +163,15 @@ def capture_anpr_snapshots(
             cam_idx = future_to_idx[future]
             try:
                 results_dict[cam_idx] = future.result()
-            except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
-                logger.error(f"[Camera] ANPR Camera {cam_idx} generated exception: {exc}")
+            except (
+                requests.RequestException,
+                OSError,
+                ValueError,
+                RuntimeError,
+            ) as exc:
+                logger.error(
+                    f"[Camera] ANPR Camera {cam_idx} generated exception: {exc}"
+                )
                 results_dict[cam_idx] = None
 
     return [(idx + 1, url, results_dict.get(idx + 1)) for idx, url in enumerate(urls)]
@@ -192,12 +214,19 @@ def capture_all_camera_snapshots(
                 results[label] = img_bytes
                 status = "SUCCESS" if img_bytes else "FAILED"
                 logger.info(f"[Camera] Full fleet {label} capture: {status}")
-            except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
+            except (
+                requests.RequestException,
+                OSError,
+                ValueError,
+                RuntimeError,
+            ) as exc:
                 logger.error(f"[Camera] {label} snapshot generated exception: {exc}")
                 results[label] = None
 
     elapsed = time.time() - start_time
-    logger.info(f"[Camera] Full fleet capture ({len(labeled_tasks)} cameras) completed in {elapsed:.2f}s")
+    logger.info(
+        f"[Camera] Full fleet capture ({len(labeled_tasks)} cameras) completed in {elapsed:.2f}s"
+    )
     return results
 
 
@@ -208,7 +237,9 @@ def log_camera_fleet() -> None:
 
     logger.info("[Cameras] Configured Camera Fleet:")
     if anpr_urls:
-        logger.info(f"  ├── Main / ANPR Cameras ({len(anpr_urls)} configured - active loop):")
+        logger.info(
+            f"  ├── Main / ANPR Cameras ({len(anpr_urls)} configured - active loop):"
+        )
         for idx, url in enumerate(anpr_urls):
             prefix = "└──" if idx == len(anpr_urls) - 1 and not aux_urls else "├──"
             logger.info(f"  │     {prefix} [Cam {idx + 1} - ANPR] {url}")
@@ -216,7 +247,9 @@ def log_camera_fleet() -> None:
         logger.warning("  ├── Main / ANPR Cameras: (None configured)")
 
     if aux_urls:
-        logger.info(f"  └── Auxiliary Cameras ({len(aux_urls)} configured - post-stability audit):")
+        logger.info(
+            f"  └── Auxiliary Cameras ({len(aux_urls)} configured - post-stability audit):"
+        )
         for idx, url in enumerate(aux_urls):
             prefix = "└──" if idx == len(aux_urls) - 1 else "├──"
             logger.info(f"        {prefix} [Aux {idx + 1}] {url}")
@@ -258,7 +291,7 @@ def compress_image_bytes(
         if ok and encoded is not None:
             return encoded.tobytes()
         return image_bytes
-    except (cv2.error, ValueError, TypeError, OSError):
+    except cv2.error, ValueError, TypeError, OSError:
         return image_bytes
 
 

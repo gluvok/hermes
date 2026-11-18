@@ -1,4 +1,5 @@
 """portal.py — Captive portal DNS interceptor, HTTP probe redirector, and provisioning service."""
+
 from __future__ import annotations
 
 import http.server
@@ -10,7 +11,6 @@ import socket
 import socketserver
 import subprocess
 import threading
-import time
 import urllib.parse
 from pathlib import Path
 from typing import Any
@@ -70,7 +70,9 @@ def _build_response(data: bytes, ip: str) -> bytes:
 class CaptiveDNSServer:
     """Lightweight UDP DNS interceptor resolving all lookups to gateway IP."""
 
-    def __init__(self, ip: str = DEFAULT_GATEWAY_IP, port: int = DEFAULT_DNS_PORT) -> None:
+    def __init__(
+        self, ip: str = DEFAULT_GATEWAY_IP, port: int = DEFAULT_DNS_PORT
+    ) -> None:
         self.ip = ip
         self.port = port
         self._sock: socket.socket | None = None
@@ -84,9 +86,13 @@ class CaptiveDNSServer:
             self._sock.bind(("0.0.0.0", self.port))
             self._sock.settimeout(0.5)
             self._stop_event.clear()
-            self._thread = threading.Thread(target=self._listen_loop, daemon=True, name="CaptiveDNS")
+            self._thread = threading.Thread(
+                target=self._listen_loop, daemon=True, name="CaptiveDNS"
+            )
             self._thread.start()
-            logger.info("[Portal DNS] Bound UDP port :%d redirecting to %s", self.port, self.ip)
+            logger.info(
+                "[Portal DNS] Bound UDP port :%d redirecting to %s", self.port, self.ip
+            )
             return True
         except OSError as e:
             logger.debug("[Portal DNS] Unable to bind UDP port :%d: %s", self.port, e)
@@ -99,7 +105,7 @@ class CaptiveDNSServer:
                 resp = _build_response(data, self.ip)
                 if resp:
                     self._sock.sendto(resp, addr)
-            except (socket.timeout, OSError):
+            except TimeoutError, OSError:
                 continue
 
     def stop(self) -> None:
@@ -148,7 +154,10 @@ class CaptiveHTTPHandler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
-        if path in PROBE_PATHS or "connectivitycheck" in self.headers.get("Host", "").lower():
+        if (
+            path in PROBE_PATHS
+            or "connectivitycheck" in self.headers.get("Host", "").lower()
+        ):
             self.send_response(302)
             self.send_header("Location", f"http://{DEFAULT_GATEWAY_IP}/")
             self.end_headers()
@@ -194,7 +203,7 @@ class CaptiveHTTPHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             status = "Connected successfully!" if ok else f"Connection failed: {msg}"
-            self.wfile.write(f"<h3>{status}</h3><p><a href='/'>Back</a></p>".encode("utf-8"))
+            self.wfile.write(f"<h3>{status}</h3><p><a href='/'>Back</a></p>".encode())
             return
 
         self.send_response(404)
@@ -211,11 +220,14 @@ class CaptiveHTTPServer:
 
     def start(self) -> bool:
         try:
+
             class ReusableTCPServer(socketserver.TCPServer):
                 allow_reuse_address = True
 
             self._server = ReusableTCPServer(("0.0.0.0", self.port), CaptiveHTTPHandler)
-            self._thread = threading.Thread(target=self._server.serve_forever, daemon=True, name="CaptiveHTTP")
+            self._thread = threading.Thread(
+                target=self._server.serve_forever, daemon=True, name="CaptiveHTTP"
+            )
             self._thread.start()
             logger.info("[Portal HTTP] Listening on port :%d", self.port)
             return True
@@ -231,9 +243,14 @@ class CaptiveHTTPServer:
 
 
 # ── Subsystem Helpers (DHCP Option 114, iptables, hosts) ──────────────────────
-def setup_nm_capport_config(gateway_ip: str = DEFAULT_GATEWAY_IP, http_port: int = DEFAULT_HTTP_PORT) -> bool:
+def setup_nm_capport_config(
+    gateway_ip: str = DEFAULT_GATEWAY_IP, http_port: int = DEFAULT_HTTP_PORT
+) -> bool:
     import sys
-    target_mod = sys.modules.get("src.devices.wifi.portal_capport", sys.modules[__name__])
+
+    target_mod = sys.modules.get(
+        "src.devices.wifi.portal_capport", sys.modules[__name__]
+    )
     dir_path = getattr(target_mod, "NM_DNSMASQ_DIR", NM_DNSMASQ_DIR)
     file_path = getattr(target_mod, "NM_CAPPORT_FILE", NM_CAPPORT_FILE)
     try:
@@ -245,48 +262,77 @@ def setup_nm_capport_config(gateway_ip: str = DEFAULT_GATEWAY_IP, http_port: int
             dir_path.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content, encoding="utf-8")
             return True
-        except (OSError, PermissionError):
+        except OSError, PermissionError:
             pass
-        pfx = ["sudo", "-n"] if getattr(os, "geteuid", lambda: 0)() != 0 and shutil.which("sudo") else []
+        pfx = (
+            ["sudo", "-n"]
+            if getattr(os, "geteuid", lambda: 0)() != 0 and shutil.which("sudo")
+            else []
+        )
         subprocess.run(pfx + ["mkdir", "-p", str(dir_path)], check=False)
         cmd = pfx + ["tee", str(file_path)]
-        proc = subprocess.run(cmd, input=content.encode("utf-8"), capture_output=True, check=False)
+        proc = subprocess.run(
+            cmd, input=content.encode("utf-8"), capture_output=True, check=False
+        )
         return proc.returncode == 0
-    except (subprocess.SubprocessError, OSError):
+    except subprocess.SubprocessError, OSError:
         return False
 
 
 def teardown_nm_capport_config() -> None:
     import sys
-    target_mod = sys.modules.get("src.devices.wifi.portal_capport", sys.modules[__name__])
+
+    target_mod = sys.modules.get(
+        "src.devices.wifi.portal_capport", sys.modules[__name__]
+    )
     file_path = getattr(target_mod, "NM_CAPPORT_FILE", NM_CAPPORT_FILE)
     try:
         if file_path.exists():
             try:
                 file_path.unlink(missing_ok=True)
                 return
-            except (OSError, PermissionError):
+            except OSError, PermissionError:
                 pass
-            pfx = ["sudo", "-n"] if getattr(os, "geteuid", lambda: 0)() != 0 and shutil.which("sudo") else []
+            pfx = (
+                ["sudo", "-n"]
+                if getattr(os, "geteuid", lambda: 0)() != 0 and shutil.which("sudo")
+                else []
+            )
             subprocess.run(pfx + ["rm", "-f", str(file_path)], check=False)
-    except (subprocess.SubprocessError, OSError):
+    except subprocess.SubprocessError, OSError:
         pass
 
 
-def setup_port_forwarding(iface: str = "wlan0", http_port: int = DEFAULT_HTTP_PORT, dns_port: int = DEFAULT_DNS_PORT) -> bool:
+def setup_port_forwarding(
+    iface: str = "wlan0",
+    http_port: int = DEFAULT_HTTP_PORT,
+    dns_port: int = DEFAULT_DNS_PORT,
+) -> bool:
     return True  # Managed through native routing
 
 
-def teardown_port_forwarding(iface: str = "wlan0", http_port: int = DEFAULT_HTTP_PORT, dns_port: int = DEFAULT_DNS_PORT) -> None:
+def teardown_port_forwarding(
+    iface: str = "wlan0",
+    http_port: int = DEFAULT_HTTP_PORT,
+    dns_port: int = DEFAULT_DNS_PORT,
+) -> None:
     pass
 
 
-def ensure_local_domain(domain: str = "hermes.local", ips: tuple[str, ...] = ("127.0.0.1", "10.42.0.1"), hosts_path: Path = DEFAULT_HOSTS) -> bool:
+def ensure_local_domain(
+    domain: str = "hermes.local",
+    ips: tuple[str, ...] = ("127.0.0.1", "10.42.0.1"),
+    hosts_path: Path = DEFAULT_HOSTS,
+) -> bool:
     try:
         if not hosts_path.exists() or not hosts_path.is_file():
             return False
         content = hosts_path.read_text(encoding="utf-8")
-        needed = [f"{ip}\t{domain}" for ip in ips if f"{ip}\t{domain}" not in content and f"{ip} {domain}" not in content]
+        needed = [
+            f"{ip}\t{domain}"
+            for ip in ips
+            if f"{ip}\t{domain}" not in content and f"{ip} {domain}" not in content
+        ]
         if not needed:
             return True
         lines = [line for line in content.splitlines() if line.strip()]
@@ -295,11 +341,17 @@ def ensure_local_domain(domain: str = "hermes.local", ips: tuple[str, ...] = ("1
         try:
             hosts_path.write_bytes(payload)
         except PermissionError:
-            res = subprocess.run(["sudo", "-n", "tee", str(hosts_path)], input=payload, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            res = subprocess.run(
+                ["sudo", "-n", "tee", str(hosts_path)],
+                input=payload,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
             if res.returncode != 0:
                 raise
         return True
-    except (OSError, PermissionError):
+    except OSError, PermissionError:
         return False
 
 
@@ -320,7 +372,12 @@ class CaptivePortalService:
         dns_ok = self.dns_server.start()
         http_ok = self.http_server.start()
         self.is_active = bool(dns_ok or http_ok)
-        logger.info("[Portal Service] Captive portal active on %s (DNS=%s, HTTP=%s)", ip, dns_ok, http_ok)
+        logger.info(
+            "[Portal Service] Captive portal active on %s (DNS=%s, HTTP=%s)",
+            ip,
+            dns_ok,
+            http_ok,
+        )
         return self.is_active
 
     def stop(self) -> None:

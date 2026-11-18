@@ -1,4 +1,5 @@
 """build.py — Local Nuitka compilation script for Hermes native binary."""
+
 from __future__ import annotations
 
 import argparse
@@ -43,7 +44,11 @@ def main() -> None:
     code = build_binary(args.output_dir)
     if code == 0 and args.run:
         script = os.path.join(args.output_dir, "hermes.sh")
-        target = script if os.path.exists(script) else os.path.join(args.output_dir, "hermes")
+        target = (
+            script
+            if os.path.exists(script)
+            else os.path.join(args.output_dir, "hermes")
+        )
         print(f"[Build] Launching {target}...\n")
         sys.exit(subprocess.run([target], check=False).returncode)
     sys.exit(code)

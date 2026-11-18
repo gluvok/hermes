@@ -70,6 +70,7 @@ def _apply_uart_config_changes(
 
     try:
         from src.devices.scale import get_uart_reader
+
         get_uart_reader().restart(config.serial_port, config.serial_baudrate)
         record_system_event(
             "SCALE",
@@ -83,10 +84,12 @@ def _apply_uart_config_changes(
 def login():
     """Authenticates superadmin credentials and issues a session token."""
     if is_rate_limited():
-        return jsonify({
-            "success": False,
-            "error": "Too many failed login attempts. Please wait 60 seconds.",
-        }), 429
+        return jsonify(
+            {
+                "success": False,
+                "error": "Too many failed login attempts. Please wait 60 seconds.",
+            }
+        ), 429
 
     data: dict[str, Any] = request.get_json(silent=True) or {}
     userid = str(data.get("userid", "")).strip()
@@ -94,20 +97,26 @@ def login():
 
     if verify_credentials(userid, password):
         token = create_session_token()
-        record_system_event("AUTH", f"Superadmin user '{userid}' signed in successfully.")
-        return jsonify({
-            "success": True,
-            "message": "Authentication successful.",
-            "token": token,
-        }), 200
+        record_system_event(
+            "AUTH", f"Superadmin user '{userid}' signed in successfully."
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": "Authentication successful.",
+                "token": token,
+            }
+        ), 200
 
     record_failed_login()
     record_system_event("AUTH", f"Failed authentication attempt for user '{userid}'.")
     time.sleep(0.5)
-    return jsonify({
-        "success": False,
-        "error": "Invalid user ID or password.",
-    }), 401
+    return jsonify(
+        {
+            "success": False,
+            "error": "Invalid user ID or password.",
+        }
+    ), 401
 
 
 @api_bp.route("/status", methods=["GET"])
@@ -120,56 +129,60 @@ def status():
     target_argus_url = resolve_anpr_endpoint(config.anpr_server_url)
     argus_online = _get_cached_argus_status(target_argus_url)
 
-    return jsonify({
-        "status": "healthy",
-        "scale": {
-            "state": get_scale_state().name,
-            "current_weight": round(get_current_weight(), 3),
-        },
-        "argus": {
-            "online": argus_online,
-        },
-        "cloud": {
-            "center_id": config.center_id,
-            "configured": bool(config.device_id and config.device_key),
-        },
-        "wifi": {
-            "connected": is_wifi_connected(),
-            "hotspot_active": is_hotspot_active(),
-            "ssid": config.wifi_ssid,
-        },
-        "config": {
-            "wifi_ssid": config.wifi_ssid,
-            "center_id": config.center_id,
-            "min_weight": config.weight_threshold,
-            "serial_port": config.serial_port,
-            "serial_baudrate": config.serial_baudrate,
-            "stability_duration": config.stability_duration,
-            "stability_tolerance": config.stability_tolerance,
-        },
-        "latest_weighment": get_latest_weighment(),
-        "spool": {},
-        "error_counts": get_error_counts(),
-        "events": get_system_events(),
-    }), 200
+    return jsonify(
+        {
+            "status": "healthy",
+            "scale": {
+                "state": get_scale_state().name,
+                "current_weight": round(get_current_weight(), 3),
+            },
+            "argus": {
+                "online": argus_online,
+            },
+            "cloud": {
+                "center_id": config.center_id,
+                "configured": bool(config.device_id and config.device_key),
+            },
+            "wifi": {
+                "connected": is_wifi_connected(),
+                "hotspot_active": is_hotspot_active(),
+                "ssid": config.wifi_ssid,
+            },
+            "config": {
+                "wifi_ssid": config.wifi_ssid,
+                "center_id": config.center_id,
+                "min_weight": config.weight_threshold,
+                "serial_port": config.serial_port,
+                "serial_baudrate": config.serial_baudrate,
+                "stability_duration": config.stability_duration,
+                "stability_tolerance": config.stability_tolerance,
+            },
+            "latest_weighment": get_latest_weighment(),
+            "spool": {},
+            "error_counts": get_error_counts(),
+            "events": get_system_events(),
+        }
+    ), 200
 
 
 @api_bp.route("/config", methods=["GET"])
 @auth_required
 def get_config():
     """Returns current system configuration values."""
-    return jsonify({
-        "min_weight": config.weight_threshold,
-        "serial_port": config.serial_port,
-        "serial_baudrate": config.serial_baudrate,
-        "stability_duration": config.stability_duration,
-        "stability_tolerance": config.stability_tolerance,
-        "anpr_camera_url": config.anpr_camera_url,
-        "anpr_camera_urls": config.anpr_camera_urls,
-        "auxiliary_camera_urls": config.auxiliary_camera_urls,
-        "anpr_server_url": config.anpr_server_url,
-        "center_id": config.center_id,
-    }), 200
+    return jsonify(
+        {
+            "min_weight": config.weight_threshold,
+            "serial_port": config.serial_port,
+            "serial_baudrate": config.serial_baudrate,
+            "stability_duration": config.stability_duration,
+            "stability_tolerance": config.stability_tolerance,
+            "anpr_camera_url": config.anpr_camera_url,
+            "anpr_camera_urls": config.anpr_camera_urls,
+            "auxiliary_camera_urls": config.auxiliary_camera_urls,
+            "anpr_server_url": config.anpr_server_url,
+            "center_id": config.center_id,
+        }
+    ), 200
 
 
 @api_bp.route("/config", methods=["POST"])
@@ -202,10 +215,12 @@ def post_config():
     )
 
     record_system_event("CONFIG", "System configuration updated via web interface.")
-    return jsonify({
-        "success": True,
-        "message": "System configuration saved and applied dynamically in real-time.",
-    }), 200
+    return jsonify(
+        {
+            "success": True,
+            "message": "System configuration saved and applied dynamically in real-time.",
+        }
+    ), 200
 
 
 @api_bp.route("/networks", methods=["GET"])
@@ -213,6 +228,7 @@ def post_config():
 def get_scanned_networks():
     """Returns scanned Wi-Fi access points via nmcli."""
     from src.devices.wifi import get_available_networks
+
     return jsonify({"success": True, "networks": get_available_networks()}), 200
 
 
@@ -220,6 +236,7 @@ def get_scanned_networks():
 def get_saved_wifi():
     """Returns saved Wi-Fi networks (SSID and metadata, no passwords)."""
     from src.core.wifi_vault import get_saved_wifi_networks
+
     networks = get_saved_wifi_networks()
     return jsonify({"success": True, "networks": networks}), 200
 
@@ -229,9 +246,12 @@ def get_saved_wifi():
 def delete_saved_wifi(ssid: str):
     """Deletes a saved Wi-Fi network from the persistent vault."""
     from src.core.wifi_vault import delete_saved_wifi_network
+
     deleted = delete_saved_wifi_network(ssid)
     if deleted:
-        record_system_event("CONFIG", f"Removed network '{ssid}' from saved Wi-Fi vault.")
+        record_system_event(
+            "CONFIG", f"Removed network '{ssid}' from saved Wi-Fi vault."
+        )
         return jsonify({"success": True, "message": f"Network '{ssid}' removed."}), 200
     return jsonify({"success": False, "error": f"Network '{ssid}' not found."}), 404
 
@@ -259,23 +279,31 @@ def post_wifi():
         save_wifi_network(ssid, password)
 
     config.update_wifi_credentials(ssid, password)
-    record_system_event("CONFIG", f"Saved Wi-Fi SSID '{ssid}' to persistent storage. Attempting connection...")
+    record_system_event(
+        "CONFIG",
+        f"Saved Wi-Fi SSID '{ssid}' to persistent storage. Attempting connection...",
+    )
 
     from src.devices.wifi import connect_to_wifi
+
     is_connected, msg = connect_to_wifi(ssid, password)
 
     if is_connected:
         record_system_event("WIFI", f"Successfully connected to '{ssid}'.")
-        return jsonify({
-            "success": True,
-            "message": f"Saved and successfully connected to Wi-Fi '{ssid}'.",
-        }), 200
+        return jsonify(
+            {
+                "success": True,
+                "message": f"Saved and successfully connected to Wi-Fi '{ssid}'.",
+            }
+        ), 200
 
     record_system_event("WIFI", f"Failed connecting to '{ssid}': {msg}")
-    return jsonify({
-        "success": False,
-        "message": f"Saved to config, but connection failed: {msg}",
-    }), 400
+    return jsonify(
+        {
+            "success": False,
+            "message": f"Saved to config, but connection failed: {msg}",
+        }
+    ), 400
 
 
 @api_bp.route("/wifi/clear", methods=["POST"])
@@ -283,10 +311,13 @@ def post_wifi():
 def post_wifi_clear():
     """Clears saved Wi-Fi credentials from persistent storage and vault."""
     from src.core.wifi_vault import clear_saved_wifi_networks
+
     config.clear_wifi_credentials()
     clear_saved_wifi_networks()
     record_system_event("CONFIG", "Wi-Fi credentials cleared from persistent storage.")
-    return jsonify({
-        "success": True,
-        "message": "Wi-Fi credentials cleared from persistent storage.",
-    }), 200
+    return jsonify(
+        {
+            "success": True,
+            "message": "Wi-Fi credentials cleared from persistent storage.",
+        }
+    ), 200

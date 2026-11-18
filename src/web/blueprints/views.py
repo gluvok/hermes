@@ -11,12 +11,24 @@ views_bp = Blueprint("views", __name__)
 
 @views_bp.before_request
 def auto_redirect_config_domain() -> Any:
-    if request.host.split(":")[0].lower() == "hermes.config" and request.path in {"/", "/index"}:
+    if request.host.split(":")[0].lower() == "hermes.config" and request.path in {
+        "/",
+        "/index",
+    }:
         return redirect("/config", code=302)
 
+
 PAGE_ROUTES = (
-    "/", "/index", "/scale", "/anpr", "/cloud",
-    "/wifi", "/telemetry", "/errors", "/config", "/admin",
+    "/",
+    "/index",
+    "/scale",
+    "/anpr",
+    "/cloud",
+    "/wifi",
+    "/telemetry",
+    "/errors",
+    "/config",
+    "/admin",
 )
 
 for route in PAGE_ROUTES:
@@ -54,4 +66,3 @@ def capport_endpoint() -> Any:
     """RFC 8908 Captive Portal API endpoint for modern Android and iOS devices."""
     payload = {"captive": not is_wifi_connected(), "user-portal-url": "/wifi"}
     return jsonify(payload), 200, {"Content-Type": "application/captive+json"}
-

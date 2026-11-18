@@ -1,4 +1,5 @@
 """src.config — Centralized system configuration and constants."""
+
 from __future__ import annotations
 
 from src.config.constants import (

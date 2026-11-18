@@ -1,4 +1,5 @@
 """store.py — SQLite persistence for runtime configuration overrides."""
+
 from __future__ import annotations
 
 import json
@@ -24,7 +25,9 @@ def init_config_table(db_path: str | None = None) -> None:
     if os.path.dirname(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
     with _lock, sqlite3.connect(path) as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS runtime_config (key TEXT PRIMARY KEY, val TEXT);")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS runtime_config (key TEXT PRIMARY KEY, val TEXT);"
+        )
 
 
 def load_overrides(db_path: str | None = None) -> dict[str, Any]:
@@ -39,7 +42,10 @@ def set_override(key: str, value: Any, db_path: str | None = None) -> None:
     path = get_config_db_path(db_path)
     init_config_table(path)
     with _lock, sqlite3.connect(path) as conn:
-        conn.execute("INSERT OR REPLACE INTO runtime_config (key, val) VALUES (?, ?)", (key, json.dumps(value)))
+        conn.execute(
+            "INSERT OR REPLACE INTO runtime_config (key, val) VALUES (?, ?)",
+            (key, json.dumps(value)),
+        )
 
 
 def remove_override(key: str, db_path: str | None = None) -> None:

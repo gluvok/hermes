@@ -1,4 +1,5 @@
 """license.py — Ed25519 offline license verification and loading."""
+
 from __future__ import annotations
 
 import json

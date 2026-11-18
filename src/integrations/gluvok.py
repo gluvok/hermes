@@ -42,7 +42,12 @@ def _build_multipart_files(
                 compressed = compress_image_bytes(b) or b
                 valid_images.append((fname, compressed))
 
-    if not valid_images and image_bytes and isinstance(image_bytes, bytes) and len(image_bytes) > 0:
+    if (
+        not valid_images
+        and image_bytes
+        and isinstance(image_bytes, bytes)
+        and len(image_bytes) > 0
+    ):
         compressed = compress_image_bytes(image_bytes) or image_bytes
         valid_images.append((filename, compressed))
 
@@ -59,15 +64,25 @@ def _parse_cloud_response(
 ) -> tuple[bool, str | None, str | None, bool]:
     if response.status_code in (200, 201):
         res_data = response.json() if response.content else {}
-        entry_id = str(res_data.get("data", {}).get("id") or res_data.get("id") or "N/A")
-        logger.info(f"[Gluvok API] Entry #{entry_id} created successfully (HTTP {response.status_code})")
-        _record_cloud_event("CLOUD", f"Entry #{entry_id} created: {safe_plate} @ {weight:.3f} kg")
+        entry_id = str(
+            res_data.get("data", {}).get("id") or res_data.get("id") or "N/A"
+        )
+        logger.info(
+            f"[Gluvok API] Entry #{entry_id} created successfully (HTTP {response.status_code})"
+        )
+        _record_cloud_event(
+            "CLOUD", f"Entry #{entry_id} created: {safe_plate} @ {weight:.3f} kg"
+        )
         return True, entry_id, None, False
 
     if response.status_code == 409:
         res_data = response.json() if response.content else {}
-        entry_id = str(res_data.get("data", {}).get("id") or res_data.get("id") or "EXISTING")
-        logger.info(f"[Gluvok API] Entry already acknowledged (HTTP 409 Conflict). ID: {entry_id}")
+        entry_id = str(
+            res_data.get("data", {}).get("id") or res_data.get("id") or "EXISTING"
+        )
+        logger.info(
+            f"[Gluvok API] Entry already acknowledged (HTTP 409 Conflict). ID: {entry_id}"
+        )
         _record_cloud_event("CLOUD", f"Entry already exists in cloud: {safe_plate}")
         return True, entry_id, None, False
 
@@ -112,7 +127,8 @@ def transmit_entry_multipart(
     raw_plate = str(detected_vehicle_number or "NO_PLATE_DETECTED").strip().upper()
     safe_plate = (
         "NO_PLATE_DETECTED"
-        if not raw_plate or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
+        if not raw_plate
+        or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
         else raw_plate
     )
     data = {
@@ -131,19 +147,29 @@ def transmit_entry_multipart(
         response = requests.post(
             entries_url, auth=auth, data=data, files=files, timeout=CLOUD_POST_TIMEOUT
         )
-        if response.status_code == 400 and has_images and "storage" in response.text.lower():
+        if (
+            response.status_code == 400
+            and has_images
+            and "storage" in response.text.lower()
+        ):
             logger.warning(
                 "[Gluvok API] Storage failed on remote server. Retrying without image payload..."
             )
             fallback_files = [("file", (filename, b"", "image/jpeg"))]
             response = requests.post(
-                entries_url, auth=auth, data=data, files=fallback_files, timeout=CLOUD_POST_TIMEOUT
+                entries_url,
+                auth=auth,
+                data=data,
+                files=fallback_files,
+                timeout=CLOUD_POST_TIMEOUT,
             )
         return _parse_cloud_response(response, safe_plate, weight)
 
     except requests.exceptions.ReadTimeout as e:
         err_msg = f"ReadTimeout: {e}"
-        logger.warning(f"[Gluvok API] Read timeout awaiting response from server: {err_msg}")
+        logger.warning(
+            f"[Gluvok API] Read timeout awaiting response from server: {err_msg}"
+        )
         _record_cloud_event("CLOUD_UPLOAD_ERROR", err_msg, is_error=True)
         return False, None, err_msg, True
 
@@ -171,7 +197,8 @@ def verify_entry_in_cloud(
     raw_plate = str(detected_vehicle_number or "NO_PLATE_DETECTED").strip().upper()
     safe_plate = (
         "NO_PLATE_DETECTED"
-        if not raw_plate or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
+        if not raw_plate
+        or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
         else raw_plate
     )
     params = {
@@ -208,10 +235,13 @@ def post_to_cloud(session_payload: dict[str, Any]) -> None:
     Preserved for direct callers; does NOT wipe session_payload on completion.
     """
     center_id = int(config.center_id)
-    raw_plate = str(session_payload.get("anpr_plate", "NO_PLATE_DETECTED")).strip().upper()
+    raw_plate = (
+        str(session_payload.get("anpr_plate", "NO_PLATE_DETECTED")).strip().upper()
+    )
     plate = (
         "NO_PLATE_DETECTED"
-        if not raw_plate or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
+        if not raw_plate
+        or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
         else raw_plate
     )
     weight = float(session_payload.get("weight", 0.0))

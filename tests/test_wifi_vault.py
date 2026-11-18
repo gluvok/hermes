@@ -17,7 +17,9 @@ class TestWifiVault(unittest.TestCase):
         wifi_vault.save_wifi_network("Plant_5G", "SecretPass123", db_path=self.db_path)
         pwd = wifi_vault.get_wifi_password("Plant_5G", db_path=self.db_path)
         self.assertEqual(pwd, "SecretPass123")
-        self.assertIsNone(wifi_vault.get_wifi_password("NonExistent", db_path=self.db_path))
+        self.assertIsNone(
+            wifi_vault.get_wifi_password("NonExistent", db_path=self.db_path)
+        )
 
     def test_get_saved_wifi_networks_masks_passwords(self):
         wifi_vault.save_wifi_network("Net_A", "PassA", db_path=self.db_path)
@@ -35,10 +37,16 @@ class TestWifiVault(unittest.TestCase):
 
     def test_save_wifi_network_upsert_updates_password(self):
         wifi_vault.save_wifi_network("Factory_WiFi", "OldPass", db_path=self.db_path)
-        self.assertEqual(wifi_vault.get_wifi_password("Factory_WiFi", db_path=self.db_path), "OldPass")
+        self.assertEqual(
+            wifi_vault.get_wifi_password("Factory_WiFi", db_path=self.db_path),
+            "OldPass",
+        )
 
         wifi_vault.save_wifi_network("Factory_WiFi", "NewPass", db_path=self.db_path)
-        self.assertEqual(wifi_vault.get_wifi_password("Factory_WiFi", db_path=self.db_path), "NewPass")
+        self.assertEqual(
+            wifi_vault.get_wifi_password("Factory_WiFi", db_path=self.db_path),
+            "NewPass",
+        )
 
     def test_delete_and_clear_saved_wifi_networks(self):
         wifi_vault.save_wifi_network("Temp_Net", "Pass1", db_path=self.db_path)
@@ -46,11 +54,17 @@ class TestWifiVault(unittest.TestCase):
 
         deleted = wifi_vault.delete_saved_wifi_network("Temp_Net", db_path=self.db_path)
         self.assertTrue(deleted)
-        self.assertIsNone(wifi_vault.get_wifi_password("Temp_Net", db_path=self.db_path))
-        self.assertFalse(wifi_vault.delete_saved_wifi_network("NonExistent", db_path=self.db_path))
+        self.assertIsNone(
+            wifi_vault.get_wifi_password("Temp_Net", db_path=self.db_path)
+        )
+        self.assertFalse(
+            wifi_vault.delete_saved_wifi_network("NonExistent", db_path=self.db_path)
+        )
 
         wifi_vault.clear_saved_wifi_networks(db_path=self.db_path)
-        self.assertEqual(len(wifi_vault.get_saved_wifi_networks(db_path=self.db_path)), 0)
+        self.assertEqual(
+            len(wifi_vault.get_saved_wifi_networks(db_path=self.db_path)), 0
+        )
 
 
 if __name__ == "__main__":

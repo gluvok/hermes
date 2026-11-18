@@ -58,7 +58,10 @@ class ScaleUARTReader:
         target_baudrate = baudrate or get_current_baudrate()
 
         if self._thread and self._thread.is_alive():
-            if self.active_port == target_port and self.active_baudrate == target_baudrate:
+            if (
+                self.active_port == target_port
+                and self.active_baudrate == target_baudrate
+            ):
                 return
             self.restart(target_port, target_baudrate)
             return
@@ -67,13 +70,19 @@ class ScaleUARTReader:
         self.active_baudrate = target_baudrate
         self._stop_event.clear()
 
-        self._thread = threading.Thread(target=self._read_loop, daemon=True, name="ScaleUART")
+        self._thread = threading.Thread(
+            target=self._read_loop, daemon=True, name="ScaleUART"
+        )
         self._thread.start()
-        logger.info(f"[Scale] UART reader thread started for {target_port} @ {target_baudrate} baud.")
+        logger.info(
+            f"[Scale] UART reader thread started for {target_port} @ {target_baudrate} baud."
+        )
 
     def restart(self, port: str | None = None, baudrate: int | None = None):
         """Restarts the UART reader thread with updated port and baud rate."""
-        logger.info("[Scale] Restarting UART reader with updated serial configuration...")
+        logger.info(
+            "[Scale] Restarting UART reader with updated serial configuration..."
+        )
         self.stop()
         time.sleep(0.1)
         self.start(port, baudrate)
@@ -81,7 +90,11 @@ class ScaleUARTReader:
     def stop(self):
         self._stop_event.set()
         self._close_serial()
-        if self._thread and self._thread.is_alive() and self._thread != threading.current_thread():
+        if (
+            self._thread
+            and self._thread.is_alive()
+            and self._thread != threading.current_thread()
+        ):
             self._thread.join(timeout=1.5)
         self._thread = None
         logger.info("[Scale] UART reader stopped.")
@@ -104,7 +117,9 @@ class ScaleUARTReader:
         self._close_serial()
         try:
             try:
-                ser = serial.Serial(port, baudrate, timeout=SCALE_TIMEOUT, exclusive=True)
+                ser = serial.Serial(
+                    port, baudrate, timeout=SCALE_TIMEOUT, exclusive=True
+                )
             except TypeError:
                 ser = serial.Serial(port, baudrate, timeout=SCALE_TIMEOUT)
             with self._serial_lock:
@@ -112,7 +127,9 @@ class ScaleUARTReader:
             logger.info(f"[Scale] UART opened: {port} @ {baudrate} baud")
             return True
         except (serial.SerialException, OSError) as e:
-            logger.error(f"[Scale] Failed to open UART port '{port}' @ {baudrate} baud: {e}")
+            logger.error(
+                f"[Scale] Failed to open UART port '{port}' @ {baudrate} baud: {e}"
+            )
             self._close_serial()
             return False
 
@@ -135,7 +152,9 @@ class ScaleUARTReader:
         except (serial.SerialException, OSError, TypeError) as e:
             if self._stop_event.is_set():
                 return
-            logger.error(f"[Scale] UART connection lost / read error: {e}. Reconnecting in 5s...")
+            logger.error(
+                f"[Scale] UART connection lost / read error: {e}. Reconnecting in 5s..."
+            )
             self._close_serial()
             time.sleep(1.0)
             return
@@ -192,7 +211,9 @@ class ScaleUARTReader:
         """Flushes the line buffer if inter-character timeout (300ms) has elapsed."""
         buf_to_parse = None
         with self._lock:
-            if self._line_buffer and (time.time() - self._last_char_time >= INTER_CHAR_TIMEOUT_S):
+            if self._line_buffer and (
+                time.time() - self._last_char_time >= INTER_CHAR_TIMEOUT_S
+            ):
                 buf_to_parse = bytes(self._line_buffer)
                 self._line_buffer.clear()
 
@@ -239,6 +260,7 @@ def handle_scale_char_processed(weight: float):
     """Bridge to stability state machine — called after a weight value is extracted."""
     logger.debug(f"[Scale] Parsed weight: {weight:.3f} kg")
     from src.core.stability import process_new_weight
+
     process_new_weight(weight)
 
 

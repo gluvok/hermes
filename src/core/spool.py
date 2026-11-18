@@ -1,11 +1,11 @@
 """spool.py — SQLite FIFO Store-and-Forward Weighment Queue."""
+
 from __future__ import annotations
 
 import json
 import logging
 import sqlite3
 import threading
-import time
 from typing import Any
 
 from src.core.db import _db_lock, _get_connection
@@ -32,7 +32,9 @@ def enqueue_weighment(session_id: str, payload: dict[str, Any]) -> bool:
                 (session_id, payload_str),
             )
             conn.commit()
-            logger.info(f"[Spool] Enqueued offline weighment {session_id} to SQLite queue.")
+            logger.info(
+                f"[Spool] Enqueued offline weighment {session_id} to SQLite queue."
+            )
             return True
         except (sqlite3.Error, OSError) as e:
             logger.error(f"[Spool] Failed to enqueue weighment {session_id}: {e}")
@@ -59,7 +61,7 @@ def get_pending_weighments(limit: int = 20) -> list[dict[str, Any]]:
             for row in rows:
                 try:
                     payload = json.loads(row[1])
-                except (json.JSONDecodeError, TypeError):
+                except json.JSONDecodeError, TypeError:
                     payload = {}
                 results.append(
                     {
@@ -89,7 +91,9 @@ def mark_weighment_completed(session_id: str) -> bool:
             logger.info(f"[Spool] Dequeued completed weighment {session_id}.")
             return True
         except (sqlite3.Error, OSError) as e:
-            logger.error(f"[Spool] Failed to mark weighment completed {session_id}: {e}")
+            logger.error(
+                f"[Spool] Failed to mark weighment completed {session_id}: {e}"
+            )
             return False
 
 
@@ -120,10 +124,12 @@ def spool_queue_count() -> int:
     with _db_lock:
         conn = _get_connection()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM weighment_queue WHERE status = 'PENDING';")
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM weighment_queue WHERE status = 'PENDING';"
+            )
             row = cursor.fetchone()
             return int(row[0]) if row else 0
-        except (sqlite3.Error, OSError):
+        except sqlite3.Error, OSError:
             return 0
 
 
@@ -152,7 +158,7 @@ def drain_spool_queue() -> int:
                 transmitted += 1
             else:
                 mark_weighment_failed(sid, f"Cloud upload returned entry_id={entry_id}")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             mark_weighment_failed(sid, str(e))
 
     return transmitted
@@ -162,7 +168,7 @@ def _spool_worker_loop(interval: float) -> None:
     while not _worker_stop_event.is_set():
         try:
             drain_spool_queue()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.debug(f"[Spool Worker] Error in drain loop: {e}")
         _worker_stop_event.wait(timeout=interval)
 
@@ -177,7 +183,9 @@ def start_spool_worker(interval: float = 10.0) -> None:
             target=_spool_worker_loop, args=(interval,), daemon=True, name="SpoolWorker"
         )
         _worker_thread.start()
-        logger.info(f"[Spool Worker] Started background queue worker (interval={interval}s).")
+        logger.info(
+            f"[Spool Worker] Started background queue worker (interval={interval}s)."
+        )
 
 
 def stop_spool_worker() -> None:

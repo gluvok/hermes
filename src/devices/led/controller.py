@@ -40,7 +40,9 @@ class RGBLedController:
 
     def startup_test(self, delay: float = 1.0) -> None:
         """Cycles Green -> Red -> Blue (delay seconds each), then resets to idle."""
-        logger.info(f"[LED] Starting hardware sequence: Green -> Red -> Blue ({delay}s each)...")
+        logger.info(
+            f"[LED] Starting hardware sequence: Green -> Red -> Blue ({delay}s each)..."
+        )
         for color in (LEDColor.GREEN, LEDColor.RED, LEDColor.BLUE):
             with self._lock:
                 self._apply_color(color)

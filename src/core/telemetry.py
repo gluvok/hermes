@@ -33,11 +33,13 @@ def record_system_event(source: str, message: str) -> None:
     with _events_lock:
         if len(_system_events) >= 20:
             _system_events.pop(0)
-        _system_events.append({
-            "time": time.strftime("%H:%M:%S"),
-            "source": source,
-            "message": message,
-        })
+        _system_events.append(
+            {
+                "time": time.strftime("%H:%M:%S"),
+                "source": source,
+                "message": message,
+            }
+        )
 
 
 def record_weighment_result(

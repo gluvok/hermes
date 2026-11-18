@@ -1,4 +1,5 @@
 """driver.py — Low-Level Hardware Interface for RGB LED using python-periphery."""
+
 from __future__ import annotations
 
 import glob
@@ -19,11 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 def _open_gpio(pin: int) -> Any:
-    for chip in ("/dev/gpiochip4", "/dev/gpiochip0") + tuple(sorted(glob.glob("/dev/gpiochip*"), reverse=True)):
+    for chip in ("/dev/gpiochip4", "/dev/gpiochip0") + tuple(
+        sorted(glob.glob("/dev/gpiochip*"), reverse=True)
+    ):
         if os.path.exists(chip):
             try:
                 return GPIO(chip, pin, "out")
-            except (GPIOError, LookupError, OSError):
+            except GPIOError, LookupError, OSError:
                 logger.debug("Failed opening GPIO %d on chip %s", pin, chip)
     return GPIO(pin, "out")
 
@@ -45,10 +48,16 @@ class LEDHardwareDriver:
 
     def _init_pins(self) -> None:
         try:
-            self.pins = {"r": _open_gpio(self.red_pin), "g": _open_gpio(self.green_pin), "b": _open_gpio(self.blue_pin)}
+            self.pins = {
+                "r": _open_gpio(self.red_pin),
+                "g": _open_gpio(self.green_pin),
+                "b": _open_gpio(self.blue_pin),
+            }
         except (GPIOError, LookupError, OSError) as err:
             self.is_mock = True
-            logger.info("[LED Driver] Native GPIO unavailable (%s). Running in mock mode.", err)
+            logger.info(
+                "[LED Driver] Native GPIO unavailable (%s). Running in mock mode.", err
+            )
 
     def set_rgb(self, red: int, green: int, blue: int) -> None:
         self.current_values = (red, green, blue)

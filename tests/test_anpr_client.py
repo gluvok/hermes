@@ -41,7 +41,9 @@ class TestANPRClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         fake_img = b"\xff\xd8\xff\xe0\x00\x10JFIF"
-        plate, status = send_frame_to_anpr_server(fake_img, server_url="http://127.0.0.1:8000/recognize")
+        plate, status = send_frame_to_anpr_server(
+            fake_img, server_url="http://127.0.0.1:8000/recognize"
+        )
 
         self.assertEqual(plate, "RJ09GA0165")
         self.assertEqual(status, "SUCCESS")
@@ -92,7 +94,9 @@ class TestANPRClient(unittest.TestCase):
         with self.assertLogs("src.integrations.anpr", level="INFO") as cm:
             plate, _ = send_frame_to_anpr_server(b"fake-bytes")
             self.assertEqual(plate, "KA01AB9999")
-            self.assertTrue(any("[ANPR] [Argus Response] Status 200" in msg for msg in cm.output))
+            self.assertTrue(
+                any("[ANPR] [Argus Response] Status 200" in msg for msg in cm.output)
+            )
 
     @patch("src.integrations.anpr.requests.post")
     def test_send_frame_timeout(self, mock_post):
@@ -103,7 +107,9 @@ class TestANPRClient(unittest.TestCase):
 
     @patch("src.integrations.anpr.requests.post")
     def test_send_frame_connection_error(self, mock_post):
-        mock_post.side_effect = requests.exceptions.ConnectionError("Connection refused")
+        mock_post.side_effect = requests.exceptions.ConnectionError(
+            "Connection refused"
+        )
         plate, status = send_frame_to_anpr_server(b"fake-bytes")
         self.assertIsNone(plate)
         self.assertEqual(status, "ANPR_CONNECTION_ERROR")
@@ -143,7 +149,9 @@ class TestANPRClient(unittest.TestCase):
         self.assertEqual(status, "SUCCESS")
 
     @patch("src.integrations.anpr.requests.post")
-    def test_send_frame_argus_multi_vehicle_different_plates_takes_first(self, mock_post):
+    def test_send_frame_argus_multi_vehicle_different_plates_takes_first(
+        self, mock_post
+    ):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {

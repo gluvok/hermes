@@ -43,12 +43,17 @@
 Create `hermes/tests/test_sandbox_isolation.py`:
 ```python
 """Verify tests cannot invoke real subprocess sudo or unmocked serial ports."""
+
 import subprocess
 import pytest
 
+
 def test_unmocked_sudo_is_blocked():
-    with pytest.raises(RuntimeError, match="Direct system execution blocked in test suite"):
+    with pytest.raises(
+        RuntimeError, match="Direct system execution blocked in test suite"
+    ):
         from tests.conftest import assert_sandbox_active
+
         assert_sandbox_active()
         subprocess.run(["sudo", "whoami"], check=True)
 ```
@@ -65,27 +70,36 @@ Expected: FAIL (`conftest` not found or sandbox inactive).
 Create `hermes/tests/conftest.py`:
 ```python
 """Global pytest fixtures sandboxing hardware, serial, and subprocess execution."""
+
 import subprocess
 import pytest
 
 _SANDBOX_ACTIVE = True
 
+
 def assert_sandbox_active():
     if not _SANDBOX_ACTIVE:
         raise RuntimeError("Sandbox inactive")
+
 
 @pytest.fixture(autouse=True)
 def guard_host_execution(monkeypatch):
     """Enforces simulation state and blocks raw sudo / iptables executions."""
     from src.devices.wifi.runner import SIMULATION_STATE
+
     SIMULATION_STATE["enabled"] = True
 
     orig_run = subprocess.run
+
     def safe_subprocess_run(cmd, *args, **kwargs):
-        if isinstance(cmd, list) and any(arg in cmd for arg in ["sudo", "iptables", "fuser"]):
+        if isinstance(cmd, list) and any(
+            arg in cmd for arg in ["sudo", "iptables", "fuser"]
+        ):
             if kwargs.get("check"):
                 raise RuntimeError("Direct system execution blocked in test suite")
-            return subprocess.CompletedProcess(cmd, returncode=0, stdout=b"", stderr=b"")
+            return subprocess.CompletedProcess(
+                cmd, returncode=0, stdout=b"", stderr=b""
+            )
         return orig_run(cmd, *args, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", safe_subprocess_run)
@@ -127,6 +141,7 @@ git commit -m "fix(test): implement global pytest sandbox preventing host and ha
 Create `hermes/tests/test_wifi_facade.py`:
 ```python
 """Verify consolidated Wi-Fi package preserves all public API signatures."""
+
 import unittest
 from src.devices.wifi import (
     is_wifi_connected,
@@ -138,6 +153,7 @@ from src.devices.wifi import (
     start_wifi_watchdog,
     stop_wifi_watchdog,
 )
+
 
 class TestWiFiFacade(unittest.TestCase):
     def test_public_interface_exists(self):
@@ -197,6 +213,7 @@ Add test in `hermes/tests/test_camera.py`:
 ```python
 def test_camera_compress_image_bytes():
     from src.devices.camera import compress_image_bytes
+
     dummy_jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 100
     res = compress_image_bytes(dummy_jpeg, max_dim=1920, quality=85)
     assert res is not None or res == dummy_jpeg
@@ -244,11 +261,17 @@ git commit -m "refactor(layout): fold image compressor into camera module and mo
 Create `hermes/tests/test_spool_queue.py`:
 ```python
 """Verify weighment sessions are spooled to SQLite during network outages and never discarded."""
+
 import json
 import unittest
 from unittest.mock import patch, MagicMock
 from src.core.db import init_db
-from src.core.spool import enqueue_weighment, get_pending_weighments, mark_weighment_completed
+from src.core.spool import (
+    enqueue_weighment,
+    get_pending_weighments,
+    mark_weighment_completed,
+)
+
 
 class TestSpoolQueue(unittest.TestCase):
     def setUp(self):

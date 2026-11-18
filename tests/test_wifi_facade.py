@@ -1,16 +1,19 @@
 """Verify consolidated Wi-Fi package preserves all public API signatures."""
+
 import unittest
+
 from src.devices.wifi import (
-    is_wifi_connected,
-    is_network_connected,
-    scan_networks,
     connect_to_wifi,
-    start_emergency_hotspot,
-    stop_emergency_hotspot,
-    start_wifi_watchdog,
-    stop_wifi_watchdog,
     is_hotspot_active,
+    is_network_connected,
+    is_wifi_connected,
+    scan_networks,
+    start_emergency_hotspot,
+    start_wifi_watchdog,
+    stop_emergency_hotspot,
+    stop_wifi_watchdog,
 )
+
 
 class TestWiFiFacade(unittest.TestCase):
     def test_public_interface_exists(self):

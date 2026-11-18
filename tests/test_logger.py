@@ -66,7 +66,9 @@ class TestColoredFormatter(unittest.TestCase):
         setup_colored_logging(level=logging.DEBUG)
         root = logging.getLogger()
         self.assertEqual(root.level, logging.DEBUG)
-        self.assertTrue(any(isinstance(h.formatter, ColoredFormatter) for h in root.handlers))
+        self.assertTrue(
+            any(isinstance(h.formatter, ColoredFormatter) for h in root.handlers)
+        )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 """Verify weighment sessions are spooled to SQLite during network outages and never discarded."""
+
 from __future__ import annotations
 
 import os
@@ -50,7 +51,9 @@ class TestSpoolQueue(unittest.TestCase):
         self.assertEqual(pending[0]["retry_count"], 1)
         self.assertEqual(pending[0]["last_error"], "Timeout connecting to cloud")
 
-    @patch("src.integrations.gluvok.post_to_cloud", return_value=(True, "CLOUD_ENTRY_999"))
+    @patch(
+        "src.integrations.gluvok.post_to_cloud", return_value=(True, "CLOUD_ENTRY_999")
+    )
     @patch("src.devices.is_wifi_connected", return_value=True)
     def test_drain_spool_queue_success(self, mock_wifi, mock_post):
         payload = {"session_id": "TRUCK_003", "weight": 12000.0}

@@ -100,7 +100,9 @@ class TestAsyncANPR(unittest.TestCase):
             return ("MH12AB9999", "SUCCESS")
 
         start = time.time()
-        with patch("src.core.session.send_frame_to_anpr_server", side_effect=slow_sender):
+        with patch(
+            "src.core.session.send_frame_to_anpr_server", side_effect=slow_sender
+        ):
             futures = self.sm._capture_and_record_anpr_sample(wait=False)
 
         elapsed = time.time() - start
@@ -132,7 +134,9 @@ class TestAsyncANPR(unittest.TestCase):
         self.assertIsNone(plate)
         self.assertEqual(status, "ANPR_WORKER_ERROR")
         self.assertEqual(len(recorded_events), 1)
-        self.assertEqual(recorded_events[0], ("SESS_ERR_TEST", 1, None, "ANPR_WORKER_ERROR"))
+        self.assertEqual(
+            recorded_events[0], ("SESS_ERR_TEST", 1, None, "ANPR_WORKER_ERROR")
+        )
 
     @patch("src.core.session.capture_anpr_snapshots")
     def test_finalize_package_drains_pending_futures(self, mock_snaps):
@@ -143,7 +147,10 @@ class TestAsyncANPR(unittest.TestCase):
             time.sleep(0.05)
             return ("KA01MM4444", "SUCCESS")
 
-        with patch("src.core.session.send_frame_to_anpr_server", side_effect=slightly_delayed_sender):
+        with patch(
+            "src.core.session.send_frame_to_anpr_server",
+            side_effect=slightly_delayed_sender,
+        ):
             self.sm._capture_and_record_anpr_sample(wait=False)
 
             # Trigger stabilization and fast-forward timer

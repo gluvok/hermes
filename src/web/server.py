@@ -59,7 +59,11 @@ class FallbackWebServer:
             logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
             self._server = make_server(
-                self.host, self.port, flask_app, threaded=True, request_handler=HermesWSGIRequestHandler
+                self.host,
+                self.port,
+                flask_app,
+                threaded=True,
+                request_handler=HermesWSGIRequestHandler,
             )
             self._is_running = True
             self._thread = threading.Thread(
@@ -68,10 +72,16 @@ class FallbackWebServer:
                 daemon=True,
             )
             self._thread.start()
-            logger.info(f"[WebServer] Diagnostics web server running at http://{self.host}:{self.port}")
-            record_system_event("SYSTEM", f"Diagnostics web server started on port {self.port}")
+            logger.info(
+                f"[WebServer] Diagnostics web server running at http://{self.host}:{self.port}"
+            )
+            record_system_event(
+                "SYSTEM", f"Diagnostics web server started on port {self.port}"
+            )
         except OSError as e:
-            logger.error(f"[WebServer] Failed to bind web server on port {self.port}: {e}")
+            logger.error(
+                f"[WebServer] Failed to bind web server on port {self.port}: {e}"
+            )
 
     def stop(self) -> None:
         """Gracefully shuts down the running WSGI server."""

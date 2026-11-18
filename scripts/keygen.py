@@ -1,4 +1,5 @@
 """keygen.py — CLI tool to generate and sign bespoke client licenses with Ed25519."""
+
 from __future__ import annotations
 
 import argparse
@@ -36,17 +37,27 @@ def generate_client_license(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Hermes Client License Generator")
-    parser.add_argument("--device-id", required=True, help="Client device ID (e.g. pi1)")
+    parser.add_argument(
+        "--device-id", required=True, help="Client device ID (e.g. pi1)"
+    )
     parser.add_argument("--device-key", required=True, help="Client pre-shared key")
-    parser.add_argument("--center-id", type=int, required=True, help="Collection center ID")
-    parser.add_argument("--min-weight", type=float, default=70.0, help="Min weight threshold")
+    parser.add_argument(
+        "--center-id", type=int, required=True, help="Collection center ID"
+    )
+    parser.add_argument(
+        "--min-weight", type=float, default=70.0, help="Min weight threshold"
+    )
     parser.add_argument("--priv-key", default=DEFAULT_PRIV_KEY, help="Private key hex")
     parser.add_argument("--output", default="data/client.lic", help="Output path")
     args = parser.parse_args()
 
     generate_client_license(
-        args.device_id, args.device_key, args.center_id,
-        args.min_weight, args.priv_key, args.output,
+        args.device_id,
+        args.device_key,
+        args.center_id,
+        args.min_weight,
+        args.priv_key,
+        args.output,
     )
 
 

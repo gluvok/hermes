@@ -1,4 +1,5 @@
 """constants.py — Centralized System & Hardware Constants."""
+
 from __future__ import annotations
 
 import os

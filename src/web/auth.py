@@ -86,14 +86,17 @@ def extract_auth_token() -> str:
 
 def auth_required(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator ensuring request contains a valid superadmin session token."""
+
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         token = extract_auth_token()
         if not validate_session_token(token):
-            return jsonify({
-                "success": False,
-                "error": "Unauthorized. Superadmin credentials required.",
-            }), 401
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "Unauthorized. Superadmin credentials required.",
+                }
+            ), 401
         return func(*args, **kwargs)
 
     return wrapper

@@ -13,7 +13,9 @@ class TestSessionErrorFallback(unittest.TestCase):
 
     @patch("src.core.session.send_frame_to_anpr_server")
     @patch("src.core.session.fetch_image_bytes")
-    def test_session_recognition_failure_sends_no_plate_detected_and_includes_image(self, mock_fetch, mock_send):
+    def test_session_recognition_failure_sends_no_plate_detected_and_includes_image(
+        self, mock_fetch, mock_send
+    ):
         fake_truck_frame = b"\xff\xd8\xff\xe0\x00\x10JFIF_TRUCK_FRAME"
         mock_fetch.return_value = fake_truck_frame
         mock_send.return_value = (None, "NO_PLATE_DETECTED")
@@ -42,7 +44,9 @@ class TestSessionErrorFallback(unittest.TestCase):
 
     @patch("src.core.session.send_frame_to_anpr_server")
     @patch("src.core.session.fetch_image_bytes")
-    def test_session_prefers_valid_plate_over_transient_errors(self, mock_fetch, mock_send):
+    def test_session_prefers_valid_plate_over_transient_errors(
+        self, mock_fetch, mock_send
+    ):
         fake_truck_frame = b"\xff\xd8\xff\xe0\x00\x10JFIF_TRUCK_FRAME"
         mock_fetch.return_value = fake_truck_frame
 
@@ -79,8 +83,10 @@ class TestSessionErrorFallback(unittest.TestCase):
             (2, "http://anpr2/rear", frame_rear),
         ]
         # Front was noisy; Rear clearly detected plate
-        mock_send.side_effect = (
-            lambda img: ("HR26DK8333", "SUCCESS") if img == frame_rear else (None, "NO_PLATE_DETECTED")
+        mock_send.side_effect = lambda img: (
+            ("HR26DK8333", "SUCCESS")
+            if img == frame_rear
+            else (None, "NO_PLATE_DETECTED")
         )
 
         self.sm.start_session()
@@ -128,7 +134,9 @@ class TestSessionErrorFallback(unittest.TestCase):
 
     @patch("src.core.session.send_frame_to_anpr_server")
     @patch("src.core.session.capture_anpr_snapshots")
-    def test_session_empty_results_from_argus_sends_no_plate_detected(self, mock_anpr_snaps, mock_send):
+    def test_session_empty_results_from_argus_sends_no_plate_detected(
+        self, mock_anpr_snaps, mock_send
+    ):
         fake_frame = b"fake_frame_bytes"
         mock_anpr_snaps.return_value = [(1, "http://anpr1/front", fake_frame)]
         mock_send.return_value = (None, "NO_PLATE_DETECTED")

@@ -45,12 +45,13 @@ __all__ = [
 ]
 
 
-
 class SessionPhase(Enum):
     PHASE_IDLE = 0
-    PHASE_STABILIZING = 1          # Weight active, 1s Multi-ANPR OCR running
-    PHASE_POST_STABILITY = 2       # Weight stable, Full fleet cameras captured, +5s timer running
-    PHASE_COMPLETED = 3            # Session finished & transmitted, awaiting weight return to 0
+    PHASE_STABILIZING = 1  # Weight active, 1s Multi-ANPR OCR running
+    PHASE_POST_STABILITY = (
+        2  # Weight stable, Full fleet cameras captured, +5s timer running
+    )
+    PHASE_COMPLETED = 3  # Session finished & transmitted, awaiting weight return to 0
 
 
 class WeighbridgeSessionManager:
@@ -92,7 +93,7 @@ class WeighbridgeSessionManager:
             if self._http_session is not None:
                 try:
                     self._http_session.close()
-                except (OSError, RuntimeError):
+                except OSError, RuntimeError:
                     pass
 
             self.session_id = f"SESS_{int(time.time())}_{uuid.uuid4().hex[:6]}"
@@ -177,7 +178,9 @@ class WeighbridgeSessionManager:
 
         for cam_idx, _cam_url, img_bytes in snapshots:
             if not img_bytes:
-                logger.warning(f"[ANPR] Camera {cam_idx} frame capture failed from {_cam_url}")
+                logger.warning(
+                    f"[ANPR] Camera {cam_idx} frame capture failed from {_cam_url}"
+                )
                 continue
 
             with self._lock:
@@ -227,19 +230,27 @@ class WeighbridgeSessionManager:
         logger.info(f"[Session {session_id}] Multi-camera ANPR capture loop started.")
         while not stop_event.is_set():
             with self._lock:
-                if self.session_id != session_id or self.phase == SessionPhase.PHASE_IDLE:
+                if (
+                    self.session_id != session_id
+                    or self.phase == SessionPhase.PHASE_IDLE
+                ):
                     break
 
             loop_start = time.time()
             try:
                 self._capture_and_record_anpr_sample(wait=False)
             except (requests.RequestException, OSError, ValueError, RuntimeError) as e:
-                logger.error(f"[Session {session_id}] Exception in ANPR loop iteration: {e}")
+                logger.error(
+                    f"[Session {session_id}] Exception in ANPR loop iteration: {e}"
+                )
 
             if stop_event.is_set():
                 break
             with self._lock:
-                if self.session_id != session_id or self.phase == SessionPhase.PHASE_IDLE:
+                if (
+                    self.session_id != session_id
+                    or self.phase == SessionPhase.PHASE_IDLE
+                ):
                     break
 
             elapsed = time.time() - loop_start
@@ -284,7 +295,8 @@ class WeighbridgeSessionManager:
         need_fleet_thread = False
         with self._lock:
             if not self._fleet_snapshots and (
-                not self._fleet_snapshot_thread or not self._fleet_snapshot_thread.is_alive()
+                not self._fleet_snapshot_thread
+                or not self._fleet_snapshot_thread.is_alive()
             ):
                 need_fleet_thread = True
         if need_fleet_thread:
@@ -301,7 +313,9 @@ class WeighbridgeSessionManager:
             snapshots = capture_all_camera_snapshots()
             compressed: dict[str, bytes | None] = {}
             for label, img_bytes in snapshots.items():
-                compressed[label] = compress_image_bytes(img_bytes) if img_bytes else None
+                compressed[label] = (
+                    compress_image_bytes(img_bytes) if img_bytes else None
+                )
             with self._lock:
                 if self.phase in (
                     SessionPhase.PHASE_STABILIZING,
@@ -314,7 +328,9 @@ class WeighbridgeSessionManager:
                         "captured and compressed in RAM."
                     )
         except (requests.RequestException, OSError, ValueError, RuntimeError) as e:
-            logger.error(f"[Session {self.session_id}] Error capturing full-fleet cameras: {e}")
+            logger.error(
+                f"[Session {self.session_id}] Error capturing full-fleet cameras: {e}"
+            )
 
     def check_session_progress(self) -> dict[str, Any] | None:
         """Checks if post-stabilization timer expired. Finalizes session immediately without blocking."""
@@ -381,7 +397,9 @@ class WeighbridgeSessionManager:
                 f"Total Snapshots={len(fleet_copy)}"
             )
             is_err = bool(not self._anpr_plates)
-            _record_session_telemetry(self.session_id, final_anpr_plate, self.stable_weight, is_err)
+            _record_session_telemetry(
+                self.session_id, final_anpr_plate, self.stable_weight, is_err
+            )
             return package
 
     def reset_session(self):
@@ -390,7 +408,9 @@ class WeighbridgeSessionManager:
             if self.phase == SessionPhase.PHASE_IDLE:
                 return
 
-            logger.info(f"[Session {self.session_id}] Weight zeroed. Resetting session manager.")
+            logger.info(
+                f"[Session {self.session_id}] Weight zeroed. Resetting session manager."
+            )
             self._stop_anpr_event.set()
             old_anpr_thread = self._anpr_thread
             old_pool = self._anpr_pool
@@ -416,7 +436,7 @@ class WeighbridgeSessionManager:
         if old_http is not None:
             try:
                 old_http.close()
-            except (OSError, RuntimeError):
+            except OSError, RuntimeError:
                 pass
 
 

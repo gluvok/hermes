@@ -1,4 +1,5 @@
 """test_license.py — Unit tests for Ed25519 offline license verification."""
+
 from __future__ import annotations
 
 import json
@@ -53,9 +54,13 @@ def test_load_client_license_missing_file() -> None:
     assert load_client_license("/nonexistent/path/client.lic") is None
 
 
-def test_config_manager_with_license(tmp_path: Path, sample_payload: dict[str, object]) -> None:
+def test_config_manager_with_license(
+    tmp_path: Path, sample_payload: dict[str, object]
+) -> None:
     lic_file = tmp_path / "client.lic"
-    lic_file.write_text(sign_license(sample_payload, DEFAULT_PRIV_KEY), encoding="utf-8")
+    lic_file.write_text(
+        sign_license(sample_payload, DEFAULT_PRIV_KEY), encoding="utf-8"
+    )
     db_file = tmp_path / "test.db"
 
     mgr = ConfigManager(db_path=str(db_file), lic_path=str(lic_file))

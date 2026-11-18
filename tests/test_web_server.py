@@ -18,6 +18,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         import sqlite3
 
         from src.config.store import get_config_db_path
+
         with sqlite3.connect(get_config_db_path()) as conn:
             conn.execute("DELETE FROM runtime_config;")
         config.load_settings()
@@ -37,6 +38,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         import sqlite3
 
         from src.config.store import get_config_db_path
+
         with sqlite3.connect(get_config_db_path()) as conn:
             conn.execute("DELETE FROM runtime_config;")
         config.load_settings()
@@ -86,7 +88,16 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertGreater(len(res_lucide.get_data()), 1000)
 
     def test_subsystem_page_routes(self):
-        for route in ("/scale", "/anpr", "/cloud", "/wifi", "/telemetry", "/errors", "/config", "/admin"):
+        for route in (
+            "/scale",
+            "/anpr",
+            "/cloud",
+            "/wifi",
+            "/telemetry",
+            "/errors",
+            "/config",
+            "/admin",
+        ):
             res = self.client.get(route)
             self.assertEqual(res.status_code, 200)
             self.assertIn("text/html", res.content_type)
@@ -266,8 +277,6 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(config.anpr_camera_urls[1], "http://127.0.0.1:8999/rear")
         self.assertEqual(config.anpr_camera_url, "http://127.0.0.1:8999/front")
 
-
-
     def test_post_api_config_unauthorized(self):
         res = self.client.post(
             "/api/config",
@@ -331,7 +340,9 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
 
         from src.web.blueprints.api import _check_argus_online
 
-        with patch("requests.get", side_effect=requests.RequestException("Connection refused")):
+        with patch(
+            "requests.get", side_effect=requests.RequestException("Connection refused")
+        ):
             online = _check_argus_online("http://127.0.0.1:8000/recognize")
             self.assertFalse(online)
 
@@ -353,7 +364,9 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertTrue(res2.get_json()["success"])
 
     def test_captive_portal_probes(self):
-        with unittest.mock.patch("src.web.blueprints.views.is_wifi_connected", return_value=False):
+        with unittest.mock.patch(
+            "src.web.blueprints.views.is_wifi_connected", return_value=False
+        ):
             res_gen = self.client.get("/generate_204")
             self.assertEqual(res_gen.status_code, 302)
             self.assertIn("/wifi", res_gen.headers.get("Location", ""))
@@ -361,7 +374,9 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
             res_cna = self.client.get("/hotspot-detect.html")
             self.assertEqual(res_cna.status_code, 302)
 
-        with unittest.mock.patch("src.web.blueprints.views.is_wifi_connected", return_value=True):
+        with unittest.mock.patch(
+            "src.web.blueprints.views.is_wifi_connected", return_value=True
+        ):
             res_online = self.client.get("/generate_204")
             self.assertEqual(res_online.status_code, 204)
 

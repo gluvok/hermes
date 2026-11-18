@@ -1,4 +1,5 @@
 """wifi_vault.py — Persistent Wi-Fi Network Vault."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -31,20 +32,32 @@ def get_saved_wifi_networks(db_path: str | None = None) -> list[dict[str, Any]]:
     sql = "SELECT ssid, created_at, last_connected_at FROM wifi_networks ORDER BY last_connected_at DESC"
     with _vault_lock, _get_conn(db_path) as conn:
         rows = conn.execute(sql).fetchall()
-        return [{"ssid": r["ssid"], "created_at": r["created_at"], "last_connected_at": r["last_connected_at"]} for r in rows]
+        return [
+            {
+                "ssid": r["ssid"],
+                "created_at": r["created_at"],
+                "last_connected_at": r["last_connected_at"],
+            }
+            for r in rows
+        ]
 
 
 def get_wifi_password(ssid: str, db_path: str | None = None) -> str | None:
     """Retrieves stored password for given SSID."""
     with _vault_lock, _get_conn(db_path) as conn:
-        row = conn.execute("SELECT password FROM wifi_networks WHERE ssid = ?", (ssid,)).fetchone()
+        row = conn.execute(
+            "SELECT password FROM wifi_networks WHERE ssid = ?", (ssid,)
+        ).fetchone()
         return str(row["password"]) if row else None
 
 
 def delete_saved_wifi_network(ssid: str, db_path: str | None = None) -> bool:
     """Deletes network from vault."""
     with _vault_lock, _get_conn(db_path) as conn:
-        return conn.execute("DELETE FROM wifi_networks WHERE ssid = ?", (ssid,)).rowcount > 0
+        return (
+            conn.execute("DELETE FROM wifi_networks WHERE ssid = ?", (ssid,)).rowcount
+            > 0
+        )
 
 
 def clear_saved_wifi_networks(db_path: str | None = None) -> None:

@@ -2,14 +2,6 @@ from src.core.db import (
     get_default_db_path,
     init_db,
 )
-from src.core.spool import (
-    enqueue_weighment,
-    get_pending_weighments,
-    mark_weighment_completed,
-    spool_queue_count,
-    start_spool_worker,
-    stop_spool_worker,
-)
 from src.core.logger import (
     ColoredFormatter,
     setup_colored_logging,
@@ -18,6 +10,14 @@ from src.core.session import (
     SessionPhase,
     WeighbridgeSessionManager,
     session_manager,
+)
+from src.core.spool import (
+    enqueue_weighment,
+    get_pending_weighments,
+    mark_weighment_completed,
+    spool_queue_count,
+    start_spool_worker,
+    stop_spool_worker,
 )
 from src.core.stability import (
     ScaleStabilityMachine,

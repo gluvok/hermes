@@ -1,4 +1,5 @@
 """manager.py — Wi-Fi NetworkManager (nmcli) connection, hotspot, and watchdog manager."""
+
 from __future__ import annotations
 
 import logging
@@ -11,7 +12,7 @@ import threading
 import time
 from typing import Any
 
-from src.core.wifi_vault import get_saved_wifi_networks, save_wifi_network
+from src.core.wifi_vault import save_wifi_network
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +50,16 @@ def is_nmcli_available() -> bool:
     return bool(_nmcli_path)
 
 
-def run_nmcli(args: list[str], timeout: float = 15.0, warn: bool = True) -> tuple[int, str]:
+def run_nmcli(
+    args: list[str], timeout: float = 15.0, warn: bool = True
+) -> tuple[int, str]:
     if SIMULATION_STATE["enabled"] or not is_nmcli_available():
         return 0, "simulated"
-    pfx = ["sudo", "-n"] if getattr(os, "geteuid", lambda: 0)() != 0 and shutil.which("sudo") else []
+    pfx = (
+        ["sudo", "-n"]
+        if getattr(os, "geteuid", lambda: 0)() != 0 and shutil.which("sudo")
+        else []
+    )
     try:
         res = subprocess.run(
             pfx + ["nmcli"] + args,
@@ -64,7 +71,9 @@ def run_nmcli(args: list[str], timeout: float = 15.0, warn: bool = True) -> tupl
         return res.returncode, (res.stdout or res.stderr).strip()
     except subprocess.TimeoutExpired:
         if warn:
-            logger.warning("[WiFi] nmcli timeout after %ss: %s", timeout, " ".join(args))
+            logger.warning(
+                "[WiFi] nmcli timeout after %ss: %s", timeout, " ".join(args)
+            )
         return 1, "timeout"
     except (subprocess.SubprocessError, OSError) as e:
         if warn:
@@ -74,6 +83,7 @@ def run_nmcli(args: list[str], timeout: float = 15.0, warn: bool = True) -> tupl
 
 def get_wifi_interface() -> str:
     from pathlib import Path
+
     for p in Path("/sys/class/net").glob("wl*"):
         if p.is_dir():
             return p.name
@@ -94,7 +104,7 @@ def get_hotspot_ip(iface: str | None = None) -> str:
             line = line.strip()
             if line.startswith("inet "):
                 return line.split()[1].split("/")[0]
-    except (subprocess.SubprocessError, OSError):
+    except subprocess.SubprocessError, OSError:
         pass
     return DEFAULT_GATEWAY_IP
 
@@ -104,7 +114,7 @@ def is_network_connected(timeout: float = 2.0) -> bool:
         try:
             with socket.create_connection((host, port), timeout=timeout):
                 return True
-        except (OSError, TimeoutError):
+        except OSError, TimeoutError:
             continue
     return False
 
@@ -118,7 +128,10 @@ def scan_networks() -> list[dict[str, Any]]:
         return list(SIMULATION_STATE["networks"])
     dev = get_wifi_interface()
     run_nmcli(["device", "wifi", "rescan", "ifname", dev], timeout=8.0, warn=False)
-    code, out = run_nmcli(["-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "ifname", dev], timeout=10.0)
+    code, out = run_nmcli(
+        ["-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list", "ifname", dev],
+        timeout=10.0,
+    )
     if code != 0 or not out:
         return []
     nets: list[dict[str, Any]] = []
@@ -160,7 +173,9 @@ def get_existing_profile(ssid: str) -> bool:
     return ssid in [l.strip() for l in out.splitlines()]
 
 
-def connect_to_wifi(ssid: str, password: str = "", timeout: float = 30.0) -> tuple[bool, str]:
+def connect_to_wifi(
+    ssid: str, password: str = "", timeout: float = 30.0
+) -> tuple[bool, str]:
     if not ssid:
         return False, "SSID cannot be empty"
     suspend_watchdog(timeout + 5.0)
@@ -199,7 +214,12 @@ def is_hotspot_active(con_name: str = HOTSPOT_CON_NAME) -> bool:
     return _hotspot_active
 
 
-def start_hotspot(ssid: str = DEFAULT_HOTSPOT_SSID, password: str = DEFAULT_HOTSPOT_PASS, iface: str | None = None, con_name: str = HOTSPOT_CON_NAME) -> bool:
+def start_hotspot(
+    ssid: str = DEFAULT_HOTSPOT_SSID,
+    password: str = DEFAULT_HOTSPOT_PASS,
+    iface: str | None = None,
+    con_name: str = HOTSPOT_CON_NAME,
+) -> bool:
     global _hotspot_active
     if _hotspot_active:
         return True
@@ -211,15 +231,65 @@ def start_hotspot(ssid: str = DEFAULT_HOTSPOT_SSID, password: str = DEFAULT_HOTS
     dev = iface or get_wifi_interface()
     run_nmcli(["device", "disconnect", dev], warn=False)
     run_nmcli(["connection", "delete", con_name], warn=False)
-    run_nmcli(["connection", "add", "type", "wifi", "ifname", dev, "con-name", con_name, "autoconnect", "no", "ssid", ssid])
-    run_nmcli(["connection", "modify", con_name, "802-11-wireless.mode", "ap", "802-11-wireless.band", "bg", "ipv4.method", "shared", "wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", password])
+    run_nmcli(
+        [
+            "connection",
+            "add",
+            "type",
+            "wifi",
+            "ifname",
+            dev,
+            "con-name",
+            con_name,
+            "autoconnect",
+            "no",
+            "ssid",
+            ssid,
+        ]
+    )
+    run_nmcli(
+        [
+            "connection",
+            "modify",
+            con_name,
+            "802-11-wireless.mode",
+            "ap",
+            "802-11-wireless.band",
+            "bg",
+            "ipv4.method",
+            "shared",
+            "wifi-sec.key-mgmt",
+            "wpa-psk",
+            "wifi-sec.psk",
+            password,
+        ]
+    )
     code, out = run_nmcli(["connection", "up", con_name])
     if code != 0:
         run_nmcli(["connection", "delete", con_name], warn=False)
-        code, out = run_nmcli(["device", "wifi", "hotspot", "ifname", dev, "con-name", con_name, "ssid", ssid, "password", password])
-    _hotspot_active = (code == 0)
+        code, out = run_nmcli(
+            [
+                "device",
+                "wifi",
+                "hotspot",
+                "ifname",
+                dev,
+                "con-name",
+                con_name,
+                "ssid",
+                ssid,
+                "password",
+                password,
+            ]
+        )
+    _hotspot_active = code == 0
     suspend_watchdog(10.0)
-    logger.log(logging.INFO if _hotspot_active else logging.ERROR, "[WiFi] Hotspot '%s': %s", ssid, get_hotspot_ip(dev) if _hotspot_active else out)
+    logger.log(
+        logging.INFO if _hotspot_active else logging.ERROR,
+        "[WiFi] Hotspot '%s': %s",
+        ssid,
+        get_hotspot_ip(dev) if _hotspot_active else out,
+    )
     return _hotspot_active
 
 
@@ -239,30 +309,44 @@ def stop_hotspot(con_name: str = HOTSPOT_CON_NAME) -> bool:
 
 def setup_nm_capport_config(*args: Any, **kwargs: Any) -> bool:
     from src.devices.wifi.portal import setup_nm_capport_config as _setup
+
     return _setup(*args, **kwargs)
 
 
-def start_emergency_hotspot(ssid: str = DEFAULT_HOTSPOT_SSID, password: str = DEFAULT_HOTSPOT_PASS, iface: str | None = None) -> bool:
+def start_emergency_hotspot(
+    ssid: str = DEFAULT_HOTSPOT_SSID,
+    password: str = DEFAULT_HOTSPOT_PASS,
+    iface: str | None = None,
+) -> bool:
     target_mod = sys.modules.get("src.devices.wifi.hotspot", sys.modules[__name__])
     notifier = getattr(target_mod, "notify_network_status", notify_network_status)
     from src.devices.wifi.portal import portal_service, setup_nm_capport_config
+
     capporter = getattr(target_mod, "setup_nm_capport_config", setup_nm_capport_config)
 
     notifier(False)
     capporter()
     ok = start_hotspot(ssid, password, iface)
     dev = iface or get_wifi_interface()
-    return bool(portal_service.start(ip=get_hotspot_ip(dev), iface=dev) and ok) if ok else False
+    return (
+        bool(portal_service.start(ip=get_hotspot_ip(dev), iface=dev) and ok)
+        if ok
+        else False
+    )
 
 
 def stop_emergency_hotspot(con_name: str = HOTSPOT_CON_NAME) -> bool:
     from src.devices.wifi.portal import portal_service
+
     portal_service.stop()
     return stop_hotspot(con_name)
 
 
 def notify_network_status(online: bool) -> None:
-    for mod, attr in (("src.devices.led", "led_controller"), ("src.core.stability", "scale_state_machine")):
+    for mod, attr in (
+        ("src.devices.led", "led_controller"),
+        ("src.core.stability", "scale_state_machine"),
+    ):
         try:
             getattr(__import__(mod, fromlist=[attr]), attr).set_network_status(online)
         except (ImportError, AttributeError) as exc:
@@ -283,14 +367,18 @@ def _watchdog_loop(interval: float = 1.0, threshold: int = 2) -> None:
             fails = 0
             notifier(True)
             if is_hotspot_active():
-                logger.info("[Watchdog] Internet restored. Stopping emergency hotspot...")
+                logger.info(
+                    "[Watchdog] Internet restored. Stopping emergency hotspot..."
+                )
                 stop_emergency_hotspot()
         else:
             fails += 1
             if fails >= threshold or not _running:
                 notifier(False)
                 if not is_hotspot_active():
-                    logger.warning("[Watchdog] Wi-Fi lost (%d fails). Activating hotspot...", fails)
+                    logger.warning(
+                        "[Watchdog] Wi-Fi lost (%d fails). Activating hotspot...", fails
+                    )
                     start_emergency_hotspot()
 
 
@@ -300,9 +388,13 @@ def start_wifi_watchdog(interval: float = 1.0) -> bool:
         if _running and _watchdog_thread and _watchdog_thread.is_alive():
             return True
         _running = True
-        _watchdog_thread = threading.Thread(target=_watchdog_loop, args=(interval,), daemon=True, name="WiFiWatchdog")
+        _watchdog_thread = threading.Thread(
+            target=_watchdog_loop, args=(interval,), daemon=True, name="WiFiWatchdog"
+        )
         _watchdog_thread.start()
-        logger.info("[WiFi Watchdog] Started connectivity monitor (interval=%.1fs)", interval)
+        logger.info(
+            "[WiFi Watchdog] Started connectivity monitor (interval=%.1fs)", interval
+        )
         return True
 
 

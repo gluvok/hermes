@@ -23,8 +23,18 @@ class TestImageCompressor(unittest.TestCase):
         # Create a synthetic 4K image (3840 x 2160)
         img_4k = np.zeros((2160, 3840, 3), dtype=np.uint8)
         # Draw some features
-        cv2.putText(img_4k, "RJ45CX3690", (500, 1000), cv2.FONT_HERSHEY_SIMPLEX, 5, (255, 255, 255), 10)
-        ok, raw_jpeg = cv2.imencode(".jpg", img_4k, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+        cv2.putText(
+            img_4k,
+            "RJ45CX3690",
+            (500, 1000),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            5,
+            (255, 255, 255),
+            10,
+        )
+        ok, raw_jpeg = cv2.imencode(
+            ".jpg", img_4k, [int(cv2.IMWRITE_JPEG_QUALITY), 100]
+        )
         self.assertTrue(ok)
         raw_bytes = raw_jpeg.tobytes()
 
@@ -43,8 +53,18 @@ class TestImageCompressor(unittest.TestCase):
     def test_compress_1080p_image_dimensions_preserved(self):
         # Create a 1920x1080 image
         img_1080 = np.zeros((1080, 1920, 3), dtype=np.uint8)
-        cv2.putText(img_1080, "PLATE", (200, 500), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 255, 255), 5)
-        ok, raw_jpeg = cv2.imencode(".jpg", img_1080, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+        cv2.putText(
+            img_1080,
+            "PLATE",
+            (200, 500),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            3,
+            (255, 255, 255),
+            5,
+        )
+        ok, raw_jpeg = cv2.imencode(
+            ".jpg", img_1080, [int(cv2.IMWRITE_JPEG_QUALITY), 100]
+        )
         self.assertTrue(ok)
         raw_bytes = raw_jpeg.tobytes()
 
@@ -62,7 +82,9 @@ class TestImageCompressor(unittest.TestCase):
     def test_compress_always_runs_for_small_image(self):
         # Create a small image (200x200) encoded at Q100
         img_small = np.full((200, 200, 3), 128, dtype=np.uint8)
-        ok, raw_jpeg = cv2.imencode(".jpg", img_small, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+        ok, raw_jpeg = cv2.imencode(
+            ".jpg", img_small, [int(cv2.IMWRITE_JPEG_QUALITY), 100]
+        )
         self.assertTrue(ok)
         raw_bytes = raw_jpeg.tobytes()
 

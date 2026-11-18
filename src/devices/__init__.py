@@ -50,4 +50,3 @@ __all__ = [
     "stop_emergency_hotspot",
     "stop_wifi_watchdog",
 ]
-

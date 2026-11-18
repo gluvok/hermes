@@ -1,4 +1,5 @@
 """runtime.py — Runtime configuration overrides mutator."""
+
 from __future__ import annotations
 
 import threading
@@ -34,7 +35,9 @@ class RuntimeConfig:
                 if kwargs.get(k) is not None:
                     set_override(k, kwargs[k], self.db_path)
             if kwargs.get("anpr_camera_urls") is not None:
-                cleaned = [str(u).strip() for u in kwargs["anpr_camera_urls"] if str(u).strip()]
+                cleaned = [
+                    str(u).strip() for u in kwargs["anpr_camera_urls"] if str(u).strip()
+                ]
                 if cleaned:
                     set_override("anpr_camera_urls", cleaned, self.db_path)
             elif kwargs.get("anpr_camera_url") is not None:

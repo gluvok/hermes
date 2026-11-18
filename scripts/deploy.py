@@ -1,4 +1,5 @@
 """deploy.py — Remote Raspberry Pi deployment automation."""
+
 from __future__ import annotations
 
 import argparse
@@ -26,12 +27,14 @@ def run_cmd(cmd: list[str]) -> None:
         sys.exit(result.returncode)
 
 
-def deploy_remote(host: str, target: str = "/opt/hermes", lic: str = "data/client.lic") -> None:
+def deploy_remote(
+    host: str, target: str = "/opt/hermes", lic: str = "data/client.lic"
+) -> None:
     print(f"[Deploy] 1. Preparing {target} on {host}...")
     prep = (
         f"sudo mkdir -p {target} && sudo chown -R $USER:$USER {target}; "
         f"command -v ccache >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ccache) || true; "
-        f"export PATH=\"$HOME/.local/bin:$PATH\"; command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh"
+        f'export PATH="$HOME/.local/bin:$PATH"; command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh'
     )
     run_cmd(["ssh", "-t", host, prep])
 
@@ -40,7 +43,7 @@ def deploy_remote(host: str, target: str = "/opt/hermes", lic: str = "data/clien
 
     print(f"[Deploy] 3. Building runtime environment into {target}...")
     build = (
-        f"set -e; export PATH=\"$HOME/.local/bin:$PATH\"; cd {target} && uv sync && "
+        f'set -e; export PATH="$HOME/.local/bin:$PATH"; cd {target} && uv sync && '
         f"uv run python scripts/build.py --output-dir={target}/bin && chmod +x {target}/run.sh {target}/bin/hermes; "
         f"rm -f {target}/bin/hermes.sh; "
         f"echo '[Deploy] Deployment build successful at {target}.'"
@@ -68,19 +71,25 @@ def deploy_remote(host: str, target: str = "/opt/hermes", lic: str = "data/clien
         f.write(svc)
 
     run_cmd(["scp", "dist/hermes.service", f"{host}:/tmp/hermes.service"])
-    run_cmd([
-        "ssh",
-        "-t",
-        host,
-        f"sudo mv /tmp/hermes.service /etc/systemd/system/hermes.service && "
-        f"sudo systemctl daemon-reload && sudo systemctl enable --now hermes && mkdir -p {target}/data",
-    ])
+    run_cmd(
+        [
+            "ssh",
+            "-t",
+            host,
+            (
+                f"sudo mv /tmp/hermes.service /etc/systemd/system/hermes.service && "
+                f"sudo systemctl daemon-reload && sudo systemctl enable --now hermes && mkdir -p {target}/data"
+            ),
+        ]
+    )
 
     if os.path.exists(lic):
         run_cmd(["scp", lic, f"{host}:{target}/data/client.lic"])
         run_cmd(["ssh", "-t", host, "sudo systemctl restart hermes"])
 
-    print(f"\n[Deploy] Complete! Hermes active & running 24/7 on {host} via {target}/run.sh.")
+    print(
+        f"\n[Deploy] Complete! Hermes active & running 24/7 on {host} via {target}/run.sh."
+    )
 
 
 def main() -> None:
@@ -96,6 +105,7 @@ def main() -> None:
 
     if args.device_id and args.device_key and args.center_id:
         from scripts.keygen import generate_client_license
+
         generate_client_license(
             args.device_id,
             args.device_key,

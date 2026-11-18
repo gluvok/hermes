@@ -1,4 +1,5 @@
 """test_wifi_manager.py — Unit tests for pure nmcli Wi-Fi management in Hermes."""
+
 from __future__ import annotations
 
 import unittest

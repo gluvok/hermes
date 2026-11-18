@@ -1,4 +1,5 @@
 """client_config.py — Bespoke client deployment configuration."""
+
 from __future__ import annotations
 
 import os

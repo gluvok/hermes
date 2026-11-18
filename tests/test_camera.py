@@ -32,29 +32,41 @@ class TestCameraDriver(unittest.TestCase):
 
     @patch("src.devices.camera.fetch_image_bytes")
     def test_capture_all_camera_snapshots_partial_failure(self, mock_fetch):
-        mock_fetch.side_effect = lambda url, timeout=3.0: b"front" if "front" in url else None
-        res = capture_all_camera_snapshots(["http://cam/front"], ["http://cam/aux_broken"])
+        mock_fetch.side_effect = lambda url, timeout=3.0: (
+            b"front" if "front" in url else None
+        )
+        res = capture_all_camera_snapshots(
+            ["http://cam/front"], ["http://cam/aux_broken"]
+        )
         self.assertEqual(res["anpr_1"], b"front")
         self.assertIsNone(res["aux_1"])
 
     @patch("src.devices.camera.logger")
     def test_log_camera_fleet(self, mock_logger):
         from src.devices.camera import log_camera_fleet
+
         with patch("src.devices.camera.config") as mock_cfg:
             mock_cfg.anpr_camera_urls = ["http://cam/front"]
             mock_cfg.auxiliary_camera_urls = ["http://cam/top"]
             log_camera_fleet()
-            self.assertTrue(any("Main / ANPR" in str(c) for c in mock_logger.info.call_args_list))
-            self.assertTrue(any("Auxiliary" in str(c) for c in mock_logger.info.call_args_list))
+            self.assertTrue(
+                any("Main / ANPR" in str(c) for c in mock_logger.info.call_args_list)
+            )
+            self.assertTrue(
+                any("Auxiliary" in str(c) for c in mock_logger.info.call_args_list)
+            )
 
     @patch("src.devices.camera.logger")
     def test_log_camera_fleet_empty(self, mock_logger):
         from src.devices.camera import log_camera_fleet
+
         with patch("src.devices.camera.config") as mock_cfg:
             mock_cfg.anpr_camera_urls = []
             mock_cfg.auxiliary_camera_urls = []
             log_camera_fleet()
-            mock_logger.warning.assert_called_with("  ├── Main / ANPR Cameras: (None configured)")
+            mock_logger.warning.assert_called_with(
+                "  ├── Main / ANPR Cameras: (None configured)"
+            )
 
 
 if __name__ == "__main__":

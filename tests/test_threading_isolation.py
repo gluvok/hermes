@@ -13,7 +13,11 @@ class TestThreadingIsolation(unittest.TestCase):
     @patch("src.devices.is_wifi_connected", return_value=True)
     def test_trigger_upload_is_non_blocking(self, _mock_wifi, mock_post):
         machine = ScaleStabilityMachine()
-        package = {"session_id": "TEST_SESSION_ASYNC", "weight": 25000.0, "anpr_plate": "MH12AB1234"}
+        package = {
+            "session_id": "TEST_SESSION_ASYNC",
+            "weight": 25000.0,
+            "anpr_plate": "MH12AB1234",
+        }
 
         start_time = time.time()
         session_id = machine._trigger_upload(package)
@@ -22,7 +26,6 @@ class TestThreadingIsolation(unittest.TestCase):
         # Trigger should return instantaneously (< 0.05s) to never stall scale UART
         self.assertLess(elapsed, 0.05)
         self.assertEqual(session_id, "TEST_SESSION_ASYNC")
-
 
     @patch("src.core.session.capture_all_camera_snapshots")
     def test_on_weight_stabilized_is_non_blocking(self, mock_capture):
@@ -66,7 +69,9 @@ class TestThreadingIsolation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_db_file = os.path.join(temp_dir, "test_hermes.db")
             cm = ConfigManager(db_path=temp_db_file)
-            errors: list[OSError | json.JSONDecodeError | ValueError | KeyError | RuntimeError] = []
+            errors: list[
+                OSError | json.JSONDecodeError | ValueError | KeyError | RuntimeError
+            ] = []
 
             def writer_task(idx: int):
                 try:
@@ -76,7 +81,13 @@ class TestThreadingIsolation(unittest.TestCase):
                             serial_baudrate=1200 + (idx * 100),
                         )
                         cm.update_wifi_credentials(f"SSID_{idx}_{i}", f"PASS_{idx}_{i}")
-                except (OSError, json.JSONDecodeError, ValueError, KeyError, RuntimeError) as e:
+                except (
+                    OSError,
+                    json.JSONDecodeError,
+                    ValueError,
+                    KeyError,
+                    RuntimeError,
+                ) as e:
                     errors.append(e)
 
             def reader_task():
@@ -87,7 +98,13 @@ class TestThreadingIsolation(unittest.TestCase):
                         _ = cm.auxiliary_camera_urls
                         _ = cm._build_data_dict()
                         time.sleep(0.001)
-                except (OSError, json.JSONDecodeError, ValueError, KeyError, RuntimeError) as e:
+                except (
+                    OSError,
+                    json.JSONDecodeError,
+                    ValueError,
+                    KeyError,
+                    RuntimeError,
+                ) as e:
                     errors.append(e)
 
             threads = [

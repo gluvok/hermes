@@ -1,13 +1,18 @@
 """Scan source files for hardcoded passwords, default keys, and plaintext storage."""
+
 import re
 from pathlib import Path
 
 PATTERNS = [
     (r'password\s*=\s*["\'][^"\']+["\']', "Hardcoded password variable"),
     (r'DEVICE_KEY\s*=\s*["\'][^"\']+["\']', "Hardcoded device key"),
-    (r'rtsp://[^:]+:[^@]+@', "RTSP URL with embedded credentials"),
-    (r'SUPERADMIN_PASS\s*=\s*os\.getenv\([^,]+,\s*["\'][^"\']+["\']\)', "Default superadmin password fallback"),
+    (r"rtsp://[^:]+:[^@]+@", "RTSP URL with embedded credentials"),
+    (
+        r'SUPERADMIN_PASS\s*=\s*os\.getenv\([^,]+,\s*["\'][^"\']+["\']\)',
+        "Default superadmin password fallback",
+    ),
 ]
+
 
 def scan_file(path: Path) -> list[tuple[int, str, str]]:
     findings = []
@@ -17,6 +22,7 @@ def scan_file(path: Path) -> list[tuple[int, str, str]]:
             if re.search(pattern, line):
                 findings.append((idx, label, line.strip()))
     return findings
+
 
 def main():
     root = Path("src")
@@ -29,6 +35,7 @@ def main():
                 print(f"  Line {lno} [{label}]: {line}")
                 total += 1
     print(f"\nTotal credential vulnerabilities flagged: {total}")
+
 
 if __name__ == "__main__":
     main()

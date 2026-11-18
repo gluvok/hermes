@@ -50,10 +50,13 @@ class ScaleStabilityMachine:
     def abort_offline_session(self) -> None:
         """Aborts active weighment session and resets session manager."""
         if self.state != ScaleState.SCALE_IDLE:
-            logger.warning("[Scale] Wi-Fi lost. Immediately aborting active weighment session.")
+            logger.warning(
+                "[Scale] Wi-Fi lost. Immediately aborting active weighment session."
+            )
             self._reset_candidate_state()
             session_manager.reset_session()
             from src.devices import led_controller
+
             led_controller.set_idle()
 
     def _reset_candidate_state(self):
@@ -80,6 +83,7 @@ class ScaleStabilityMachine:
                 self._reset_candidate_state()
                 session_manager.reset_session()
                 from src.devices import led_controller
+
                 led_controller.set_idle()
             return True
 
@@ -146,6 +150,7 @@ class ScaleStabilityMachine:
             )
             session_manager.start_session()
             from src.devices import led_controller
+
             led_controller.set_active()
             return
 
@@ -162,15 +167,19 @@ class ScaleStabilityMachine:
                 f"[Weighment] Wi-Fi offline. Enqueueing weighment {session_id} to SQLite queue."
             )
             from src.core.spool import enqueue_weighment
+
             enqueue_weighment(session_id, session_package)
             from src.core.telemetry import record_system_event
+
             record_system_event(
                 "WEIGHMENT_QUEUED",
                 f"Session {session_id} queued offline: {session_package.get('anpr_plate')} @ {session_package.get('weight')}kg",
             )
             return session_id
 
-        logger.info(f"[Weighment] Transmitting session {session_id} directly to cloud...")
+        logger.info(
+            f"[Weighment] Transmitting session {session_id} directly to cloud..."
+        )
         threading.Thread(
             target=self._transmit_online_weighment,
             args=(session_package,),
@@ -188,9 +197,13 @@ class ScaleStabilityMachine:
         try:
             post_to_cloud(session_package)
             led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
-            logger.info(f"[Weighment] Successfully uploaded session {session_id} to cloud.")
+            logger.info(
+                f"[Weighment] Successfully uploaded session {session_id} to cloud."
+            )
         except (OSError, RuntimeError, ValueError) as exc:
-            logger.error(f"[Weighment] Direct cloud upload error for {session_id}: {exc}")
+            logger.error(
+                f"[Weighment] Direct cloud upload error for {session_id}: {exc}"
+            )
 
     def reset(self):
         """Manually reset the state machine."""
@@ -201,6 +214,7 @@ class ScaleStabilityMachine:
         self._last_printed_weight = -9999.0
         session_manager.reset_session()
         from src.devices import led_controller
+
         led_controller.set_idle()
 
 

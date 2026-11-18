@@ -34,7 +34,9 @@ class TestCloudPost(unittest.TestCase):
         call_kwargs = mock_post.call_args.kwargs
 
         # 1. Verify Basic Auth (-u "{device_id}:{device_key}")
-        self.assertEqual(call_kwargs["auth"], (str(config.device_id), str(config.device_key)))
+        self.assertEqual(
+            call_kwargs["auth"], (str(config.device_id), str(config.device_key))
+        )
 
         # 2. Verify form data
         data = call_kwargs["data"]
@@ -77,7 +79,9 @@ class TestCloudPost(unittest.TestCase):
 
     @patch("src.integrations.gluvok.requests.post")
     def test_post_to_cloud_403_forbidden(self, mock_post: Mock):
-        mock_resp = Mock(status_code=403, content=b"Forbidden", text="Device deactivated")
+        mock_resp = Mock(
+            status_code=403, content=b"Forbidden", text="Device deactivated"
+        )
         mock_post.return_value = mock_resp
 
         session = {"weight": 1000.0, "anpr_plate": "MH12AB1234"}
@@ -99,7 +103,9 @@ class TestCloudPost(unittest.TestCase):
 
     @patch("src.integrations.gluvok.requests.post")
     def test_post_to_cloud_500_server_error(self, mock_post: Mock):
-        mock_resp = Mock(status_code=500, content=b"Server Error", text="Internal Error")
+        mock_resp = Mock(
+            status_code=500, content=b"Server Error", text="Internal Error"
+        )
         mock_post.return_value = mock_resp
 
         session = {"weight": 5000.0, "anpr_plate": "MH12AB1234"}
@@ -139,7 +145,9 @@ class TestCloudPost(unittest.TestCase):
         files = mock_post.call_args.kwargs["files"]
         self.assertEqual(len(files), 3)
         filenames = [f[1][0] for f in files]
-        self.assertEqual(filenames, ["truck_anpr_1.jpg", "truck_anpr_2.jpg", "truck_aux_1.jpg"])
+        self.assertEqual(
+            filenames, ["truck_anpr_1.jpg", "truck_anpr_2.jpg", "truck_aux_1.jpg"]
+        )
 
 
 if __name__ == "__main__":
