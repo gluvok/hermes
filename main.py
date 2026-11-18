@@ -28,6 +28,8 @@ from src.core import (
     init_db,
     scale_state_machine,
     session_manager,
+    start_spool_worker,
+    stop_spool_worker,
 )
 from src.devices import (
     get_uart_reader,
@@ -44,6 +46,7 @@ from src.web import start_web_server, stop_web_server
 # ── Graceful shutdown ─────────────────────────────────────────────────────────
 def shutdown(signum, frame):
     logger.info("\n[Main] Shutdown signal received. Cleaning up...")
+    stop_spool_worker()
     led_controller.cleanup()
     get_uart_reader().stop()
     stop_web_server()
@@ -81,6 +84,7 @@ def setup():
 
     # Initialize SQLite database for Wi-Fi credentials and system settings
     init_db()
+    start_spool_worker(interval=10.0)
 
 
     # Log active client settings

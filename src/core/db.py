@@ -50,6 +50,25 @@ def init_db(db_path: str | None = None) -> None:
                 );
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS weighment_queue (
+                    session_id TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    status TEXT DEFAULT 'PENDING',
+                    retry_count INTEGER DEFAULT 0,
+                    last_error TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+            conn.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_weighment_queue_status 
+                ON weighment_queue(status, created_at);
+                """
+            )
             conn.commit()
 
         logger.info(f"[DB] Initialized SQLite database at: {_db_path}")

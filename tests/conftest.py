@@ -31,12 +31,6 @@ def guard_host_execution(monkeypatch):
     mock_uart = MagicMock()
     monkeypatch.setattr(scale, "get_uart_reader", lambda: mock_uart)
 
-def pytest_sessionfinish(session, exitstatus):
-    import threading
-    print("\n--- ACTIVE THREADS AT SESSION FINISH ---")
-    for t in threading.enumerate():
-        print(f"Thread: {t.name}, daemon={t.daemon}, is_alive={t.is_alive()}")
-
     # Prevent OpenCV from attempting real network RTSP connections in tests
     from src.devices import camera
     monkeypatch.setattr(camera, "_fetch_rtsp_frame", lambda url, timeout: None)

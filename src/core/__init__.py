@@ -2,6 +2,14 @@ from src.core.db import (
     get_default_db_path,
     init_db,
 )
+from src.core.spool import (
+    enqueue_weighment,
+    get_pending_weighments,
+    mark_weighment_completed,
+    spool_queue_count,
+    start_spool_worker,
+    stop_spool_worker,
+)
 from src.core.logger import (
     ColoredFormatter,
     setup_colored_logging,
@@ -36,13 +44,16 @@ __all__ = [
     "ScaleState",
     "SessionPhase",
     "WeighbridgeSessionManager",
+    "enqueue_weighment",
     "get_current_weight",
     "get_default_db_path",
     "get_error_counts",
     "get_latest_weighment",
+    "get_pending_weighments",
     "get_scale_state",
     "get_system_events",
     "init_db",
+    "mark_weighment_completed",
     "process_new_weight",
     "record_error_event",
     "record_system_event",
@@ -52,4 +63,7 @@ __all__ = [
     "scale_state_machine",
     "session_manager",
     "setup_colored_logging",
+    "spool_queue_count",
+    "start_spool_worker",
+    "stop_spool_worker",
 ]

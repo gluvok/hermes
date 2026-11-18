@@ -158,13 +158,15 @@ class ScaleStabilityMachine:
         session_id = str(session_package.get("session_id", "UNKNOWN"))
 
         if not self._is_online or not is_wifi_connected():
-            logger.warning(
-                f"[Weighment] Wi-Fi offline. Weighment {session_id} discarded."
+            logger.info(
+                f"[Weighment] Wi-Fi offline. Enqueueing weighment {session_id} to SQLite queue."
             )
+            from src.core.spool import enqueue_weighment
+            enqueue_weighment(session_id, session_package)
             from src.core.telemetry import record_system_event
             record_system_event(
-                "WEIGHMENT_DISCARDED",
-                f"Session {session_id} discarded: Wi-Fi offline",
+                "WEIGHMENT_QUEUED",
+                f"Session {session_id} queued offline: {session_package.get('anpr_plate')} @ {session_package.get('weight')}kg",
             )
             return session_id
 
