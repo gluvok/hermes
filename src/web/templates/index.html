@@ -5,100 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gluvok Hermes — Industrial Console & System Configuration</title>
 
-  <!-- Immediate Offline Stylesheet Guarantee (Zero Render Blocking) -->
-  <style>
-    html, body {
-      background-color: #09090b !important;
-      color: #fafafa !important;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
-      margin: 0;
-      padding: 0;
-      -webkit-font-smoothing: antialiased;
-    }
-  </style>
+  <!-- Offline Static Stylesheet (Zero Network/CDN Dependency) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
   <!-- Lucide Icons (Offline) -->
   <script src="{{ url_for('static', filename='lucide.min.js') }}"></script>
-
-  <!-- Tailwind CSS v4 Browser Runtime (Offline) -->
-  <script src="{{ url_for('static', filename='tailwindcss.js') }}"></script>
-
-  <style type="text/tailwindcss">
-    @theme {
-      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-mono: "JetBrains Mono", ui-monospace, monospace;
-
-      --color-background: #09090b;
-      --color-foreground: #fafafa;
-      --color-card: #09090b;
-      --color-card-foreground: #fafafa;
-      --color-popover: #09090b;
-      --color-popover-foreground: #fafafa;
-      --color-primary: #fafafa;
-      --color-primary-foreground: #09090b;
-      --color-secondary: #27272a;
-      --color-secondary-foreground: #fafafa;
-      --color-muted: #27272a;
-      --color-muted-foreground: #a1a1aa;
-      --color-accent: #27272a;
-      --color-accent-foreground: #fafafa;
-      --color-destructive: #ef4444;
-      --color-destructive-foreground: #fafafa;
-      --color-border: #27272a;
-      --color-input: #27272a;
-      --color-ring: #d4d4d8;
-
-      --color-sidebar: #09090b;
-      --color-sidebar-foreground: #f4f4f5;
-      --color-sidebar-primary: #18181b;
-      --color-sidebar-primary-foreground: #fafafa;
-      --color-sidebar-accent: #27272a;
-      --color-sidebar-accent-foreground: #fafafa;
-      --color-sidebar-border: #27272a;
-      --color-sidebar-ring: #d4d4d8;
-    }
-
-    * { box-sizing: border-box; }
-    body {
-      background-color: #09090b;
-      color: #fafafa;
-      font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-      margin: 0;
-      padding: 0;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* Custom scrollbar */
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #52525b; }
-
-    /* Transitions */
-    .sidebar-transition {
-      transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-  </style>
 </head>
 
-<body class="min-h-screen bg-background text-foreground flex antialiased selection:bg-zinc-800 selection:text-white">
-
-  <!-- Mobile Sidebar Overlay Backdrop -->
-  <div id="sidebar-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm hidden lg:hidden"></div>
+<body class="min-h-screen bg-background text-foreground flex flex-col antialiased selection:bg-zinc-800 selection:text-white">
 
   <!-- ══════════════════════════════════════════════════════════════════════ -->
-  <!-- SIDEBAR NAVIGATION COMPONENT                                           -->
+  <!-- TOP APPLICATION NAVIGATION BAR                                         -->
   <!-- ══════════════════════════════════════════════════════════════════════ -->
-  <aside id="main-sidebar" class="sidebar-transition fixed lg:sticky top-0 z-50 h-screen w-64 flex flex-col justify-between border-r border-sidebar-border bg-sidebar text-sidebar-foreground -translate-x-full lg:translate-x-0 flex-shrink-0">
-    
-    <!-- Top Area: Header & Navigation Menu -->
-    <div class="flex flex-col flex-1 overflow-y-auto custom-scrollbar">
-      
-      <!-- Sidebar Header (App Branding / Workspace Switcher) -->
-      <div class="h-16 px-4 flex items-center gap-3 border-b border-sidebar-border">
-        <div class="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-700 flex items-center justify-center flex-shrink-0 shadow-sm">
-          <!-- Mini LUVOK Geometric Logo -->
-          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6">
+  <header class="top-nav">
+    <div class="top-nav-left">
+      <!-- Brand & Version -->
+      <a href="#overview" onclick="switchTab('overview')" class="brand-badge">
+        <div class="brand-logo">
+          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:1.5rem;height:1.5rem">
             <circle cx="100" cy="28" r="16" fill="#38bdf8"/>
             <path d="M100 50 L100 70" stroke="#38bdf8" stroke-width="12" stroke-linecap="round"/>
             <path d="M56 160 L100 60 L144 160" stroke="#38bdf8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -106,126 +30,71 @@
             <rect x="36" y="155" width="128" height="14" rx="7" fill="#38bdf8"/>
           </svg>
         </div>
-        <div class="flex flex-col min-w-0 flex-1">
+        <div class="flex flex-col min-w-0">
           <div class="flex items-center gap-1.5">
             <span class="font-bold text-sm text-foreground truncate">LUVOK Hermes</span>
-            <span class="px-1.5 py-0.2 rounded text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">v2.0</span>
+            <span class="badge badge-emerald">v2.0</span>
           </div>
-          <span class="text-xs text-muted-foreground truncate">Weighbridge Edge</span>
+          <span class="text-xs text-muted-foreground truncate font-mono">Weighbridge Edge</span>
         </div>
-      </div>
+      </a>
 
-      <!-- Navigation Links (Grouped per sidebar-13 structure) -->
-      <div class="p-3 space-y-6">
-        
-        <!-- Group 1: Platform -->
-        <div class="space-y-1">
-          <div class="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Platform</div>
-          <nav class="space-y-1">
-            <button onclick="switchTab('overview')" id="nav-item-overview" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium bg-sidebar-accent text-sidebar-accent-foreground transition">
-              <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-400"></i>
-              <span>Overview</span>
-            </button>
-            <button onclick="switchTab('scale')" id="nav-item-scale" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition">
-              <i data-lucide="scale" class="w-4 h-4"></i>
-              <span>Scale Indicator</span>
-            </button>
-            <button onclick="switchTab('anpr')" id="nav-item-anpr" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition">
-              <i data-lucide="camera" class="w-4 h-4"></i>
-              <span>ANPR & Cameras</span>
-            </button>
-          </nav>
-        </div>
-
-        <!-- Group 2: Communications -->
-        <div class="space-y-1">
-          <div class="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Communications</div>
-          <nav class="space-y-1">
-            <button onclick="switchTab('cloud')" id="nav-item-cloud" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition">
-              <i data-lucide="cloud-upload" class="w-4 h-4"></i>
-              <span>Cloud Transfer</span>
-            </button>
-            <button onclick="switchTab('telemetry')" id="nav-item-telemetry" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition">
-              <i data-lucide="terminal" class="w-4 h-4"></i>
-              <span>Telemetry Logs</span>
-            </button>
-          </nav>
-        </div>
-
-        <!-- Group 3: System Administration -->
-        <div class="space-y-1">
-          <div class="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Admin Panel</div>
-          <nav class="space-y-1">
-            <button onclick="switchTab('config')" id="nav-item-config" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition">
-              <i data-lucide="sliders-horizontal" class="w-4 h-4 text-amber-400"></i>
-              <span>System Config</span>
-              <span class="ml-auto flex h-1.5 w-1.5 rounded-full bg-amber-400" title="Superadmin Protected"></span>
-            </button>
-            <button onclick="switchTab('wifi')" id="nav-item-wifi" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition">
-              <i data-lucide="wifi" class="w-4 h-4 text-amber-400"></i>
-              <span>Wi-Fi Setup</span>
-              <span class="ml-auto flex h-1.5 w-1.5 rounded-full bg-amber-400" title="Superadmin Protected"></span>
-            </button>
-          </nav>
-        </div>
-
-      </div>
-
-    </div>
-
-    <!-- Sidebar Footer: Operator Account Profile (sidebar-13 style) -->
-    <div class="p-3 border-t border-sidebar-border">
-      <div class="flex items-center justify-between p-2 rounded-lg bg-zinc-900/60 border border-zinc-800">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-white">
-            SA
-          </div>
-          <div class="flex flex-col min-w-0">
-            <span class="text-xs font-semibold text-foreground truncate">Super Admin</span>
-            <span class="text-xs text-muted-foreground truncate">Operator</span>
-          </div>
-        </div>
-        <button onclick="logoutConfig()" title="Lock / Sign Out" class="p-1.5 rounded-md hover:bg-zinc-800 text-muted-foreground hover:text-white transition">
-          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+      <!-- Horizontal Navigation Tabs -->
+      <nav class="nav-tabs-container">
+        <button onclick="switchTab('overview')" id="nav-item-overview" class="nav-tab-btn active">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-400"></i>
+          <span>Overview</span>
         </button>
-      </div>
+        <button onclick="switchTab('scale')" id="nav-item-scale" class="nav-tab-btn">
+          <i data-lucide="scale" class="w-4 h-4"></i>
+          <span>Scale Indicator</span>
+        </button>
+        <button onclick="switchTab('anpr')" id="nav-item-anpr" class="nav-tab-btn">
+          <i data-lucide="camera" class="w-4 h-4"></i>
+          <span>Cameras & Crop</span>
+        </button>
+        <button onclick="switchTab('cloud')" id="nav-item-cloud" class="nav-tab-btn">
+          <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+          <span>Cloud Transfer</span>
+        </button>
+        <button onclick="switchTab('telemetry')" id="nav-item-telemetry" class="nav-tab-btn">
+          <i data-lucide="terminal" class="w-4 h-4"></i>
+          <span>Telemetry Logs</span>
+        </button>
+        <button onclick="switchTab('config')" id="nav-item-config" class="nav-tab-btn">
+          <i data-lucide="sliders-horizontal" class="w-4 h-4 text-amber-400"></i>
+          <span>System Config</span>
+        </button>
+        <button onclick="switchTab('wifi')" id="nav-item-wifi" class="nav-tab-btn">
+          <i data-lucide="wifi" class="w-4 h-4 text-sky-400"></i>
+          <span>Wi-Fi Setup</span>
+        </button>
+      </nav>
     </div>
 
-  </aside>
+    <!-- Top Nav Right Actions -->
+    <div class="top-nav-right">
+      <span id="breadcrumb-parent" class="hidden">Platform</span>
+      <span id="breadcrumb-current-tab" class="hidden">Overview</span>
+      <div id="live-indicator" class="badge badge-zinc">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="network-ip-display" class="font-mono">Connecting...</span>
+      </div>
+      <span id="hotspot-badge" class="hidden badge badge-amber">Hotspot: 10.42.0.1</span>
+      <button onclick="fetchStatus(true)" title="Refresh Telemetry" class="btn btn-secondary py-1 px-2.5 text-xs">
+        <i id="refresh-icon" data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+      </button>
+      <button onclick="logoutConfig()" title="Lock / Sign Out" class="btn btn-secondary py-1 px-3 text-xs">
+        <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        <span>Lock</span>
+      </button>
+    </div>
+  </header>
 
   <!-- ══════════════════════════════════════════════════════════════════════ -->
   <!-- MAIN APPLICATION CONTENT AREA                                         -->
   <!-- ══════════════════════════════════════════════════════════════════════ -->
   <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-    
-    <!-- Top Header Navigation Bar (Breadcrumb & Live Status) -->
-    <header class="h-16 px-4 sm:px-6 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
-      
-      <!-- Left: Mobile Toggle, Desktop Separator & Breadcrumbs -->
-      <div class="flex items-center gap-3">
-        <button onclick="toggleMobileSidebar()" class="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition lg:hidden">
-          <i data-lucide="panel-left" class="w-5 h-5"></i>
-        </button>
-        <div class="hidden lg:flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <span id="breadcrumb-parent" class="hover:text-foreground cursor-pointer" onclick="switchTab('overview')">Platform</span>
-          <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-          <span id="breadcrumb-current-tab" class="text-foreground font-semibold">Overview</span>
-        </div>
-      </div>
-
-      <!-- Right: Status Indicators & Quick Actions -->
-      <div class="flex items-center gap-2.5">
-        <div id="live-indicator" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/70 border border-border text-xs font-medium text-emerald-400">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="network-ip-display">Connecting...</span>
-        </div>
-        <span id="hotspot-badge" class="hidden px-2 py-1 rounded-md text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">Hotspot: 10.42.0.1</span>
-        <button onclick="fetchStatus(true)" class="p-2 rounded-lg border border-border bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition">
-          <i id="refresh-icon" data-lucide="refresh-cw" class="w-4 h-4"></i>
-        </button>
-      </div>
-
-    </header>
 
     <!-- Main Views Container -->
     <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto custom-scrollbar space-y-6">
@@ -700,6 +569,68 @@
             </div>
           </div>
 
+          <!-- Section 4: Vehicle Bounding Box & Network Crop Padding -->
+          <div class="p-6 rounded-xl border border-border bg-card text-card-foreground shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-border">
+              <div class="flex items-center gap-3">
+                <div class="p-2.5 rounded-lg bg-secondary text-primary">
+                  <i data-lucide="crop" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-semibold text-foreground">Vehicle Bounding Box & Crop Padding</h3>
+                  <p class="text-xs text-muted-foreground">Adjust bounding box expansion percentages for the cropped vehicle photo sent to cloud</p>
+                </div>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">LIVE APPLIED</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-medium text-foreground">Top Padding (%)</label>
+                  <span id="cfg-crop-pad-top-val" class="text-xs font-mono text-sky-400 font-bold">10%</span>
+                </div>
+                <input id="cfg-crop-pad-top" type="range" min="0" max="50" step="1" value="10"
+                  oninput="document.getElementById('cfg-crop-pad-top-val').textContent = this.value + '%'"
+                  class="w-full accent-sky-400 cursor-pointer" />
+                <p class="text-xs text-muted-foreground">Expansion above vehicle roof</p>
+              </div>
+
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-medium text-foreground">Bottom Padding (%)</label>
+                  <span id="cfg-crop-pad-bottom-val" class="text-xs font-mono text-sky-400 font-bold">10%</span>
+                </div>
+                <input id="cfg-crop-pad-bottom" type="range" min="0" max="50" step="1" value="10"
+                  oninput="document.getElementById('cfg-crop-pad-bottom-val').textContent = this.value + '%'"
+                  class="w-full accent-sky-400 cursor-pointer" />
+                <p class="text-xs text-muted-foreground">Expansion below tires & road</p>
+              </div>
+
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-medium text-foreground">Left Padding (%)</label>
+                  <span id="cfg-crop-pad-left-val" class="text-xs font-mono text-sky-400 font-bold">15%</span>
+                </div>
+                <input id="cfg-crop-pad-left" type="range" min="0" max="50" step="1" value="15"
+                  oninput="document.getElementById('cfg-crop-pad-left-val').textContent = this.value + '%'"
+                  class="w-full accent-sky-400 cursor-pointer" />
+                <p class="text-xs text-muted-foreground">Expansion toward left side</p>
+              </div>
+
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-medium text-foreground">Right Padding (%)</label>
+                  <span id="cfg-crop-pad-right-val" class="text-xs font-mono text-sky-400 font-bold">15%</span>
+                </div>
+                <input id="cfg-crop-pad-right" type="range" min="0" max="50" step="1" value="15"
+                  oninput="document.getElementById('cfg-crop-pad-right-val').textContent = this.value + '%'"
+                  class="w-full accent-sky-400 cursor-pointer" />
+                <p class="text-xs text-muted-foreground">Expansion toward right side</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Save Button & Alert Feedback -->
 
 
@@ -797,27 +728,15 @@
         window.location.hash = tabId;
       }
 
-      // Close mobile sidebar if open
-      const sidebar = document.getElementById("main-sidebar");
-      const backdrop = document.getElementById("sidebar-backdrop");
-      if (window.innerWidth < 1024) {
-        sidebar?.classList.add("-translate-x-full");
-        backdrop?.classList.add("hidden");
-      }
-
       updateBreadcrumb(tabId);
 
-      // Toggle views
+      // Toggle views & top nav tab active states
       const tabs = ["overview", "scale", "anpr", "cloud", "wifi", "telemetry", "config"];
       tabs.forEach(t => {
         const view = document.getElementById("view-" + t);
         const navBtn = document.getElementById("nav-item-" + t);
         if (view) view.classList.toggle("hidden", t !== tabId);
-        if (navBtn) {
-          navBtn.className = t === tabId
-            ? "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold bg-sidebar-accent text-sidebar-accent-foreground transition shadow-sm"
-            : "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition";
-        }
+        if (navBtn) navBtn.classList.toggle("active", t === tabId);
       });
 
       if (tabId === "config" || tabId === "wifi") {
@@ -1012,6 +931,20 @@
         document.getElementById('cfg-anpr-server-url').value = data.anpr_server_url ?? '';
         document.getElementById('cfg-center-id').value = data.center_id ?? 1;
 
+        // Populate Crop Padding
+        const padTop = data.crop_pad_top ?? 10.0;
+        const padBottom = data.crop_pad_bottom ?? 10.0;
+        const padLeft = data.crop_pad_left ?? 15.0;
+        const padRight = data.crop_pad_right ?? 15.0;
+        const elTop = document.getElementById('cfg-crop-pad-top');
+        if (elTop) { elTop.value = padTop; document.getElementById('cfg-crop-pad-top-val').textContent = padTop + '%'; }
+        const elBottom = document.getElementById('cfg-crop-pad-bottom');
+        if (elBottom) { elBottom.value = padBottom; document.getElementById('cfg-crop-pad-bottom-val').textContent = padBottom + '%'; }
+        const elLeft = document.getElementById('cfg-crop-pad-left');
+        if (elLeft) { elLeft.value = padLeft; document.getElementById('cfg-crop-pad-left-val').textContent = padLeft + '%'; }
+        const elRight = document.getElementById('cfg-crop-pad-right');
+        if (elRight) { elRight.value = padRight; document.getElementById('cfg-crop-pad-right-val').textContent = padRight + '%'; }
+
         // Populate ANPR Cameras
         const anprContainer = document.getElementById('cfg-anpr-cameras-container');
         anprContainer.innerHTML = '';
@@ -1105,6 +1038,11 @@
       const durVal = durInput ? parseFloat(durInput.value) : NaN;
       const tolVal = tolInput ? parseFloat(tolInput.value) : NaN;
 
+      const padTopInput = document.getElementById('cfg-crop-pad-top');
+      const padBottomInput = document.getElementById('cfg-crop-pad-bottom');
+      const padLeftInput = document.getElementById('cfg-crop-pad-left');
+      const padRightInput = document.getElementById('cfg-crop-pad-right');
+
       const payload = {
         serial_port: document.getElementById('cfg-serial-port').value.trim(),
         serial_baudrate: parseInt(document.getElementById('cfg-serial-baudrate').value) || 1200,
@@ -1113,6 +1051,10 @@
         anpr_camera_urls: anprUrls,
         anpr_camera_url: anprUrls.length > 0 ? anprUrls[0] : '',
         auxiliary_camera_urls: auxUrls,
+        crop_pad_top: padTopInput ? parseFloat(padTopInput.value) : 10.0,
+        crop_pad_bottom: padBottomInput ? parseFloat(padBottomInput.value) : 10.0,
+        crop_pad_left: padLeftInput ? parseFloat(padLeftInput.value) : 15.0,
+        crop_pad_right: padRightInput ? parseFloat(padRightInput.value) : 15.0,
       };
 
 

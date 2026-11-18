@@ -49,7 +49,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn("text/html", res.content_type)
         html = res.get_data(as_text=True)
         self.assertIn("Gluvok Hermes", html)
-        self.assertIn("/static/tailwindcss.js", html)
+        self.assertIn("/static/style.css", html)
         self.assertIn("/static/lucide.min.js", html)
         self.assertNotIn("unpkg.com", html)
         self.assertNotIn("cdn.jsdelivr.net", html)

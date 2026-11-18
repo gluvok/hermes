@@ -63,6 +63,17 @@ def _validate_stability(duration: Any, tolerance: Any) -> tuple[bool, str | None
     return True, None
 
 
+def _validate_crop_padding(pad_val: Any, pad_name: str) -> tuple[bool, str | None]:
+    if pad_val is not None:
+        try:
+            val = float(pad_val)
+            if not (0.0 <= val <= 100.0):
+                return False, f"{pad_name} must be between 0.0 and 100.0 percent."
+        except (ValueError, TypeError):
+            return False, f"Invalid {pad_name} value."
+    return True, None
+
+
 def validate_config_payload(data: dict[str, Any]) -> tuple[bool, str | None]:
     for key in IMMUTABLE_FIELDS:
         if key in data:
@@ -84,4 +95,14 @@ def validate_config_payload(data: dict[str, Any]) -> tuple[bool, str | None]:
         ok_cam, err_cam = _validate_cameras(data.get(cam_field))
         if not ok_cam:
             return False, err_cam
+    for pad_key in (
+        "crop_pad_top",
+        "crop_pad_bottom",
+        "crop_pad_left",
+        "crop_pad_right",
+    ):
+        if pad_key in data:
+            ok_pad, err_pad = _validate_crop_padding(data.get(pad_key), pad_key)
+            if not ok_pad:
+                return False, err_pad
     return True, None

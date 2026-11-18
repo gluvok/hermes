@@ -206,7 +206,12 @@ class WeighbridgeSessionManager:
 
         if pool is None:
             for cam_idx, img_bytes in batch_to_dispatch:
-                res = send_frame_to_anpr_server(img_bytes, return_details=True)
+                try:
+                    res = send_frame_to_anpr_server(
+                        img_bytes, return_details=True
+                    )
+                except TypeError:
+                    res = send_frame_to_anpr_server(img_bytes)
                 if isinstance(res, tuple) and len(res) >= 3:
                     plate, status_code, vbox = res[0], res[1], res[2]
                 else:

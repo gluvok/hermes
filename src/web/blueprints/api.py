@@ -156,6 +156,10 @@ def status():
                 "serial_baudrate": config.serial_baudrate,
                 "stability_duration": config.stability_duration,
                 "stability_tolerance": config.stability_tolerance,
+                "crop_pad_top": config.crop_pad_top,
+                "crop_pad_bottom": config.crop_pad_bottom,
+                "crop_pad_left": config.crop_pad_left,
+                "crop_pad_right": config.crop_pad_right,
             },
             "latest_weighment": get_latest_weighment(),
             "spool": {},
@@ -181,6 +185,10 @@ def get_config():
             "auxiliary_camera_urls": config.auxiliary_camera_urls,
             "anpr_server_url": config.anpr_server_url,
             "center_id": config.center_id,
+            "crop_pad_top": config.crop_pad_top,
+            "crop_pad_bottom": config.crop_pad_bottom,
+            "crop_pad_left": config.crop_pad_left,
+            "crop_pad_right": config.crop_pad_right,
         }
     ), 200
 
@@ -205,6 +213,10 @@ def post_config():
         anpr_camera_url=data.get("anpr_camera_url"),
         anpr_camera_urls=data.get("anpr_camera_urls"),
         auxiliary_camera_urls=data.get("auxiliary_camera_urls"),
+        crop_pad_top=data.get("crop_pad_top"),
+        crop_pad_bottom=data.get("crop_pad_bottom"),
+        crop_pad_left=data.get("crop_pad_left"),
+        crop_pad_right=data.get("crop_pad_right"),
     )
 
     _apply_uart_config_changes(
