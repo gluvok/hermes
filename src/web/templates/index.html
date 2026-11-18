@@ -684,16 +684,7 @@
     }
 
     function toggleMobileSidebar() {
-      const sidebar = document.getElementById("main-sidebar");
-      const backdrop = document.getElementById("sidebar-backdrop");
-      const isOpen = !sidebar.classList.contains("-translate-x-full");
-      if (isOpen) {
-        sidebar.classList.add("-translate-x-full");
-        backdrop.classList.add("hidden");
-      } else {
-        sidebar.classList.remove("-translate-x-full");
-        backdrop.classList.remove("hidden");
-      }
+      // Sidebar retired in favor of Janus top navigation
     }
 
     function updateBreadcrumb(tabId) {
