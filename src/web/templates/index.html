@@ -10,6 +10,9 @@
 
   <!-- Lucide Icons (Offline) -->
   <script src="{{ url_for('static', filename='lucide.min.js') }}"></script>
+
+  <!-- Tailwind CSS Engine (Offline) -->
+  <script src="{{ url_for('static', filename='tailwindcss.js') }}"></script>
 </head>
 
 <body class="min-h-screen bg-background text-foreground flex flex-col antialiased selection:bg-zinc-800 selection:text-white">
@@ -20,7 +23,7 @@
   <header class="top-nav">
     <div class="top-nav-left">
       <!-- Brand & Version -->
-      <a href="#overview" onclick="switchTab('overview')" class="brand-badge">
+      <a href="#overview" onclick="switchConsoleMode('operator')" class="brand-badge">
         <div class="brand-logo">
           <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-primary" style="width:1.5rem;height:1.5rem">
             <circle cx="100" cy="28" r="16" fill="currentColor"/>
@@ -40,49 +43,55 @@
       </a>
     </div>
 
-    <!-- Compact Subsystem Health Strip -->
+    <!-- Center: Janus-styled Console Mode Switcher -->
     <div class="top-nav-center">
-      <div id="health-strip" class="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-card border border-border text-xs font-mono">
-        <span id="health-scale-pill" class="inline-flex items-center gap-1.5 font-medium text-foreground">
-          <span id="health-scale-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Scale
-        </span>
-        <span class="text-border">&bull;</span>
-        <span id="health-anpr-pill" class="inline-flex items-center gap-1.5 font-medium text-muted-foreground">
-          <span id="health-anpr-dot" class="w-2 h-2 rounded-full bg-zinc-500"></span> ANPR
-        </span>
-        <span class="text-border">&bull;</span>
-        <span id="health-sync-pill" class="inline-flex items-center gap-1.5 font-medium text-muted-foreground">
-          <span id="health-sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span> Sync
-        </span>
-        <span class="text-border">&bull;</span>
-        <span id="health-wifi-pill" class="inline-flex items-center gap-1.5 font-medium text-foreground">
-          <span id="health-wifi-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span> Wi-Fi
-        </span>
-      </div>
-      <!-- Internal tab hooks preserved for programmatic view switching -->
-      <div id="drawer-nav-hooks" class="hidden">
-        <button id="nav-item-overview" onclick="switchTab('overview')"></button>
-        <button id="nav-item-scale" onclick="switchTab('scale')"></button>
-        <button id="nav-item-anpr" onclick="switchTab('anpr')"></button>
+      <div id="console-mode-switcher" class="console-mode-switcher">
+        <button id="btn-mode-operator" type="button" onclick="switchConsoleMode('operator')" class="mode-tab active" title="Weighbridge Kiosk Operator View">
+          <i data-lucide="scale" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Operator Console</span>
+        </button>
+        <button id="btn-mode-developer" type="button" onclick="switchConsoleMode('developer')" class="mode-tab" title="Hardware Tuning, Camera & Config Dashboard">
+          <i data-lucide="terminal" class="w-3.5 h-3.5 text-sky-400"></i>
+          <span>Developer Console</span>
+        </button>
       </div>
     </div>
 
     <!-- Top Nav Right Actions -->
     <div class="top-nav-right">
+      <!-- Subsystem Health Strip (Clicking jumps directly into developer subsystem) -->
+      <div id="health-strip" class="flex items-center gap-2 px-2.5 py-1 rounded-full bg-card border border-border text-xs font-mono shadow-sm">
+        <button type="button" id="health-scale-pill" onclick="switchConsoleMode('developer'); switchTab('scale');" class="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-emerald-400 transition cursor-pointer" title="Scale UART Stream">
+          <span id="health-scale-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Scale
+        </button>
+        <span class="text-border">&bull;</span>
+        <button type="button" id="health-anpr-pill" onclick="switchConsoleMode('developer'); switchTab('anpr');" class="inline-flex items-center gap-1.5 font-medium text-muted-foreground hover:text-sky-400 transition cursor-pointer" title="ANPR Cameras & Crop">
+          <span id="health-anpr-dot" class="w-2 h-2 rounded-full bg-zinc-500"></span> ANPR
+        </button>
+        <span class="text-border">&bull;</span>
+        <button type="button" id="health-sync-pill" onclick="switchConsoleMode('developer'); switchTab('cloud');" class="inline-flex items-center gap-1.5 font-medium text-muted-foreground hover:text-amber-400 transition cursor-pointer" title="Cloud Transfer Queue">
+          <span id="health-sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span> Sync
+        </button>
+        <span class="text-border">&bull;</span>
+        <button type="button" id="health-wifi-pill" onclick="switchConsoleMode('developer'); switchTab('wifi');" class="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-emerald-400 transition cursor-pointer" title="Wi-Fi Network Status">
+          <span id="health-wifi-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span> Wi-Fi
+        </button>
+      </div>
+
       <span id="breadcrumb-parent" class="hidden">Platform</span>
       <span id="breadcrumb-current-tab" class="hidden">Overview</span>
-      <div id="live-indicator" class="badge badge-zinc">
+      <div id="live-indicator" class="badge badge-zinc hidden sm:inline-flex">
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
         <span id="network-ip-display" class="font-mono">Connecting...</span>
       </div>
       <span id="hotspot-badge" class="hidden badge badge-amber">Hotspot: 10.42.0.1</span>
-      <button onclick="toggleAdminDrawer()" id="btn-open-admin-drawer" class="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5" title="Hardware Settings & Diagnostics">
-        <i data-lucide="settings" class="w-3.5 h-3.5 text-muted-foreground"></i>
-        <span>Settings</span>
+      <button onclick="toggleAdminDrawer()" id="btn-open-admin-drawer" class="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5" title="Slide-Over Quick Tuning Drawer">
+        <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-muted-foreground"></i>
+        <span class="hidden md:inline font-mono">Drawer</span>
       </button>
-      <button onclick="logoutConfig()" title="Lock / Sign Out" class="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1">
+      <button onclick="logoutConfig()" title="Lock / Sign Out" class="btn btn-secondary py-1 px-2 text-xs flex items-center gap-1">
         <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
-        <span>Lock</span>
+        <span class="hidden md:inline font-mono">Lock</span>
       </button>
     </div>
   </header>
@@ -144,9 +153,12 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════════ -->
-      <!-- VIEW 1: OVERVIEW SPLIT HERO HUD                                    -->
+      <!-- CONSOLE 1: OPERATOR CONSOLE (WEIGHBRIDGE KIOSK HUD)                 -->
       <!-- ══════════════════════════════════════════════════════════════════ -->
-      <div id="view-overview" class="space-y-6">
+      <div id="console-operator-view" class="space-y-6">
+
+        <!-- VIEW 1: OVERVIEW SPLIT HERO HUD -->
+        <div id="view-overview" class="space-y-6">
         
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           
@@ -259,6 +271,43 @@
         </div>
 
       </div>
+      </div> <!-- End #console-operator-view -->
+
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- CONSOLE 2: DEVELOPER & SYSTEM MAINTENANCE CONSOLE                  -->
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <div id="console-developer-view" class="hidden space-y-6">
+        <!-- Developer Horizontal Subnav (Janus Project Navigation Style) -->
+        <div class="developer-subnav">
+          <button type="button" onclick="switchConsoleMode('operator')" id="nav-item-overview" class="subnav-tab" title="Return to Operator Kiosk HUD">
+            <i data-lucide="scale" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span>Operator HUD</span>
+          </button>
+          <button type="button" onclick="switchTab('scale')" id="nav-item-scale" class="subnav-tab active">
+            <i data-lucide="gauge" class="w-3.5 h-3.5"></i>
+            <span>Scale UART</span>
+          </button>
+          <button type="button" onclick="switchTab('anpr')" id="nav-item-anpr" class="subnav-tab">
+            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+            <span>Cameras & Crop</span>
+          </button>
+          <button type="button" onclick="switchTab('cloud')" id="nav-item-cloud" class="subnav-tab">
+            <i data-lucide="cloud" class="w-3.5 h-3.5"></i>
+            <span>Cloud Transfer</span>
+          </button>
+          <button type="button" onclick="switchTab('wifi')" id="nav-item-wifi" class="subnav-tab">
+            <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+            <span>Wi-Fi Network</span>
+          </button>
+          <button type="button" onclick="switchTab('telemetry')" id="nav-item-telemetry" class="subnav-tab">
+            <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+            <span>Telemetry Logs</span>
+          </button>
+          <button type="button" onclick="switchTab('config')" id="nav-item-config" class="subnav-tab">
+            <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+            <span>System Config</span>
+          </button>
+        </div>
 
       <!-- ══════════════════════════════════════════════════════════════════ -->
       <!-- VIEW 2: SCALE INDICATOR                                            -->
@@ -776,6 +825,8 @@
 
       </div>
 
+      </div> <!-- End #console-developer-view -->
+
     </main>
 
     <!-- Footer -->
@@ -952,9 +1003,53 @@
       if (curTab) curTab.textContent = titles[tabId] || tabId;
     }
 
+    let currentConsoleMode = "operator";
+
+    function switchConsoleMode(mode, triggerTabSwitch = true) {
+      currentConsoleMode = mode;
+      const opBtn = document.getElementById("btn-mode-operator");
+      const devBtn = document.getElementById("btn-mode-developer");
+      const opView = document.getElementById("console-operator-view");
+      const devView = document.getElementById("console-developer-view");
+
+      if (mode === "operator") {
+        if (opBtn) opBtn.classList.add("active");
+        if (devBtn) devBtn.classList.remove("active");
+        if (opView) opView.classList.remove("hidden");
+        if (devView) devView.classList.add("hidden");
+        if (triggerTabSwitch) {
+          activeTab = "overview";
+          if (window.location.hash !== "#operator" && window.location.hash !== "#overview") {
+            window.location.hash = "operator";
+          }
+        }
+      } else {
+        if (devBtn) devBtn.classList.add("active");
+        if (opBtn) opBtn.classList.remove("active");
+        if (opView) opView.classList.add("hidden");
+        if (devView) devView.classList.remove("hidden");
+        if (triggerTabSwitch) {
+          const target = (activeTab && activeTab !== "overview") ? activeTab : "scale";
+          switchTab(target, true);
+        }
+      }
+      lucide.createIcons();
+    }
+
     function switchTab(tabId, updateHash = true) {
       if (tabId === "admin") tabId = "config";
       activeTab = tabId;
+
+      if (tabId === "overview") {
+        if (currentConsoleMode !== "developer") {
+          switchConsoleMode("operator", false);
+        }
+      } else {
+        if (currentConsoleMode !== "developer") {
+          switchConsoleMode("developer", false);
+        }
+      }
+
       if (updateHash && window.location.hash.replace(/^#\/?/, "") !== tabId) {
         window.location.hash = tabId;
       }
@@ -1952,7 +2047,11 @@
 
     function syncTabFromUrl() {
       const target = getTabFromUrl();
-      if (target !== activeTab) {
+      if (target === "overview") {
+        switchConsoleMode("operator", false);
+        switchTab("overview", false);
+      } else {
+        switchConsoleMode("developer", false);
         switchTab(target, false);
       }
     }
@@ -1961,7 +2060,7 @@
     window.addEventListener("popstate", syncTabFromUrl);
 
     // Initialize view from URL hash or path
-    switchTab(getTabFromUrl(), false);
+    syncTabFromUrl();
 
     // Wi-Fi form auto-dismiss vault badge on input
     document.getElementById("wifi-ssid")?.addEventListener("input", () => {

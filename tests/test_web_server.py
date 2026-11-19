@@ -183,6 +183,24 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn("function printWeighmentSlip", html)
         self.assertIn("showContextualActionBar", html)
 
+    def test_console_mode_switcher_and_developer_console(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Mode switcher in header
+        self.assertIn('id="console-mode-switcher"', html)
+        self.assertIn('id="btn-mode-operator"', html)
+        self.assertIn('id="btn-mode-developer"', html)
+
+        # Separate operator and developer console containers
+        self.assertIn('id="console-operator-view"', html)
+        self.assertIn('id="console-developer-view"', html)
+
+        # JavaScript functions for switching modes
+        self.assertIn("switchConsoleMode", html)
+
+
 
 
 
