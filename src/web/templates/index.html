@@ -22,12 +22,12 @@
       <!-- Brand & Version -->
       <a href="#overview" onclick="switchTab('overview')" class="brand-badge">
         <div class="brand-logo">
-          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:1.5rem;height:1.5rem">
-            <circle cx="100" cy="28" r="16" fill="#38bdf8"/>
-            <path d="M100 50 L100 70" stroke="#38bdf8" stroke-width="12" stroke-linecap="round"/>
-            <path d="M56 160 L100 60 L144 160" stroke="#38bdf8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <path d="M42 160 L100 40 L158 160" stroke="#38bdf8" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <rect x="36" y="155" width="128" height="14" rx="7" fill="#38bdf8"/>
+          <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-primary" style="width:1.5rem;height:1.5rem">
+            <circle cx="100" cy="28" r="16" fill="currentColor"/>
+            <path d="M100 50 L100 70" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+            <path d="M56 160 L100 60 L144 160" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M42 160 L100 40 L158 160" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <rect x="36" y="155" width="128" height="14" rx="7" fill="currentColor"/>
           </svg>
         </div>
         <div class="flex flex-col min-w-0">
@@ -107,12 +107,12 @@
         <div class="relative w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-2xl space-y-6">
           <div class="flex flex-col items-center text-center space-y-3">
             <div id="admin-logo-box" class="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shadow-sm">
-              <svg id="admin-logo-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-8 h-8">
-                <circle cx="100" cy="28" r="16" fill="#f59e0b"/>
-                <path d="M100 50 L100 70" stroke="#f59e0b" stroke-width="12" stroke-linecap="round"/>
-                <path d="M56 160 L100 60 L144 160" stroke="#f59e0b" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                <path d="M42 160 L100 40 L158 160" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                <rect x="36" y="155" width="128" height="14" rx="7" fill="#f59e0b"/>
+              <svg id="admin-logo-svg" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-primary">
+                <circle cx="100" cy="28" r="16" fill="currentColor"/>
+                <path d="M100 50 L100 70" stroke="currentColor" stroke-width="12" stroke-linecap="round"/>
+                <path d="M56 160 L100 60 L144 160" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <path d="M42 160 L100 40 L158 160" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <rect x="36" y="155" width="128" height="14" rx="7" fill="currentColor"/>
               </svg>
             </div>
             <div class="space-y-1">
@@ -885,12 +885,12 @@
           : "Protected hardware settings • Session token secured";
       }
       if (svg) {
-        const color = isWifi ? "#f59e0b" : "#38bdf8";
+        const color = isWifi ? "var(--accent-amber)" : "var(--primary)";
         svg.innerHTML = `
           <circle cx="100" cy="28" r="16" fill="${color}"/>
           <path d="M100 50 L100 70" stroke="${color}" stroke-width="12" stroke-linecap="round"/>
-          <path d="M56 160 L100 60 L144 160" stroke="#f59e0b" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <path d="M42 160 L100 40 L158 160" stroke="#f59e0b" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M56 160 L100 60 L144 160" stroke="${color}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M42 160 L100 40 L158 160" stroke="${color}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
           <rect x="36" y="155" width="128" height="14" rx="7" fill="${color}"/>
         `;
       }
