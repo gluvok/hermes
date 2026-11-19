@@ -1,0 +1,46 @@
+services:
+  hermes:
+    image: ghcr.io/kaalu/hermes:edge
+    container_name: hermes-edge
+    restart: unless-stopped
+    stop_grace_period: 30s
+    network_mode: host
+    privileged: true
+    devices:
+      - /dev/ttyAMA0:/dev/ttyAMA0
+    volumes:
+      - /var/lib/hermes/data:/data
+      - /etc/hermes/vault.key:/etc/hermes/vault.key:ro
+    environment:
+      - SQLITE_DB_PATH=/data/hermes.db
+      - HERMES_PORT=8080
+      - PYTHONUNBUFFERED=1
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+
+  argus:
+    image: ghcr.io/kaalu/argus:edge
+    container_name: argus-edge
+    restart: unless-stopped
+    stop_grace_period: 10s
+    network_mode: host
+    volumes:
+      - /var/lib/argus/models:/models
+    environment:
+      - PORT=8000
+      - MODEL_PATH=/models/yolov8n.onnx
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: edge-watchtower
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_INCLUDE_STOPPED=true
+      - WATCHTOWER_POLL_INTERVAL=300
+      - WATCHTOWER_LABEL_ENABLE=true
+    command: --interval 300 --cleanup --label-enable
