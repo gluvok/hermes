@@ -88,6 +88,21 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(css_res.status_code, 200)
         self.assertIn("--bg-base: #09090b", css_res.get_data(as_text=True))
 
+    def test_static_stylesheet_light_mode_tokens(self):
+        css_res = self.client.get("/static/style.css")
+        self.assertEqual(css_res.status_code, 200)
+        css_text = css_res.get_data(as_text=True)
+        # Verify light mode tokens in :root
+        self.assertIn("--background: oklch(0.986 0.005 130)", css_text)
+        self.assertIn("--foreground: oklch(0.18 0.015 150)", css_text)
+        self.assertIn("--card: oklch(1 0 0)", css_text)
+        self.assertIn("--primary: oklch(0.42 0.065 155)", css_text)
+        self.assertIn("--secondary: oklch(0.96 0.008 140)", css_text)
+        self.assertIn("--muted: oklch(0.96 0.008 140)", css_text)
+        self.assertIn("--border: oklch(0.915 0.008 135)", css_text)
+        # Verify backward compatibility fallback alias
+        self.assertIn("--bg-base: #09090b", css_text)
+
     def test_janus_navigation_elements_present_and_sidebar_removed(self):
         res = self.client.get("/")
         html = res.get_data(as_text=True)

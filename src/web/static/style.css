@@ -1,66 +1,67 @@
 /**
  * Hermes Industrial Edge Web Console Stylesheet
  * 100% Zero-Dependency, Offline-First Static CSS
- * Strict Color Palette & Design Tokens Aligned with Janus OKLCH Dark Mode
+ * Strict Color Palette & Design Tokens Aligned with Janus OKLCH Light Mode
  */
 
 :root {
-  /* Exact Janus Dark Mode OKLCH Design Tokens */
-  --background: oklch(0.145 0.012 155);
-  --foreground: oklch(0.965 0.006 140);
-  --card: oklch(0.185 0.012 155);
-  --card-foreground: oklch(0.965 0.006 140);
-  --popover: oklch(0.185 0.012 155);
-  --popover-foreground: oklch(0.965 0.006 140);
-  --primary: oklch(0.76 0.055 155);
-  --primary-foreground: oklch(0.14 0.012 155);
-  --secondary: oklch(0.23 0.012 155);
-  --secondary-foreground: oklch(0.965 0.006 140);
-  --muted: oklch(0.22 0.012 155);
-  --muted-foreground: oklch(0.65 0.018 150);
-  --accent: oklch(0.23 0.018 155);
-  --accent-foreground: oklch(0.965 0.006 140);
-  --destructive: oklch(0.65 0.15 28);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.76 0.055 155);
+  /* Exact Janus Light Mode OKLCH Design Tokens */
+  --background: oklch(0.986 0.005 130);
+  --foreground: oklch(0.18 0.015 150);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.015 150);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.015 150);
+  --primary: oklch(0.42 0.065 155);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.008 140);
+  --secondary-foreground: oklch(0.22 0.015 150);
+  --muted: oklch(0.96 0.008 140);
+  --muted-foreground: oklch(0.54 0.018 150);
+  --accent: oklch(0.95 0.012 155);
+  --accent-foreground: oklch(0.2 0.025 155);
+  --destructive: oklch(0.58 0.16 28);
+  --border: oklch(0.915 0.008 135);
+  --input: oklch(0.915 0.008 135);
+  --ring: oklch(0.55 0.06 155);
 
   /* Janus Chart & Accent Palette */
-  --chart-1: oklch(0.76 0.055 155);
-  --chart-2: oklch(0.68 0.07 140);
-  --chart-3: oklch(0.72 0.08 75);
-  --chart-4: oklch(0.65 0.12 28);
-  --chart-5: oklch(0.65 0.018 150);
+  --chart-1: oklch(0.42 0.065 155);
+  --chart-2: oklch(0.58 0.08 140);
+  --chart-3: oklch(0.68 0.08 75);
+  --chart-4: oklch(0.58 0.12 28);
+  --chart-5: oklch(0.54 0.018 150);
 
   /* Janus Sidebar Tokens */
-  --sidebar: oklch(0.165 0.012 155);
-  --sidebar-foreground: oklch(0.965 0.006 140);
-  --sidebar-primary: oklch(0.76 0.055 155);
-  --sidebar-primary-foreground: oklch(0.14 0.012 155);
-  --sidebar-accent: oklch(0.21 0.012 155);
-  --sidebar-accent-foreground: oklch(0.965 0.006 140);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.76 0.055 155);
+  --sidebar: oklch(0.986 0.005 130);
+  --sidebar-foreground: oklch(0.18 0.015 150);
+  --sidebar-primary: oklch(0.42 0.065 155);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.95 0.012 155);
+  --sidebar-accent-foreground: oklch(0.2 0.025 155);
+  --sidebar-border: oklch(0.915 0.008 135);
+  --sidebar-ring: oklch(0.55 0.06 155);
 
   /* Janus Mapped Component Tokens */
-  --canvas-deep: oklch(0.115 0.012 155);
-  --accent-emerald: oklch(0.76 0.055 155);
-  --accent-sky: oklch(0.75 0.065 215);
-  --accent-amber: oklch(0.72 0.08 75);
-  --accent-rose: oklch(0.65 0.15 28);
-  --accent-violet: oklch(0.72 0.07 285);
+  --canvas-deep: oklch(0.96 0.008 140);
+  --accent-emerald: oklch(0.42 0.065 155);
+  --accent-sky: oklch(0.50 0.12 230);
+  --accent-amber: oklch(0.55 0.12 75);
+  --accent-rose: oklch(0.58 0.16 28);
+  --accent-violet: oklch(0.52 0.14 285);
+  --radius: 0.625rem;
 
   /* Backward Compatibility & Fallback Aliases */
   --bg-base: #09090b;
   --bg-card: var(--card);
-  --bg-card-hover: oklch(0.205 0.012 155);
+  --bg-card-hover: oklch(0.95 0.012 155);
   --bg-muted: var(--muted);
   --bg-accent: var(--accent);
-  --border-hex: #27272a;
-  --border-light: oklch(1 0 0 / 15%);
+  --border-hex: #e4e4e7;
+  --border-light: oklch(0.915 0.008 135);
   --text-main: var(--foreground);
   --text-muted: var(--muted-foreground);
-  --text-dim: oklch(0.48 0.018 150);
+  --text-dim: oklch(0.54 0.018 150);
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
