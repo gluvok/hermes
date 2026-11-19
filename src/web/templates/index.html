@@ -141,9 +141,9 @@
         
         <div id="client-hero-view" class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           
-          <!-- LEFT 60%: HERO LIVE WEIGHBRIDGE SCALE -->
+          <!-- LEFT 60%: HERO LIVE WEIGHBRIDGE SCALE (60/40 INDUSTRIAL HERO) -->
           <div id="hud-scale-column" class="lg:col-span-7 flex flex-col gap-4">
-            <div class="p-8 rounded-2xl border border-border bg-card text-card-foreground shadow-lg flex-1 flex flex-col justify-between space-y-6">
+            <div id="hero-scale-pane" class="hero-weight-display p-6 sm:p-8 rounded-2xl border border-hairline bg-card text-card-foreground shadow-lg flex-1 flex flex-col justify-between space-y-6">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                   <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -154,16 +154,19 @@
                     <p class="text-xs text-muted-foreground font-mono">Zero-Click Automated Weighment</p>
                   </div>
                 </div>
-                <span id="scale-state-detail" class="px-3 py-1 rounded-full text-xs font-bold bg-secondary text-foreground font-mono">
-                  STATE: IDLE
-                </span>
+                <div class="flex items-center gap-2">
+                  <span id="weight-stability-pill" class="badge badge-emerald font-mono uppercase">STABLE</span>
+                  <span id="scale-state-detail" class="px-3 py-1 rounded-full text-xs font-bold bg-secondary text-foreground font-mono">
+                    STATE: IDLE
+                  </span>
+                </div>
                 <span id="ov-scale-state" class="hidden">IDLE</span>
               </div>
 
-              <!-- Massive Hero Monospace Weight Display -->
-              <div id="live-weight-display" class="my-8 text-center space-y-3">
+              <!-- Massive Hero Monospace Tabular Weight Display -->
+              <div id="live-weight-display" class="my-6 text-center space-y-2">
                 <div class="text-xs text-muted-foreground uppercase tracking-widest font-mono font-medium">Current Deck Load</div>
-                <div id="ov-weight" class="text-7xl lg:text-8xl font-black font-mono tracking-tight text-emerald-400">
+                <div id="ov-weight" class="text-7xl lg:text-8xl font-black font-mono tabular-nums tracking-tight text-emerald-400">
                   0.000 <span class="text-3xl font-normal text-muted-foreground">kg</span>
                 </div>
                 <div id="scale-page-weight" class="hidden">0.000 kg</div>
@@ -184,7 +187,7 @@
 
           <!-- RIGHT 40%: VEHICLE CROP & ANPR CARD -->
           <div id="hud-vehicle-column" class="lg:col-span-5 flex flex-col gap-4">
-            <div class="p-6 rounded-2xl border border-border bg-card text-card-foreground shadow-lg flex-1 flex flex-col justify-between space-y-4">
+            <div id="hero-camera-pane" class="hero-camera-display p-6 rounded-2xl border border-hairline bg-card text-card-foreground shadow-lg flex-1 flex flex-col justify-between space-y-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                   <div class="p-2 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
@@ -210,17 +213,19 @@
                 </div>
               </div>
 
-              <!-- Verified License Plate Badge -->
-              <div id="verified-plate-badge" class="p-4 rounded-xl bg-secondary border border-border flex items-center justify-between">
-                <div>
-                  <div class="text-2xs uppercase tracking-widest text-muted-foreground font-mono font-medium">Recognized Plate</div>
-                  <div id="ov-anpr-plate" class="text-3xl font-black font-mono tracking-widest text-primary">READY</div>
-                  <div id="ov-plate" class="hidden">READY</div>
-                  <div id="ov-session-plate" class="hidden">READY</div>
-                </div>
-                <div class="text-right">
-                  <div class="text-2xs uppercase tracking-widest text-muted-foreground font-mono">Confidence</div>
-                  <div id="ov-anpr-confidence" class="text-sm font-bold font-mono text-emerald-400">--%</div>
+              <!-- Verified License Plate Hero Badge -->
+              <div id="anpr-plate-hero-badge" class="p-4 rounded-xl bg-secondary/80 border border-border flex items-center justify-between">
+                <div id="verified-plate-badge" class="flex-1 flex items-center justify-between">
+                  <div>
+                    <div class="text-2xs uppercase tracking-widest text-muted-foreground font-mono font-medium">Recognized Plate</div>
+                    <div id="ov-anpr-plate" class="text-3xl font-black font-mono tabular-nums tracking-widest text-primary">READY</div>
+                    <div id="ov-plate" class="hidden">READY</div>
+                    <div id="ov-session-plate" class="hidden">READY</div>
+                  </div>
+                  <div class="text-right">
+                    <div class="text-2xs uppercase tracking-widest text-muted-foreground font-mono">Confidence</div>
+                    <div id="ov-anpr-confidence" class="text-sm font-bold font-mono text-emerald-400">--%</div>
+                  </div>
                 </div>
               </div>
 
