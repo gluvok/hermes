@@ -12,7 +12,7 @@ import logging
 import signal
 import threading
 import time
-from typing import Callable, Dict, Set
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +21,9 @@ class GracefulShutdownDrain:
     def __init__(self, grace_period: float = 30.0, auto_trap_signals: bool = False):
         self.grace_period = grace_period
         self._is_shutting_down = False
-        self._active_sessions: Set[str] = set()
+        self._active_sessions: set[str] = set()
         self._lock = threading.Lock()
-        self._cleanup_hooks: Dict[str, Callable[[], None]] = {}
+        self._cleanup_hooks: dict[str, Callable[[], None]] = {}
         self._drain_event = threading.Event()
 
         if auto_trap_signals:
@@ -115,7 +115,7 @@ class GracefulShutdownDrain:
             try:
                 logger.info(f"[Shutdown] Executing cleanup hook: {name}")
                 hook()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.error(f"[Shutdown] Error executing cleanup hook {name}: {e}")
 
         return drained

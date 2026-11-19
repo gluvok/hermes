@@ -1,8 +1,9 @@
-import time
 import signal
 import threading
+import time
 import unittest
 from unittest.mock import MagicMock
+
 from src.core.shutdown import GracefulShutdownDrain
 
 
