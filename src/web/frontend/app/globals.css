@@ -29,6 +29,14 @@
 }
 
 :root {
+  /* Mettler Toledo & Tesla Telemetry Industrial Slate Design Tokens */
+  --bg-industrial-base: #0c1014;
+  --bg-industrial-card: #141a20;
+  --border-hairline: #222b35;
+  --accent-electric-mint: #10b981;
+  --accent-ochre-amber: #f59e0b;
+  --accent-hazard-red: #ef4444;
+
   --background: oklch(0.986 0.005 130);
   --foreground: oklch(0.18 0.015 150);
   --card: oklch(1 0 0);
@@ -77,4 +85,10 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
 }

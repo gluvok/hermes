@@ -95,7 +95,7 @@ export default function HermesKioskPage() {
               type="text"
               value={plateInput}
               onChange={(e) => setPlateInput(e.target.value.toUpperCase())}
-              className="w-full h-11 px-3 rounded-lg border border-border bg-background font-mono text-lg font-bold tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full h-11 px-3 rounded-lg border border-border bg-background font-mono tabular-nums text-lg font-bold tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-ring"
               placeholder="e.g. KA01MJ5021"
             />
           </div>
