@@ -1708,6 +1708,11 @@
           scaleStateDetail.textContent = "STATE: " + state;
           scaleStateDetail.className = stateClass.replace("px-2 py-0.5", "px-2.5 py-1");
         }
+
+        const curWeight = data.scale.current_weight || 0;
+        if (curWeight < 5.0 && (state === "IDLE" || state === "SCALE_IDLE")) {
+          hideContextualActionBar();
+        }
       }
       if (data.config) {
         const thresh = document.getElementById("scale-thresh-disp");
@@ -1814,12 +1819,56 @@
       if (ovWifiSsid) ovWifiSsid.textContent = displaySsid;
     }
 
+    let contextualActionTimer = null;
+
+    function showContextualActionBar() {
+      const bar = document.getElementById("contextual-action-bar");
+      if (!bar) return;
+      bar.classList.remove("hidden");
+      if (contextualActionTimer) clearTimeout(contextualActionTimer);
+      // Auto-hide after 15 seconds
+      contextualActionTimer = setTimeout(() => {
+        hideContextualActionBar();
+      }, 15000);
+      lucide.createIcons();
+    }
+
+    function hideContextualActionBar() {
+      const bar = document.getElementById("contextual-action-bar");
+      if (bar) bar.classList.add("hidden");
+      if (contextualActionTimer) {
+        clearTimeout(contextualActionTimer);
+        contextualActionTimer = null;
+      }
+    }
+
+    function promptManualPlateCorrection() {
+      const currentPlate = document.getElementById("ov-anpr-plate")?.textContent || "";
+      const promptVal = (currentPlate !== "READY" && currentPlate !== "NO_PLATE_DETECTED") ? currentPlate : "";
+      const newPlate = prompt("Enter corrected vehicle license plate:", promptVal);
+      if (newPlate && newPlate.trim()) {
+        const cleanPlate = newPlate.trim().toUpperCase();
+        const anprPlate = document.getElementById("ov-anpr-plate");
+        const ovPlate = document.getElementById("ov-plate");
+        const sessionPlate = document.getElementById("ov-session-plate");
+        if (anprPlate) anprPlate.textContent = cleanPlate;
+        if (ovPlate) ovPlate.textContent = cleanPlate;
+        if (sessionPlate) sessionPlate.textContent = cleanPlate;
+        showContextualActionBar();
+      }
+    }
+
+    function printWeighmentSlip() {
+      window.print();
+    }
+
     function updateSessionUI(data) {
       if (!data.latest_weighment || !data.latest_weighment.session_id) return;
       const lw = data.latest_weighment;
+      const plateVal = lw.plate || "READY";
+
       const plateEl = document.getElementById("ov-plate");
       if (plateEl) {
-        const plateVal = lw.plate || "READY";
         plateEl.textContent = plateVal;
         if (plateVal.startsWith("REJECTED_") || plateVal === "NO_PLATE_DETECTED") {
           plateEl.className = "text-2xl font-extrabold font-mono text-amber-400 mt-1";
@@ -1829,12 +1878,29 @@
           plateEl.className = "text-2xl font-extrabold font-mono text-emerald-400 mt-1";
         }
       }
+
+      const anprPlateEl = document.getElementById("ov-anpr-plate");
+      if (anprPlateEl) {
+        anprPlateEl.textContent = plateVal;
+      }
+
+      const lastWeightEl = document.getElementById("last-weighed-weight");
+      const lastPlateEl = document.getElementById("last-weighed-plate");
+      const lastTimeEl = document.getElementById("last-weighed-time");
+      if (lastWeightEl) lastWeightEl.textContent = (lw.weight || 0).toFixed(3) + " kg";
+      if (lastPlateEl) lastPlateEl.textContent = plateVal;
+      if (lastTimeEl) lastTimeEl.textContent = lw.timestamp ? "Captured at " + lw.timestamp : "Just now";
+
       const weightEl = document.getElementById("ov-confirmed-weight");
       const sessionEl = document.getElementById("ov-session-id");
       const timeEl = document.getElementById("ov-last-time");
       if (weightEl) weightEl.textContent = (lw.weight || 0).toFixed(3) + " kg";
       if (sessionEl) sessionEl.textContent = lw.session_id;
       if (timeEl) timeEl.textContent = lw.timestamp ? "Captured at " + lw.timestamp : "Just now";
+
+      if (plateVal && plateVal !== "READY") {
+        showContextualActionBar();
+      }
     }
 
     function updateTelemetryUI(data) {

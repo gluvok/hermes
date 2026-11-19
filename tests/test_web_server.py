@@ -170,6 +170,22 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn('id="cfg-serial-baud"', html)
         self.assertIn('id="telemetry-log-stream"', html)
 
+    def test_contextual_micro_actions_present(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Contextual micro-action bar exists and is initially hidden
+        self.assertIn('id="contextual-action-bar"', html)
+        self.assertIn('id="btn-quick-edit-plate"', html)
+        self.assertIn('id="btn-quick-print-slip"', html)
+        self.assertIn("function promptManualPlateCorrection", html)
+        self.assertIn("function printWeighmentSlip", html)
+        self.assertIn("showContextualActionBar", html)
+
+
+
+
     def test_static_assets_served(self):
         res_tw = self.client.get("/static/tailwindcss.js")
         self.assertEqual(res_tw.status_code, 200)
