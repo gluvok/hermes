@@ -120,6 +120,44 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn('id="cfg-crop-pad-left"', html)
         self.assertIn('id="cfg-crop-pad-right"', html)
 
+    def test_concise_navigation_labels_and_light_theme_root(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Root document has light theme or default clean root without forced dark class
+        self.assertNotIn('<html lang="en" class="dark">', html)
+        self.assertIn('<html lang="en"', html)
+
+        # Navigation container contains concise labels
+        nav_start = html.find('<nav class="nav-tabs-container">')
+        self.assertGreater(nav_start, 0)
+        nav_end = html.find('</nav>', nav_start)
+        nav_html = html[nav_start:nav_end]
+
+        self.assertIn('id="nav-item-overview"', nav_html)
+        self.assertIn('<span>Overview</span>', nav_html)
+        self.assertIn('id="nav-item-scale"', nav_html)
+        self.assertIn('<span>Scale</span>', nav_html)
+        self.assertIn('id="nav-item-anpr"', nav_html)
+        self.assertIn('<span>Cameras</span>', nav_html)
+        self.assertIn('id="nav-item-cloud"', nav_html)
+        self.assertIn('<span>Sync</span>', nav_html)
+        self.assertIn('id="nav-item-telemetry"', nav_html)
+        self.assertIn('<span>Logs</span>', nav_html)
+        self.assertIn('id="nav-item-config"', nav_html)
+        self.assertIn('<span>Config</span>', nav_html)
+        self.assertIn('id="nav-item-wifi"', nav_html)
+        self.assertIn('<span>Wi-Fi</span>', nav_html)
+
+        # Verbose labels removed from navigation bar
+        self.assertNotIn('<span>Scale Indicator</span>', nav_html)
+        self.assertNotIn('<span>Cameras & Crop</span>', nav_html)
+        self.assertNotIn('<span>Cloud Transfer</span>', nav_html)
+        self.assertNotIn('<span>Telemetry Logs</span>', nav_html)
+        self.assertNotIn('<span>System Config</span>', nav_html)
+        self.assertNotIn('<span>Wi-Fi Setup</span>', nav_html)
+
     def test_static_assets_served(self):
         res_tw = self.client.get("/static/tailwindcss.js")
         self.assertEqual(res_tw.status_code, 200)
