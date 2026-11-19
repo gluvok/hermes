@@ -123,6 +123,26 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         # Verbose tab buttons are replaced with clean kiosk header
         self.assertNotIn('class="nav-tabs-container"', html)
 
+    def test_split_hero_hud_layout_elements(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Split Hero HUD containers present
+        self.assertIn('id="hud-scale-column"', html)
+        self.assertIn('id="hud-vehicle-column"', html)
+
+        # Hero Scale Display elements preserved
+        self.assertIn('id="ov-weight"', html)
+        self.assertIn('id="scale-page-weight"', html)
+        self.assertIn('id="scale-state-detail"', html)
+
+        # Vehicle Framing & ANPR Crop elements preserved
+        self.assertIn('id="ov-anpr-plate"', html)
+        self.assertIn('id="ov-anpr-crop-stage"', html)
+        self.assertIn('id="ov-anpr-confidence"', html)
+        self.assertIn('id="ov-sync-status-badge"', html)
+
     def test_static_assets_served(self):
         res_tw = self.client.get("/static/tailwindcss.js")
         self.assertEqual(res_tw.status_code, 200)

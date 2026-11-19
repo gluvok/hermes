@@ -144,108 +144,118 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════════════ -->
-      <!-- VIEW 1: OVERVIEW DASHBOARD                                         -->
+      <!-- VIEW 1: OVERVIEW SPLIT HERO HUD                                    -->
       <!-- ══════════════════════════════════════════════════════════════════ -->
       <div id="view-overview" class="space-y-6">
         
-        <!-- Metrics Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           
-          <!-- Metric 1: Scale -->
-          <div onclick="switchTab('scale')" class="p-5 rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:border-emerald-500/40 transition cursor-pointer flex flex-col justify-between space-y-4">
-            <div class="flex items-center justify-between text-xs text-muted-foreground font-medium">
-              <span>Scale Indicator</span>
-              <span id="ov-scale-state" class="px-2 py-0.5 rounded-full text-xs font-bold bg-secondary text-foreground">IDLE</span>
-            </div>
-            <div>
-              <div id="ov-weight" class="text-3xl font-extrabold font-mono text-emerald-400">0.000 <span class="text-sm font-normal text-muted-foreground">kg</span></div>
-              <p id="ov-scale-port" class="text-xs font-mono text-muted-foreground mt-1">/dev/ttyAMA0 @ 1200 baud</p>
-            </div>
-            <div class="text-xs text-muted-foreground flex items-center justify-between border-t border-border pt-2">
-              <span id="ov-stability-label">10s Stability Machine</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </div>
-          </div>
-
-          <!-- Metric 2: ANPR -->
-          <div onclick="switchTab('anpr')" class="p-5 rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:border-sky-500/40 transition cursor-pointer flex flex-col justify-between space-y-4">
-            <div class="flex items-center justify-between text-xs text-muted-foreground font-medium">
-              <span>ANPR Microservice</span>
-              <span id="ov-argus-badge" class="px-2 py-0.5 rounded-full text-xs font-bold bg-sky-500/10 text-sky-400 border border-sky-500/20">ONLINE</span>
-            </div>
-            <div>
-              <div class="text-lg font-bold text-foreground">YOLO + RapidOCR</div>
-              <p class="text-xs font-mono text-muted-foreground mt-1">Port 8000 (FastAPI)</p>
-            </div>
-            <div class="text-xs text-muted-foreground flex items-center justify-between border-t border-border pt-2">
-              <span>Top Plate OCR</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </div>
-          </div>
-
-          <!-- Metric 3: Cloud -->
-          <div onclick="switchTab('cloud')" class="p-5 rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:border-violet-500/40 transition cursor-pointer flex flex-col justify-between space-y-4">
-            <div class="flex items-center justify-between text-xs text-muted-foreground font-medium">
-              <span>Cloud Transfer</span>
-              <span id="ov-sb-badge" class="px-2 py-0.5 rounded-full text-xs font-bold bg-muted text-muted-foreground border border-border">CHECKING...</span>
-            </div>
-            <div>
-              <div id="ov-center-id" class="text-base font-bold text-foreground truncate">Center ID: 1</div>
-              <p class="text-xs text-muted-foreground mt-1">Gluvok Cloud API</p>
-            </div>
-            <div class="text-xs text-muted-foreground flex items-center justify-between border-t border-border pt-2">
-              <span>HTTP Basic Auth</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </div>
-          </div>
-
-          <!-- Metric 4: Wi-Fi -->
-          <div onclick="switchTab('wifi')" class="p-5 rounded-xl border border-border bg-card text-card-foreground shadow-sm hover:border-amber-500/40 transition cursor-pointer flex flex-col justify-between space-y-4">
-            <div class="flex items-center justify-between text-xs text-muted-foreground font-medium">
-              <span>Local Network</span>
-              <span id="ov-wifi-badge" class="px-2 py-0.5 rounded-full text-xs font-bold bg-muted text-muted-foreground border border-border">CHECKING...</span>
-            </div>
-            <div>
-              <div id="ov-wifi-ssid" class="text-base font-bold text-foreground truncate">Checking Network...</div>
-              <p class="text-xs text-muted-foreground mt-1">Fallback AP: hermes</p>
-            </div>
-            <div class="text-xs text-muted-foreground flex items-center justify-between border-t border-border pt-2">
-              <span>Watchdog Active</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Latest Weighment Outcome Card -->
-        <div class="p-6 rounded-xl border border-border bg-card text-card-foreground shadow-sm">
-          <div class="flex items-center justify-between pb-4 border-b border-border">
-            <div class="flex items-center gap-3">
-              <div class="p-2.5 rounded-lg bg-secondary text-primary">
-                <i data-lucide="truck" class="w-5 h-5"></i>
+          <!-- LEFT 60%: HERO LIVE WEIGHBRIDGE SCALE -->
+          <div id="hud-scale-column" class="lg:col-span-7 flex flex-col gap-4">
+            <div class="p-8 rounded-2xl border border-border bg-card text-card-foreground shadow-lg flex-1 flex flex-col justify-between space-y-6">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <i data-lucide="scale" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground font-mono">Live Weighbridge Scale</h2>
+                    <p class="text-xs text-muted-foreground font-mono">Zero-Click Automated Weighment</p>
+                  </div>
+                </div>
+                <span id="scale-state-detail" class="px-3 py-1 rounded-full text-xs font-bold bg-secondary text-foreground font-mono">
+                  STATE: IDLE
+                </span>
+                <span id="ov-scale-state" class="hidden">IDLE</span>
               </div>
-              <div>
-                <h2 class="text-base font-semibold text-foreground">Latest Weighment Session</h2>
-                <p class="text-xs text-muted-foreground">Most recent weighbridge record transmitted to Gluvok API</p>
+
+              <!-- Massive Hero Monospace Weight Display -->
+              <div class="my-8 text-center space-y-3">
+                <div class="text-xs text-muted-foreground uppercase tracking-widest font-mono font-medium">Current Deck Load</div>
+                <div id="ov-weight" class="text-7xl lg:text-8xl font-black font-mono tracking-tight text-emerald-400">
+                  0.000 <span class="text-3xl font-normal text-muted-foreground">kg</span>
+                </div>
+                <div id="scale-page-weight" class="hidden">0.000 kg</div>
+                <div id="ov-confirmed-weight" class="hidden">0.000 kg</div>
+                <div class="text-xs font-mono text-muted-foreground pt-1">
+                  Automatic Trigger: &gt; <span id="scale-thresh-disp" class="text-emerald-400 font-bold">50.0 kg</span> continuous stability (&plusmn;<span id="scale-tolerance-disp">2.0</span> kg)
+                </div>
+              </div>
+
+              <!-- Recent Weighment Mini-Ticker -->
+              <div class="pt-4 border-t border-border flex items-center justify-between text-xs font-mono text-muted-foreground">
+                <span>Last Session: <strong id="ov-session-id" class="text-foreground">None</strong></span>
+                <span>Confirmed: <strong id="last-weighed-weight" class="text-emerald-400">0.000 kg</strong></span>
+                <span id="ov-last-time">Waiting for scale trigger...</span>
               </div>
             </div>
-            <span id="ov-session-id" class="text-xs font-mono text-muted-foreground">No session yet</span>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-5">
-            <div>
-              <span class="text-xs font-medium text-muted-foreground block">Recognized Vehicle Plate</span>
-              <div id="ov-plate" class="text-2xl font-extrabold font-mono text-sky-400 mt-1">READY</div>
-            </div>
-            <div>
-              <span class="text-xs font-medium text-muted-foreground block">Confirmed Stable Weight</span>
-              <div id="ov-confirmed-weight" class="text-2xl font-extrabold font-mono text-emerald-400 mt-1">0.000 kg</div>
-            </div>
-            <div>
-              <span class="text-xs font-medium text-muted-foreground block">Timestamp</span>
-              <div id="ov-last-time" class="text-sm font-medium text-foreground mt-1.5">Waiting for scale trigger...</div>
+          <!-- RIGHT 40%: VEHICLE CROP & ANPR CARD -->
+          <div id="hud-vehicle-column" class="lg:col-span-5 flex flex-col gap-4">
+            <div class="p-6 rounded-2xl border border-border bg-card text-card-foreground shadow-lg flex-1 flex flex-col justify-between space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="p-2 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                    <i data-lucide="camera" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground font-mono">Vehicle Camera & Crop</h2>
+                    <p class="text-xs text-muted-foreground font-mono">Dynamic Framing Pipeline</p>
+                  </div>
+                </div>
+                <span id="ov-sync-status-badge" class="badge badge-emerald">AUTOMATED</span>
+              </div>
+
+              <!-- Live Vehicle Framing Preview Stage -->
+              <div id="ov-anpr-crop-stage" class="relative aspect-[16/10] rounded-xl bg-zinc-950 border border-border overflow-hidden flex items-center justify-center">
+                <img id="ov-anpr-crop-img" src="" alt="Vehicle Framing" class="w-full h-full object-cover hidden" />
+                <div id="ov-anpr-placeholder" class="text-center p-4 space-y-2">
+                  <i data-lucide="truck" class="w-10 h-10 text-muted-foreground mx-auto stroke-[1.5]"></i>
+                  <p class="text-xs text-muted-foreground font-mono">Awaiting Vehicle Mount</p>
+                  <p class="text-2xs text-zinc-600 font-mono">Camera stream auto-captures on weight stability</p>
+                </div>
+              </div>
+
+              <!-- Verified License Plate Badge -->
+              <div class="p-4 rounded-xl bg-secondary border border-border flex items-center justify-between">
+                <div>
+                  <div class="text-2xs uppercase tracking-widest text-muted-foreground font-mono font-medium">Recognized Plate</div>
+                  <div id="ov-anpr-plate" class="text-3xl font-black font-mono tracking-widest text-primary">READY</div>
+                  <div id="ov-plate" class="hidden">READY</div>
+                  <div id="ov-session-plate" class="hidden">READY</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-2xs uppercase tracking-widest text-muted-foreground font-mono">Confidence</div>
+                  <div id="ov-anpr-confidence" class="text-sm font-bold font-mono text-emerald-400">--%</div>
+                </div>
+              </div>
+
+              <!-- Contextual Edge-Case Micro-Action Bar -->
+              <div id="contextual-action-bar" class="hidden pt-2 border-t border-border flex items-center justify-between gap-2">
+                <button id="btn-quick-edit-plate" onclick="promptManualPlateCorrection()" class="btn btn-secondary flex-1 py-1.5 px-3 text-xs flex items-center justify-center gap-1.5">
+                  <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                  <span>Edit Plate</span>
+                </button>
+                <button id="btn-quick-print-slip" onclick="printWeighmentSlip()" class="btn btn-secondary flex-1 py-1.5 px-3 text-xs flex items-center justify-center gap-1.5">
+                  <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                  <span>Print Slip</span>
+                </button>
+              </div>
+
+              <!-- Preserved Hidden Status Hooks for Polling Engine -->
+              <div class="hidden">
+                <span id="ov-scale-port"></span>
+                <span id="ov-argus-badge"></span>
+                <span id="ov-center-id"></span>
+                <span id="ov-sb-badge"></span>
+                <span id="ov-wifi-badge"></span>
+                <span id="ov-wifi-ssid"></span>
+                <span id="ov-stability-label"></span>
+              </div>
             </div>
           </div>
+
         </div>
 
       </div>
