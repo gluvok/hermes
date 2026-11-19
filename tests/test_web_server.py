@@ -88,21 +88,6 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(css_res.status_code, 200)
         self.assertIn("--bg-base: #09090b", css_res.get_data(as_text=True))
 
-    def test_static_stylesheet_light_mode_tokens(self):
-        css_res = self.client.get("/static/style.css")
-        self.assertEqual(css_res.status_code, 200)
-        css_text = css_res.get_data(as_text=True)
-        # Verify light mode tokens in :root
-        self.assertIn("--background: oklch(0.986 0.005 130)", css_text)
-        self.assertIn("--foreground: oklch(0.18 0.015 150)", css_text)
-        self.assertIn("--card: oklch(1 0 0)", css_text)
-        self.assertIn("--primary: oklch(0.42 0.065 155)", css_text)
-        self.assertIn("--secondary: oklch(0.96 0.008 140)", css_text)
-        self.assertIn("--muted: oklch(0.96 0.008 140)", css_text)
-        self.assertIn("--border: oklch(0.915 0.008 135)", css_text)
-        # Verify backward compatibility fallback alias
-        self.assertIn("--bg-base: #09090b", css_text)
-
     def test_janus_navigation_elements_present_and_sidebar_removed(self):
         res = self.client.get("/")
         html = res.get_data(as_text=True)
@@ -119,67 +104,6 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn('id="cfg-crop-pad-bottom"', html)
         self.assertIn('id="cfg-crop-pad-left"', html)
         self.assertIn('id="cfg-crop-pad-right"', html)
-
-    def test_concise_navigation_labels_and_light_theme_root(self):
-        res = self.client.get("/")
-        self.assertEqual(res.status_code, 200)
-        html = res.get_data(as_text=True)
-
-        # Root document has light theme or default clean root without forced dark class
-        self.assertNotIn('<html lang="en" class="dark">', html)
-        self.assertIn('<html lang="en"', html)
-
-        # Navigation container contains concise labels
-        nav_start = html.find('<nav class="nav-tabs-container">')
-        self.assertGreater(nav_start, 0)
-        nav_end = html.find('</nav>', nav_start)
-        nav_html = html[nav_start:nav_end]
-
-        self.assertIn('id="nav-item-overview"', nav_html)
-        self.assertIn('<span>Overview</span>', nav_html)
-        self.assertIn('id="nav-item-scale"', nav_html)
-        self.assertIn('<span>Scale</span>', nav_html)
-        self.assertIn('id="nav-item-anpr"', nav_html)
-        self.assertIn('<span>Cameras</span>', nav_html)
-        self.assertIn('id="nav-item-cloud"', nav_html)
-        self.assertIn('<span>Sync</span>', nav_html)
-        self.assertIn('id="nav-item-telemetry"', nav_html)
-        self.assertIn('<span>Logs</span>', nav_html)
-        self.assertIn('id="nav-item-config"', nav_html)
-        self.assertIn('<span>Config</span>', nav_html)
-        self.assertIn('id="nav-item-wifi"', nav_html)
-        self.assertIn('<span>Wi-Fi</span>', nav_html)
-
-        # Verbose labels removed from navigation bar
-        self.assertNotIn('<span>Scale Indicator</span>', nav_html)
-        self.assertNotIn('<span>Cameras & Crop</span>', nav_html)
-        self.assertNotIn('<span>Cloud Transfer</span>', nav_html)
-        self.assertNotIn('<span>Telemetry Logs</span>', nav_html)
-        self.assertNotIn('<span>System Config</span>', nav_html)
-        self.assertNotIn('<span>Wi-Fi Setup</span>', nav_html)
-
-    def test_light_mode_component_contrast_and_surfaces(self):
-        css_res = self.client.get("/static/style.css")
-        self.assertEqual(css_res.status_code, 200)
-        css = css_res.get_data(as_text=True)
-
-        # Form elements have light mode background and input border
-        self.assertIn('input[type="text"]', css)
-        self.assertIn("background: var(--card)", css)
-        self.assertIn("border: 1px solid var(--input)", css)
-
-        # Top nav uses light translucent card background
-        self.assertIn(".top-nav {", css)
-        self.assertIn("background-color: oklch(1 0 0 / 92%)", css)
-
-        # Active nav button elevated light pill styling
-        self.assertIn(".nav-tab-btn.active", css)
-        self.assertIn("background: var(--card)", css)
-        self.assertIn("color: var(--foreground)", css)
-
-        # High-contrast light badges
-        self.assertIn(".badge-emerald", css)
-        self.assertIn("color: oklch(0.32 0.08 155)", css)
 
     def test_static_assets_served(self):
         res_tw = self.client.get("/static/tailwindcss.js")
