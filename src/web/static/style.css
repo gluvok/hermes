@@ -705,3 +705,31 @@ input[type="range"] {
 .cfg-aux-cam-url {
   width: 100%;
 }
+
+/* Slide-Over Admin Drawer & Overlay */
+#admin-drawer,
+.admin-drawer {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.6);
+}
+
+#admin-drawer.open,
+#admin-drawer.drawer-open,
+.admin-drawer.open,
+.admin-drawer.drawer-open {
+  transform: translateX(0) !important;
+}
+
+#admin-drawer-overlay,
+.admin-drawer-overlay {
+  transition: opacity 0.3s ease;
+}
+
+#admin-drawer-overlay.open,
+#admin-drawer-overlay.drawer-backdrop-open,
+.admin-drawer-overlay.open,
+.admin-drawer-overlay.drawer-backdrop-open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+

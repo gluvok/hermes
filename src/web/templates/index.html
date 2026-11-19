@@ -787,6 +787,120 @@
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- SLIDE-OVER SUPERADMIN SETTINGS DRAWER                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div id="admin-drawer-overlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 opacity-0 pointer-events-none transition-opacity duration-300" onclick="closeAdminDrawer()"></div>
+
+  <aside id="admin-drawer" class="fixed top-0 right-0 bottom-0 w-full max-w-xl bg-card border-l border-border shadow-2xl z-50 translate-x-full transition-transform duration-300 flex flex-col">
+    <!-- Drawer Header -->
+    <div class="p-5 border-b border-border flex items-center justify-between bg-card/90 backdrop-blur">
+      <div class="flex items-center gap-2.5">
+        <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <i data-lucide="shield-check" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h2 class="text-sm font-bold text-foreground">Hardware & Maintenance Tuning</h2>
+          <p class="text-xs text-muted-foreground font-mono">Protected Superadmin Drawer</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeAdminDrawer()" class="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition cursor-pointer" title="Close Drawer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- Gate 1: Unauthenticated Login Form -->
+    <div id="admin-drawer-login-form" class="flex-1 p-6 flex flex-col justify-center max-w-sm mx-auto w-full space-y-6">
+      <div class="text-center space-y-2">
+        <div class="w-12 h-12 rounded-xl bg-secondary border border-border mx-auto flex items-center justify-center text-primary">
+          <i data-lucide="lock" class="w-6 h-6 text-emerald-400"></i>
+        </div>
+        <h3 class="text-base font-bold text-foreground">Superadmin Authentication Required</h3>
+        <p class="text-xs text-muted-foreground">Sign in with superadmin credentials to configure hardware and edge settings.</p>
+      </div>
+
+      <form onsubmit="handleDrawerLogin(event)" class="space-y-4">
+        <div class="space-y-1.5">
+          <label class="text-xs font-medium text-foreground">User ID</label>
+          <input id="drawer-login-userid" type="text" placeholder="superadmin" autocomplete="username" class="w-full px-3 py-2 rounded-lg bg-background border border-input text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-xs font-medium text-foreground">Password</label>
+          <input id="drawer-login-password" type="password" placeholder="••••••••" autocomplete="current-password" class="w-full px-3 py-2 rounded-lg bg-background border border-input text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
+        </div>
+        <div id="drawer-login-error" class="hidden p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-xs"></div>
+        <button type="submit" id="drawer-login-btn" class="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition shadow-sm">
+          Unlock Admin Console
+        </button>
+      </form>
+    </div>
+
+    <!-- Gate 2: Authenticated Drawer Content -->
+    <div id="admin-drawer-content" class="hidden flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+      <!-- Section 1: Camera & Vehicle Crop Tuning -->
+      <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+        <div class="flex items-center gap-2 pb-2 border-b border-border">
+          <i data-lucide="camera" class="w-4 h-4 text-sky-400"></i>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Camera RTSP & ANPR Optical Tuning</h3>
+        </div>
+        <div class="space-y-1.5">
+          <label for="cfg-anpr-url" class="text-xs font-medium text-foreground">Primary ANPR Stream URL</label>
+          <input id="cfg-anpr-url" type="text" placeholder="rtsp://admin:pass@192.168.1.108:554/ch0" class="w-full px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
+          <p class="text-[11px] text-muted-foreground font-mono">Stream feed for vehicle detection and plate crop extraction</p>
+        </div>
+      </div>
+
+      <!-- Section 2: Scale UART Configuration -->
+      <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+        <div class="flex items-center gap-2 pb-2 border-b border-border">
+          <i data-lucide="scale" class="w-4 h-4 text-emerald-400"></i>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Weighbridge Serial UART Stream</h3>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label class="text-xs font-medium text-foreground">Serial Port</label>
+            <input type="text" value="/dev/ttyAMA0" readonly disabled class="w-full px-3 py-2 rounded-lg bg-secondary/60 border border-input font-mono text-sm text-muted-foreground cursor-not-allowed" />
+          </div>
+          <div class="space-y-1.5">
+            <label for="cfg-serial-baud" class="text-xs font-medium text-foreground">Baudrate</label>
+            <select id="cfg-serial-baud" class="w-full px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition cursor-pointer">
+              <option value="1200" selected>1200 baud</option>
+              <option value="2400">2400 baud</option>
+              <option value="4800">4800 baud</option>
+              <option value="9600">9600 baud</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Live Telemetry Logs -->
+      <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-border">
+          <div class="flex items-center gap-2">
+            <i data-lucide="terminal" class="w-4 h-4 text-primary"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Live Telemetry Logs</h3>
+          </div>
+          <button type="button" onclick="fetchStatus(true)" class="text-xs font-mono text-primary hover:underline">Refresh</button>
+        </div>
+        <div id="telemetry-log-stream" class="custom-scrollbar p-3 rounded-lg bg-zinc-950 border border-zinc-900 font-mono text-xs text-zinc-300 space-y-1 max-h-40 overflow-y-auto leading-relaxed">
+          <div class="text-zinc-600">[System] Circular telemetry feed active...</div>
+        </div>
+      </div>
+
+      <!-- Section 4: Edge Actions & Lock -->
+      <div class="pt-4 border-t border-border flex items-center justify-between gap-3">
+        <button type="button" onclick="lockAdminPanels(); closeAdminDrawer();" class="flex-1 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-foreground font-mono text-xs font-bold transition flex items-center justify-center gap-2">
+          <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-400"></i>
+          Lock Admin Session
+        </button>
+        <button type="button" onclick="rebootSystem()" class="px-4 py-2.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 border border-destructive/30 text-destructive font-mono text-xs font-bold transition flex items-center gap-1.5">
+          <i data-lucide="power" class="w-3.5 h-3.5"></i>
+          Reboot Edge
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
   <!-- JAVASCRIPT LOGIC                                                      -->
   <!-- ══════════════════════════════════════════════════════════════════════ -->
   <script>
@@ -917,6 +1031,12 @@
       const wPanel = document.getElementById('wifi-panel');
       if (wPanel) wPanel.classList.remove('opacity-25', 'pointer-events-none', 'select-none', 'filter', 'blur-sm');
 
+      // Update slide-over drawer authentication view
+      const drawerLoginForm = document.getElementById('admin-drawer-login-form');
+      const drawerContent = document.getElementById('admin-drawer-content');
+      if (drawerLoginForm) drawerLoginForm.classList.add('hidden');
+      if (drawerContent) drawerContent.classList.remove('hidden');
+
       loadSystemConfig();
       fetchSavedNetworks();
       lucide.createIcons();
@@ -939,10 +1059,84 @@
       if (pass) pass.value = '';
       if (err) err.classList.add('hidden');
 
+      const dUser = document.getElementById('drawer-login-userid');
+      const dPass = document.getElementById('drawer-login-password');
+      const dErr = document.getElementById('drawer-login-error');
+      if (dUser) dUser.value = '';
+      if (dPass) dPass.value = '';
+      if (dErr) dErr.classList.add('hidden');
+
+      // Update slide-over drawer authentication view
+      const drawerLoginForm = document.getElementById('admin-drawer-login-form');
+      const drawerContent = document.getElementById('admin-drawer-content');
+      if (drawerLoginForm) drawerLoginForm.classList.remove('hidden');
+      if (drawerContent) drawerContent.classList.add('hidden');
+
       if (activeTab === "wifi" || activeTab === "config") {
         showAdminLoginModal(activeTab);
       }
       lucide.createIcons();
+    }
+
+    function updateAdminDrawerAuthView() {
+      const drawerLoginForm = document.getElementById('admin-drawer-login-form');
+      const drawerContent = document.getElementById('admin-drawer-content');
+      if (authToken) {
+        if (drawerLoginForm) drawerLoginForm.classList.add('hidden');
+        if (drawerContent) drawerContent.classList.remove('hidden');
+      } else {
+        if (drawerLoginForm) drawerLoginForm.classList.remove('hidden');
+        if (drawerContent) drawerContent.classList.add('hidden');
+      }
+    }
+
+    function openAdminDrawer() {
+      const drawer = document.getElementById('admin-drawer');
+      const overlay = document.getElementById('admin-drawer-overlay');
+      if (drawer) {
+        drawer.classList.remove('translate-x-full');
+        drawer.classList.add('translate-x-0', 'open');
+      }
+      if (overlay) {
+        overlay.classList.remove('opacity-0', 'pointer-events-none');
+        overlay.classList.add('opacity-100', 'pointer-events-auto', 'open');
+      }
+      updateAdminDrawerAuthView();
+      lucide.createIcons();
+    }
+
+    function closeAdminDrawer() {
+      const drawer = document.getElementById('admin-drawer');
+      const overlay = document.getElementById('admin-drawer-overlay');
+      if (drawer) {
+        drawer.classList.add('translate-x-full');
+        drawer.classList.remove('translate-x-0', 'open');
+      }
+      if (overlay) {
+        overlay.classList.add('opacity-0', 'pointer-events-none');
+        overlay.classList.remove('opacity-100', 'pointer-events-auto', 'open');
+      }
+    }
+
+    function toggleAdminDrawer() {
+      const drawer = document.getElementById('admin-drawer');
+      if (drawer && (drawer.classList.contains('translate-x-0') || drawer.classList.contains('open'))) {
+        closeAdminDrawer();
+      } else {
+        openAdminDrawer();
+      }
+    }
+
+    async function handleDrawerLogin(event) {
+      event.preventDefault();
+      const userid = document.getElementById('drawer-login-userid').value.trim();
+      const password = document.getElementById('drawer-login-password').value;
+      const errorEl = document.getElementById('drawer-login-error');
+      const btn = document.getElementById('drawer-login-btn');
+      await performLogin(userid, password, errorEl, btn);
+      if (authToken) {
+        updateAdminDrawerAuthView();
+      }
     }
 
     function checkExistingAuth() {
@@ -1645,15 +1839,19 @@
 
     function updateTelemetryUI(data) {
       if (!data.events || data.events.length === 0) return;
-      const logDiv = document.getElementById("events-log");
-      if (!logDiv) return;
-      logDiv.innerHTML = data.events.map(ev => `
+      const logHtml = data.events.map(ev => `
         <div class="flex items-start gap-2">
           <span class="text-zinc-600 flex-shrink-0">[${ev.time || 'NOW'}]</span>
           <span class="text-emerald-400 font-bold flex-shrink-0">[${ev.source || 'SYSTEM'}]</span>
           <span class="text-zinc-300 break-words">${ev.message}</span>
         </div>
       `).join("");
+
+      const logDiv = document.getElementById("events-log");
+      if (logDiv) logDiv.innerHTML = logHtml;
+
+      const drawerLog = document.getElementById("telemetry-log-stream");
+      if (drawerLog) drawerLog.innerHTML = logHtml;
     }
 
     async function fetchStatus(manual = false) {

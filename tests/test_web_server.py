@@ -143,6 +143,33 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn('id="ov-anpr-confidence"', html)
         self.assertIn('id="ov-sync-status-badge"', html)
 
+    def test_slide_over_admin_drawer_and_preserved_controls(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Slide-over admin drawer structure is present
+        self.assertIn('id="admin-drawer"', html)
+        self.assertIn('id="admin-drawer-overlay"', html)
+        self.assertIn('id="admin-drawer-login-form"', html)
+        self.assertIn('id="admin-drawer-content"', html)
+
+        # All 8 vehicle crop configuration sliders & inputs preserved
+        self.assertIn('id="crop_pad_top_slider"', html)
+        self.assertIn('id="crop_pad_bottom_slider"', html)
+        self.assertIn('id="crop_pad_left_slider"', html)
+        self.assertIn('id="crop_pad_right_slider"', html)
+        self.assertIn('id="cfg-crop-pad-top"', html)
+        self.assertIn('id="cfg-crop-pad-bottom"', html)
+        self.assertIn('id="cfg-crop-pad-left"', html)
+        self.assertIn('id="cfg-crop-pad-right"', html)
+
+        # Camera URLs, serial UART, Wi-Fi inputs preserved
+        self.assertIn('id="cfg-anpr-url"', html)
+        self.assertIn('id="cfg-serial-port"', html)
+        self.assertIn('id="cfg-serial-baud"', html)
+        self.assertIn('id="telemetry-log-stream"', html)
+
     def test_static_assets_served(self):
         res_tw = self.client.get("/static/tailwindcss.js")
         self.assertEqual(res_tw.status_code, 200)
