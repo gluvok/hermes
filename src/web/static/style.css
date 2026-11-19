@@ -5,6 +5,16 @@
  */
 
 :root {
+  /* Mettler Toledo & Tesla Telemetry Industrial Slate Design Tokens */
+  --bg-industrial-base: #0c1014;
+  --bg-industrial-card: #141a20;
+  --border-hairline: #222b35;
+  --accent-electric-mint: #10b981;
+  --accent-ochre-amber: #f59e0b;
+  --accent-hazard-red: #ef4444;
+  --text-high-contrast: #f0f4f8;
+  --text-muted-steel: #8b949e;
+
   /* Exact Janus Dark Mode OKLCH Design Tokens */
   --background: oklch(0.145 0.012 155);
   --foreground: oklch(0.965 0.006 140);
@@ -363,6 +373,11 @@ html, body {
 .font-extrabold { font-weight: 800; }
 .font-black { font-weight: 900; }
 .font-mono { font-family: var(--font-mono); }
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
+}
 
 .text-center { text-align: center; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -855,24 +870,13 @@ input[type="range"] {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  background-color: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
+  background-color: var(--bg-industrial-card, var(--card));
+  border: 1px solid var(--border-hairline, var(--border));
+  border-radius: 0.75rem;
   padding: 1.75rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   position: relative;
   overflow: hidden;
-}
-
-.hero-weight-display::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--primary), transparent);
-  opacity: 0.6;
 }
 
 .hero-camera-display {
