@@ -200,6 +200,23 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         # JavaScript functions for switching modes
         self.assertIn("switchConsoleMode", html)
 
+    def test_janus_minimalist_client_view_and_maintainer_sheet(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Verify client hero elements exist
+        self.assertIn('id="client-hero-view"', html)
+        self.assertIn('id="live-weight-display"', html)
+        self.assertIn('id="vehicle-camera-feed"', html)
+        self.assertIn('id="verified-plate-badge"', html)
+        self.assertIn('id="action-bar-minimal"', html)
+
+        # Verify maintainer sheet exists
+        self.assertIn('id="maintainer-sheet"', html)
+        self.assertIn('id="btn-open-maintainer-sheet"', html)
+
+
 
 
 
