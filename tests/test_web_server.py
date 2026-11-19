@@ -105,6 +105,24 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn('id="cfg-crop-pad-left"', html)
         self.assertIn('id="cfg-crop-pad-right"', html)
 
+    def test_minimalist_header_and_health_strip(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+
+        # Header has compact health status strip
+        self.assertIn('id="health-strip"', html)
+        self.assertIn('id="health-scale-pill"', html)
+        self.assertIn('id="health-anpr-pill"', html)
+        self.assertIn('id="health-sync-pill"', html)
+        self.assertIn('id="health-wifi-pill"', html)
+
+        # Admin settings gear button is present
+        self.assertIn('id="btn-open-admin-drawer"', html)
+
+        # Verbose tab buttons are replaced with clean kiosk header
+        self.assertNotIn('class="nav-tabs-container"', html)
+
     def test_static_assets_served(self):
         res_tw = self.client.get("/static/tailwindcss.js")
         self.assertEqual(res_tw.status_code, 200)

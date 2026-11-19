@@ -38,38 +38,33 @@
           <span class="text-xs text-muted-foreground truncate font-mono">Weighbridge Edge</span>
         </div>
       </a>
+    </div>
 
-      <!-- Horizontal Navigation Tabs -->
-      <nav class="nav-tabs-container">
-        <button onclick="switchTab('overview')" id="nav-item-overview" class="nav-tab-btn active">
-          <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-400"></i>
-          <span>Overview</span>
-        </button>
-        <button onclick="switchTab('scale')" id="nav-item-scale" class="nav-tab-btn">
-          <i data-lucide="scale" class="w-4 h-4"></i>
-          <span>Scale Indicator</span>
-        </button>
-        <button onclick="switchTab('anpr')" id="nav-item-anpr" class="nav-tab-btn">
-          <i data-lucide="camera" class="w-4 h-4"></i>
-          <span>Cameras & Crop</span>
-        </button>
-        <button onclick="switchTab('cloud')" id="nav-item-cloud" class="nav-tab-btn">
-          <i data-lucide="cloud-upload" class="w-4 h-4"></i>
-          <span>Cloud Transfer</span>
-        </button>
-        <button onclick="switchTab('telemetry')" id="nav-item-telemetry" class="nav-tab-btn">
-          <i data-lucide="terminal" class="w-4 h-4"></i>
-          <span>Telemetry Logs</span>
-        </button>
-        <button onclick="switchTab('config')" id="nav-item-config" class="nav-tab-btn">
-          <i data-lucide="sliders-horizontal" class="w-4 h-4 text-amber-400"></i>
-          <span>System Config</span>
-        </button>
-        <button onclick="switchTab('wifi')" id="nav-item-wifi" class="nav-tab-btn">
-          <i data-lucide="wifi" class="w-4 h-4 text-sky-400"></i>
-          <span>Wi-Fi Setup</span>
-        </button>
-      </nav>
+    <!-- Compact Subsystem Health Strip -->
+    <div class="top-nav-center">
+      <div id="health-strip" class="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-card border border-border text-xs font-mono">
+        <span id="health-scale-pill" class="inline-flex items-center gap-1.5 font-medium text-foreground">
+          <span id="health-scale-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Scale
+        </span>
+        <span class="text-border">&bull;</span>
+        <span id="health-anpr-pill" class="inline-flex items-center gap-1.5 font-medium text-muted-foreground">
+          <span id="health-anpr-dot" class="w-2 h-2 rounded-full bg-zinc-500"></span> ANPR
+        </span>
+        <span class="text-border">&bull;</span>
+        <span id="health-sync-pill" class="inline-flex items-center gap-1.5 font-medium text-muted-foreground">
+          <span id="health-sync-dot" class="w-2 h-2 rounded-full bg-amber-400"></span> Sync
+        </span>
+        <span class="text-border">&bull;</span>
+        <span id="health-wifi-pill" class="inline-flex items-center gap-1.5 font-medium text-foreground">
+          <span id="health-wifi-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span> Wi-Fi
+        </span>
+      </div>
+      <!-- Internal tab hooks preserved for programmatic view switching -->
+      <div id="drawer-nav-hooks" class="hidden">
+        <button id="nav-item-overview" onclick="switchTab('overview')"></button>
+        <button id="nav-item-scale" onclick="switchTab('scale')"></button>
+        <button id="nav-item-anpr" onclick="switchTab('anpr')"></button>
+      </div>
     </div>
 
     <!-- Top Nav Right Actions -->
@@ -81,10 +76,11 @@
         <span id="network-ip-display" class="font-mono">Connecting...</span>
       </div>
       <span id="hotspot-badge" class="hidden badge badge-amber">Hotspot: 10.42.0.1</span>
-      <button onclick="fetchStatus(true)" title="Refresh Telemetry" class="btn btn-secondary py-1 px-2.5 text-xs">
-        <i id="refresh-icon" data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+      <button onclick="toggleAdminDrawer()" id="btn-open-admin-drawer" class="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1.5" title="Hardware Settings & Diagnostics">
+        <i data-lucide="settings" class="w-3.5 h-3.5 text-muted-foreground"></i>
+        <span>Settings</span>
       </button>
-      <button onclick="logoutConfig()" title="Lock / Sign Out" class="btn btn-secondary py-1 px-3 text-xs">
+      <button onclick="logoutConfig()" title="Lock / Sign Out" class="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1">
         <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         <span>Lock</span>
       </button>
