@@ -402,24 +402,24 @@ html, body {
 .bg-zinc-900\/60 { background-color: oklch(0.165 0.012 155 / 60%); }
 .bg-black\/75 { background-color: rgba(0, 0, 0, 0.75); }
 
-.bg-secondary\/30 { background-color: oklch(0.23 0.012 155 / 30%); }
-.bg-secondary\/40 { background-color: oklch(0.23 0.012 155 / 40%); }
-.bg-secondary\/50 { background-color: oklch(0.23 0.012 155 / 50%); }
-.bg-secondary\/60 { background-color: oklch(0.23 0.012 155 / 60%); }
-.bg-secondary\/80 { background-color: oklch(0.23 0.012 155 / 80%); }
+.bg-secondary\/30 { background-color: oklch(0.96 0.008 140 / 30%); }
+.bg-secondary\/40 { background-color: oklch(0.96 0.008 140 / 40%); }
+.bg-secondary\/50 { background-color: oklch(0.96 0.008 140 / 50%); }
+.bg-secondary\/60 { background-color: oklch(0.96 0.008 140 / 60%); }
+.bg-secondary\/80 { background-color: oklch(0.96 0.008 140 / 80%); }
 
 .bg-emerald-400 { background-color: var(--primary); }
-.bg-emerald-500\/10 { background-color: oklch(0.76 0.055 155 / 15%); }
-.bg-sky-500\/10 { background-color: oklch(0.75 0.065 215 / 15%); }
-.bg-amber-500\/10 { background-color: oklch(0.72 0.08 75 / 15%); }
-.bg-violet-500\/10 { background-color: oklch(0.72 0.07 285 / 15%); }
-.bg-destructive\/10 { background-color: oklch(0.65 0.15 28 / 15%); }
+.bg-emerald-500\/10 { background-color: oklch(0.42 0.065 155 / 12%); }
+.bg-sky-500\/10 { background-color: oklch(0.50 0.12 230 / 12%); }
+.bg-amber-500\/10 { background-color: oklch(0.55 0.12 75 / 12%); }
+.bg-violet-500\/10 { background-color: oklch(0.52 0.14 285 / 12%); }
+.bg-destructive\/10 { background-color: oklch(0.58 0.16 28 / 12%); }
 
 /* Effects & Interactivity */
-.shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.25); }
-.shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.25); }
-.shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
-.shadow-inner { box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.6); }
+.shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04); }
+.shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15); }
+.shadow-inner { box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.04); }
 
 .backdrop-blur-md { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .blur-sm { filter: blur(4px); }
@@ -469,7 +469,7 @@ html, body {
   position: sticky;
   top: 0;
   z-index: 50;
-  background-color: oklch(0.165 0.012 155 / 96%);
+  background-color: oklch(1 0 0 / 92%);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
@@ -505,7 +505,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .nav-tabs-container {
@@ -539,10 +539,10 @@ html, body {
 }
 
 .nav-tab-btn.active {
-  color: var(--sidebar-accent-foreground);
-  background: var(--sidebar-accent);
-  border-color: oklch(1 0 0 / 12%);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  color: var(--foreground);
+  background: var(--card);
+  border-color: var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   font-weight: 600;
 }
 
@@ -567,24 +567,24 @@ html, body {
 }
 
 .badge-emerald {
-  background: oklch(0.76 0.055 155 / 15%);
-  color: oklch(0.76 0.055 155);
-  border-color: oklch(0.76 0.055 155 / 30%);
+  background: oklch(0.42 0.065 155 / 12%);
+  color: oklch(0.32 0.08 155);
+  border-color: oklch(0.42 0.065 155 / 25%);
 }
 .badge-sky {
-  background: oklch(0.75 0.065 215 / 15%);
-  color: oklch(0.75 0.065 215);
-  border-color: oklch(0.75 0.065 215 / 30%);
+  background: oklch(0.50 0.12 230 / 12%);
+  color: oklch(0.35 0.12 230);
+  border-color: oklch(0.50 0.12 230 / 25%);
 }
 .badge-amber {
-  background: oklch(0.72 0.08 75 / 15%);
-  color: oklch(0.72 0.08 75);
-  border-color: oklch(0.72 0.08 75 / 30%);
+  background: oklch(0.55 0.12 75 / 12%);
+  color: oklch(0.38 0.10 75);
+  border-color: oklch(0.55 0.12 75 / 25%);
 }
 .badge-rose {
-  background: oklch(0.65 0.15 28 / 15%);
-  color: oklch(0.65 0.15 28);
-  border-color: oklch(0.65 0.15 28 / 30%);
+  background: oklch(0.58 0.16 28 / 12%);
+  color: oklch(0.40 0.16 28);
+  border-color: oklch(0.58 0.16 28 / 25%);
 }
 .badge-zinc {
   background: var(--secondary);
@@ -612,10 +612,10 @@ html, body {
   background: var(--primary);
   color: var(--primary-foreground);
   font-weight: 600;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.08);
 }
 .btn-primary:hover {
-  background: oklch(0.76 0.055 155 / 85%);
+  background: oklch(0.38 0.065 155);
 }
 
 .btn-secondary {
@@ -624,17 +624,17 @@ html, body {
   border-color: var(--border);
 }
 .btn-secondary:hover {
-  background: oklch(0.27 0.012 155);
-  border-color: oklch(1 0 0 / 15%);
+  background: var(--accent);
+  border-color: var(--border);
 }
 
 .btn-danger {
-  background: oklch(0.65 0.15 28 / 15%);
+  background: oklch(0.58 0.16 28 / 12%);
   color: var(--destructive);
-  border-color: oklch(0.65 0.15 28 / 30%);
+  border-color: oklch(0.58 0.16 28 / 25%);
 }
 .btn-danger:hover {
-  background: oklch(0.65 0.15 28 / 25%);
+  background: oklch(0.58 0.16 28 / 20%);
 }
 
 .btn:disabled {
@@ -647,7 +647,7 @@ html, body {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
@@ -663,7 +663,7 @@ html, body {
   border: 1px solid var(--border);
   border-radius: 1rem;
   padding: 1.75rem 1.5rem;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
   color: var(--popover-foreground);
 }
 
@@ -675,8 +675,8 @@ select,
 textarea {
   width: 100%;
   padding: 0.55rem 0.85rem;
-  background: oklch(0.125 0.012 155);
-  border: 1px solid var(--border);
+  background: var(--card);
+  border: 1px solid var(--input);
   border-radius: 0.5rem;
   color: var(--foreground);
   font-size: 0.85rem;
@@ -686,7 +686,7 @@ textarea {
 
 input:focus, select:focus, textarea:focus {
   border-color: var(--ring);
-  box-shadow: 0 0 0 2px oklch(0.76 0.055 155 / 25%);
+  box-shadow: 0 0 0 2px oklch(0.42 0.065 155 / 20%);
 }
 
 /* Sliders */

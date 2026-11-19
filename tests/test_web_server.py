@@ -158,6 +158,29 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertNotIn('<span>System Config</span>', nav_html)
         self.assertNotIn('<span>Wi-Fi Setup</span>', nav_html)
 
+    def test_light_mode_component_contrast_and_surfaces(self):
+        css_res = self.client.get("/static/style.css")
+        self.assertEqual(css_res.status_code, 200)
+        css = css_res.get_data(as_text=True)
+
+        # Form elements have light mode background and input border
+        self.assertIn('input[type="text"]', css)
+        self.assertIn("background: var(--card)", css)
+        self.assertIn("border: 1px solid var(--input)", css)
+
+        # Top nav uses light translucent card background
+        self.assertIn(".top-nav {", css)
+        self.assertIn("background-color: oklch(1 0 0 / 92%)", css)
+
+        # Active nav button elevated light pill styling
+        self.assertIn(".nav-tab-btn.active", css)
+        self.assertIn("background: var(--card)", css)
+        self.assertIn("color: var(--foreground)", css)
+
+        # High-contrast light badges
+        self.assertIn(".badge-emerald", css)
+        self.assertIn("color: oklch(0.32 0.08 155)", css)
+
     def test_static_assets_served(self):
         res_tw = self.client.get("/static/tailwindcss.js")
         self.assertEqual(res_tw.status_code, 200)
