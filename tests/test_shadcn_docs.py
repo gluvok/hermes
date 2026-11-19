@@ -25,7 +25,7 @@ class TestShadcnDocsAndSkill(unittest.TestCase):
         self.assertTrue((docs_dir / "README.md").exists(), "Missing README.md in docs/shadcn")
 
         # Verify core component docs exist
-        required_components = ["card", "badge", "button", "tabs", "slider", "dialog"]
+        required_components = ["card", "badge", "button", "tabs", "slider", "dialog", "sheet"]
         for comp in required_components:
             doc_file = docs_dir / f"{comp}.md"
             self.assertTrue(doc_file.exists(), f"Missing doc for component: {comp}")

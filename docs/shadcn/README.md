@@ -12,5 +12,6 @@ This directory maintains component reference specifications for all shadcn/ui co
 - [Button](button.md) - Action triggers for manual weighment capture, tare, and zero.
 - [Card](card.md) - Container surfaces for operator HUD cards and telemetry panels.
 - [Dialog](dialog.md) - Modal dialogs for manual plate override and system reboot confirmation.
+- [Sheet](sheet.md) - Slide-over drawer for maintainer hardware diagnostics and calibration.
 - [Slider](slider.md) - Threshold adjustments for scale debounce and OCR confidence cutoff.
 - [Tabs](tabs.md) - Segmented controls for switching between Operator Kiosk and Developer Console.
