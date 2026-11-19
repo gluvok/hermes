@@ -915,58 +915,95 @@
     </div>
 
     <!-- Gate 2: Authenticated Drawer Content -->
-    <div id="admin-drawer-content" class="hidden flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-      <!-- Section 1: Camera & Vehicle Crop Tuning -->
-      <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
-        <div class="flex items-center gap-2 pb-2 border-b border-border">
-          <i data-lucide="camera" class="w-4 h-4 text-sky-400"></i>
-          <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Camera RTSP & ANPR Optical Tuning</h3>
-        </div>
-        <div class="space-y-1.5">
-          <label for="cfg-anpr-url" class="text-xs font-medium text-foreground">Primary ANPR Stream URL</label>
-          <input id="cfg-anpr-url" type="text" placeholder="rtsp://admin:pass@192.168.1.108:554/ch0" class="w-full px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
-          <p class="text-[11px] text-muted-foreground font-mono">Stream feed for vehicle detection and plate crop extraction</p>
+    <div id="admin-drawer-content" class="hidden flex-1 overflow-y-auto custom-scrollbar p-6 space-y-5">
+      <!-- Maintainer Diagnostic Navigation Tabs -->
+      <div class="flex items-center gap-1.5 p-1 rounded-lg bg-secondary/60 border border-border">
+        <button type="button" id="tab-btn-hw" onclick="switchMaintainerTab('hw')" class="maintainer-tab-btn flex-1 py-1.5 px-2 rounded-md text-xs font-mono font-semibold transition text-center bg-card text-foreground shadow-sm cursor-pointer">
+          Hardware
+        </button>
+        <button type="button" id="tab-btn-cameras" onclick="switchMaintainerTab('cameras')" class="maintainer-tab-btn flex-1 py-1.5 px-2 rounded-md text-xs font-mono font-semibold transition text-center text-muted-foreground hover:text-foreground cursor-pointer">
+          Cameras
+        </button>
+        <button type="button" id="tab-btn-cloud" onclick="switchMaintainerTab('cloud')" class="maintainer-tab-btn flex-1 py-1.5 px-2 rounded-md text-xs font-mono font-semibold transition text-center text-muted-foreground hover:text-foreground cursor-pointer">
+          Cloud
+        </button>
+        <button type="button" id="tab-btn-telemetry" onclick="switchMaintainerTab('telemetry')" class="maintainer-tab-btn flex-1 py-1.5 px-2 rounded-md text-xs font-mono font-semibold transition text-center text-muted-foreground hover:text-foreground cursor-pointer">
+          Telemetry
+        </button>
+      </div>
+
+      <!-- Tab Panel 1: Hardware Tuning -->
+      <div id="tab-panel-hw" class="maintainer-tab-panel space-y-4">
+        <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+          <div class="flex items-center gap-2 pb-2 border-b border-border">
+            <i data-lucide="scale" class="w-4 h-4 text-emerald-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Weighbridge Serial UART Stream</h3>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1.5">
+              <label class="text-xs font-medium text-foreground">Serial Port</label>
+              <input type="text" value="/dev/ttyAMA0" readonly disabled class="w-full px-3 py-2 rounded-lg bg-secondary/60 border border-input font-mono text-sm text-muted-foreground cursor-not-allowed" />
+            </div>
+            <div class="space-y-1.5">
+              <label for="cfg-serial-baud" class="text-xs font-medium text-foreground">Baudrate</label>
+              <select id="cfg-serial-baud" class="w-full px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition cursor-pointer">
+                <option value="1200" selected>1200 baud</option>
+                <option value="2400">2400 baud</option>
+                <option value="4800">4800 baud</option>
+                <option value="9600">9600 baud</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Section 2: Scale UART Configuration -->
-      <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
-        <div class="flex items-center gap-2 pb-2 border-b border-border">
-          <i data-lucide="scale" class="w-4 h-4 text-emerald-400"></i>
-          <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Weighbridge Serial UART Stream</h3>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1.5">
-            <label class="text-xs font-medium text-foreground">Serial Port</label>
-            <input type="text" value="/dev/ttyAMA0" readonly disabled class="w-full px-3 py-2 rounded-lg bg-secondary/60 border border-input font-mono text-sm text-muted-foreground cursor-not-allowed" />
+      <!-- Tab Panel 2: ANPR & Cameras Tuning -->
+      <div id="tab-panel-cameras" class="maintainer-tab-panel hidden space-y-4">
+        <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+          <div class="flex items-center gap-2 pb-2 border-b border-border">
+            <i data-lucide="camera" class="w-4 h-4 text-sky-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Camera RTSP & ANPR Optical Tuning</h3>
           </div>
           <div class="space-y-1.5">
-            <label for="cfg-serial-baud" class="text-xs font-medium text-foreground">Baudrate</label>
-            <select id="cfg-serial-baud" class="w-full px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition cursor-pointer">
-              <option value="1200" selected>1200 baud</option>
-              <option value="2400">2400 baud</option>
-              <option value="4800">4800 baud</option>
-              <option value="9600">9600 baud</option>
-            </select>
+            <label for="cfg-anpr-url" class="text-xs font-medium text-foreground">Primary ANPR Stream URL</label>
+            <input id="cfg-anpr-url" type="text" placeholder="rtsp://admin:pass@192.168.1.108:554/ch0" class="w-full px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
+            <p class="text-[11px] text-muted-foreground font-mono">Stream feed for vehicle detection and plate crop extraction</p>
           </div>
         </div>
       </div>
 
-      <!-- Section 3: Live Telemetry Logs -->
-      <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
-        <div class="flex items-center justify-between pb-2 border-b border-border">
-          <div class="flex items-center gap-2">
-            <i data-lucide="terminal" class="w-4 h-4 text-primary"></i>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Live Telemetry Logs</h3>
+      <!-- Tab Panel 3: Cloud & Network -->
+      <div id="tab-panel-cloud" class="maintainer-tab-panel hidden space-y-4">
+        <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+          <div class="flex items-center gap-2 pb-2 border-b border-border">
+            <i data-lucide="cloud" class="w-4 h-4 text-amber-400"></i>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Argus & Cloud Transfer Pipeline</h3>
           </div>
-          <button type="button" onclick="fetchStatus(true)" class="text-xs font-mono text-primary hover:underline">Refresh</button>
-        </div>
-        <div id="telemetry-log-stream" class="custom-scrollbar p-3 rounded-lg bg-zinc-950 border border-zinc-900 font-mono text-xs text-zinc-300 space-y-1 max-h-40 overflow-y-auto leading-relaxed">
-          <div class="text-zinc-600">[System] Circular telemetry feed active...</div>
+          <div class="text-xs font-mono text-muted-foreground space-y-1.5">
+            <div class="flex justify-between"><span>Argus ANPR Service:</span><span class="text-emerald-400 font-bold">ONLINE (:8000)</span></div>
+            <div class="flex justify-between"><span>Cloud Transfer Queue:</span><span class="text-foreground">0 Pending Spool</span></div>
+            <div class="flex justify-between"><span>Wi-Fi Network:</span><span class="text-emerald-400 font-bold">Connected</span></div>
+          </div>
         </div>
       </div>
 
-      <!-- Section 4: Edge Actions & Lock -->
+      <!-- Tab Panel 4: Raw Telemetry Stream -->
+      <div id="tab-panel-telemetry" class="maintainer-tab-panel hidden space-y-4">
+        <div class="p-4 rounded-xl bg-secondary/30 border border-border space-y-3">
+          <div class="flex items-center justify-between pb-2 border-b border-border">
+            <div class="flex items-center gap-2">
+              <i data-lucide="terminal" class="w-4 h-4 text-primary"></i>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-foreground font-mono">Live Telemetry Logs</h3>
+            </div>
+            <button type="button" onclick="fetchStatus(true)" class="text-xs font-mono text-primary hover:underline cursor-pointer">Refresh</button>
+          </div>
+          <div id="telemetry-log-stream" class="custom-scrollbar p-3 rounded-lg bg-zinc-950 border border-zinc-900 font-mono text-xs text-zinc-300 space-y-1 max-h-48 overflow-y-auto leading-relaxed">
+            <div class="text-zinc-600">[System] Circular telemetry feed active...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 5: Edge Actions & Lock -->
       <div class="pt-4 border-t border-border flex items-center justify-between gap-3">
         <button type="button" onclick="lockAdminPanels(); closeAdminDrawer();" class="flex-1 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-foreground font-mono text-xs font-bold transition flex items-center justify-center gap-2">
           <i data-lucide="lock" class="w-3.5 h-3.5 text-amber-400"></i>
@@ -1241,6 +1278,24 @@
         overlay.classList.add('opacity-0', 'pointer-events-none');
         overlay.classList.remove('opacity-100', 'pointer-events-auto', 'open');
       }
+    }
+
+    function switchMaintainerTab(tabName) {
+      const tabs = ["hw", "cameras", "cloud", "telemetry"];
+      tabs.forEach(t => {
+        const btn = document.getElementById("tab-btn-" + t);
+        const panel = document.getElementById("tab-panel-" + t);
+        if (t === tabName) {
+          btn?.classList.add("bg-card", "text-foreground", "shadow-sm");
+          btn?.classList.remove("text-muted-foreground");
+          panel?.classList.remove("hidden");
+        } else {
+          btn?.classList.remove("bg-card", "text-foreground", "shadow-sm");
+          btn?.classList.add("text-muted-foreground");
+          panel?.classList.add("hidden");
+        }
+      });
+      lucide.createIcons();
     }
 
     function toggleAdminDrawer() {
