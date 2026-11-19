@@ -27,3 +27,14 @@ class TestShadcnComponents(unittest.TestCase):
         for ui in required_ui:
             base_name = ui.replace(".tsx", ".md")
             self.assertTrue((docs_dir / base_name).exists(), f"Missing doc for {base_name}")
+
+    def test_maintainer_sheet_and_minimalist_page(self):
+        root = Path(__file__).parent.parent
+        kiosk_dir = root / "src" / "web" / "frontend" / "components" / "kiosk"
+        page_file = root / "src" / "web" / "frontend" / "app" / "page.tsx"
+
+        self.assertTrue((kiosk_dir / "maintainer-sheet.tsx").exists(), "Missing maintainer-sheet.tsx")
+        page_content = page_file.read_text()
+        self.assertIn("MaintainerSheet", page_content)
+        self.assertIn("OperatorHUD", page_content)
+
