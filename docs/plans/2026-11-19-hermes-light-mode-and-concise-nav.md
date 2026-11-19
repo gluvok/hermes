@@ -8,15 +8,17 @@
 
 **Tech Stack:** Python 3.14, Flask, Static CSS with OKLCH color variables (zero external CDN dependencies), Lucide Icons, Pytest.
 
-**Relevant Skills:**
-- `@writing-plans`: Implementation task structure, TDD cycles, exact paths and commands.
-- `@clean-code`: Clean, minimal, pragmatic changes without over-engineering.
-- `@test-driven-development`: Red-Green-Refactor testing on Flask routes and static assets.
-- `@verification-loop`: Multi-repo cross-verification across Hermes, Argus, and Janus.
+**Relevant Skills Orchestration:**
+- Task 1: `@tailwind-design-system` - Systematic OKLCH token architecture, semantic light palette variables, fallback compatibility.
+- Task 2: `@clean-code` - Concise, pragmatic navigation labels, eliminating UI verbosity, maintaining DOM integrity.
+- Task 3: `@ui-ux-pro-max` - High-contrast accessible design (WCAG AA > 4.5:1), elevated card surfaces, input and badge states.
+- Task 4: `@verification-loop` - Comprehensive cross-repo test suites, static analysis, and end-to-end field sanity.
 
 ---
 
-### Task 1: Janus OKLCH Light Mode Token Architecture
+### Task 1: Janus OKLCH Light Mode Token Architecture [@tailwind-design-system]
+
+**Dedicated Skill:** `@tailwind-design-system` (design tokens, semantic color mappings, OKLCH color space, theming fallbacks)
 
 **Files:**
 - Modify: `hermes/src/web/static/style.css:1-68`
@@ -128,7 +130,9 @@ git commit -m "feat(web): map root tokens to Janus OKLCH light mode palette"
 
 ---
 
-### Task 2: Concise Navigation Bar & Clean Document Root
+### Task 2: Concise Navigation Bar & Clean Document Root [@clean-code]
+
+**Dedicated Skill:** `@clean-code` (pragmatic simplicity, eliminating UI verbosity, maintaining DOM contracts and minimal diff footprint)
 
 **Files:**
 - Modify: `hermes/src/web/templates/index.html:1-75`
@@ -232,7 +236,9 @@ git commit -m "feat(web): update root to light mode and shorten nav tab labels"
 
 ---
 
-### Task 3: Component Surfaces, Forms, Badges & High-Contrast Light Mode Styling
+### Task 3: Component Surfaces, Forms, Badges & High-Contrast Light Mode Styling [@ui-ux-pro-max]
+
+**Dedicated Skill:** `@ui-ux-pro-max` (WCAG AA accessibility > 4.5:1 contrast, elevated card surfaces, form interaction states, industrial palette harmonization)
 
 **Files:**
 - Modify: `hermes/src/web/static/style.css:320-707`
@@ -393,7 +399,9 @@ git commit -m "style(web): tune light mode surfaces, inputs, nav buttons, and hi
 
 ---
 
-### Task 4: Multi-Repo Verification & Field Gate Check
+### Task 4: Multi-Repo Verification & Field Gate Check [@verification-loop]
+
+**Dedicated Skill:** `@verification-loop` (holistic multi-phase verification across Hermes, Argus, Janus, static analysis, and real HTML curl testing)
 
 **Files:**
 - Test: All suites across Hermes, Argus, and Janus
