@@ -36,7 +36,8 @@ class CaptiveDNSServer:
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind(("0.0.0.0", p))
-                self._sock, self.port, self._running = s, p, True; break
+                self._sock, self.port, self._running = s, p, True
+                break
             except (OSError, PermissionError): continue
         if not self._sock: return False
         self._thread = threading.Thread(target=self._serve, name="CaptiveDNS", daemon=True)

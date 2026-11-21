@@ -2,8 +2,7 @@
 gluvok.py — Gluvok Cloud API Integration Client
 ===============================================
 Handles HTTP Basic Authentication (-u device_id:device_key), multipart/form-data
-weighment transmission matching the official curl specification, and anti-duplicate
-verification against Gluvok API (/api/entries).
+weighment transmission matching the official curl specification (/api/entries).
 """
 
 from __future__ import annotations
@@ -18,6 +17,15 @@ from src.config.constants import CLOUD_POST_TIMEOUT, GLUVOK_BASE_URL
 from src.core.telemetry import record_error_event, record_system_event
 
 logger = logging.getLogger(__name__)
+
+
+_NO_PLATE_VALUES = ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
+
+
+def _safe_plate(value: object) -> str:
+    """Normalise a plate string; placeholder or empty values become NO_PLATE_DETECTED."""
+    plate = str(value or "NO_PLATE_DETECTED").strip().upper()
+    return "NO_PLATE_DETECTED" if not plate or plate in _NO_PLATE_VALUES else plate
 
 
 def _record_cloud_event(event_type: str, message: str, is_error: bool = False) -> None:
@@ -62,13 +70,6 @@ def _parse_cloud_response(
         _record_cloud_event("CLOUD", f"Entry #{entry_id} created: {safe_plate} @ {weight:.3f} kg")
         return True, entry_id, None, False
 
-    if response.status_code == 409:
-        res_data = response.json() if response.content else {}
-        entry_id = str(res_data.get("data", {}).get("id") or res_data.get("id") or "EXISTING")
-        logger.info(f"[Gluvok API] Entry already acknowledged (HTTP 409 Conflict). ID: {entry_id}")
-        _record_cloud_event("CLOUD", f"Entry already exists in cloud: {safe_plate}")
-        return True, entry_id, None, False
-
     err_msg = f"HTTP {response.status_code}: {response.text}"
     event_map = {
         401: "CLOUD_AUTH_FAILED",
@@ -107,12 +108,7 @@ def transmit_entry_multipart(
 
     entries_url = f"{GLUVOK_BASE_URL}/api/entries"
     auth = (str(config.device_id), config.device_key)
-    raw_plate = str(detected_vehicle_number or "NO_PLATE_DETECTED").strip().upper()
-    safe_plate = (
-        "NO_PLATE_DETECTED"
-        if not raw_plate or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
-        else raw_plate
-    )
+    safe_plate = _safe_plate(detected_vehicle_number)
     data = {
         "center_id": str(center_id),
         "detected_vehicle_number": safe_plate,
@@ -152,66 +148,13 @@ def transmit_entry_multipart(
         return False, None, err_msg, False
 
 
-def verify_entry_in_cloud(
-    center_id: int,
-    detected_vehicle_number: str,
-    weight: float,
-) -> str | None:
-    """
-    Verifies if an entry with matching vehicle and weight exists in the cloud.
-    Called specifically after an ambiguous ReadTimeout to prevent creating duplicate entries.
-    """
-    if not config.device_id or not config.device_key:
-        return None
-
-    entries_url = f"{GLUVOK_BASE_URL}/api/entries"
-    auth = (str(config.device_id), config.device_key)
-    raw_plate = str(detected_vehicle_number or "NO_PLATE_DETECTED").strip().upper()
-    safe_plate = (
-        "NO_PLATE_DETECTED"
-        if not raw_plate or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
-        else raw_plate
-    )
-    params = {
-        "center_id": str(center_id),
-        "detected_vehicle_number": safe_plate,
-    }
-
-    try:
-        response = requests.get(entries_url, auth=auth, params=params, timeout=10.0)
-        if response.status_code == 200:
-            res_data = response.json()
-            entries = res_data.get("data", []) if isinstance(res_data, dict) else []
-            if isinstance(entries, list):
-                for entry in entries:
-                    if not isinstance(entry, dict):
-                        continue
-                    entry_weight = float(entry.get("weight", 0.0))
-                    if abs(entry_weight - weight) <= 2.0:
-                        entry_id = str(entry.get("id", "VERIFIED"))
-                        logger.info(
-                            f"[Gluvok API] Pre-retry verification found entry #{entry_id} in cloud. "
-                            f"Duplicate upload prevented!"
-                        )
-                        return entry_id
-    except (requests.RequestException, ValueError, KeyError) as e:
-        logger.debug(f"[Gluvok API] Verification query returned error: {e}")
-
-    return None
-
-
 def post_to_cloud(session_payload: dict[str, Any]) -> tuple[bool, str | None, str | None, bool]:
     """
     Bridge function: transmits entry from session dictionary and updates telemetry.
     Preserved for direct callers; does NOT wipe session_payload on completion.
     """
     center_id = int(config.center_id)
-    raw_plate = str(session_payload.get("anpr_plate", "NO_PLATE_DETECTED")).strip().upper()
-    plate = (
-        "NO_PLATE_DETECTED"
-        if not raw_plate or raw_plate in ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
-        else raw_plate
-    )
+    plate = _safe_plate(session_payload.get("anpr_plate"))
     weight = float(session_payload.get("weight", 0.0))
 
     images_to_send: list[tuple[str, bytes]] = []
@@ -234,5 +177,4 @@ __all__ = [
     "GLUVOK_BASE_URL",
     "post_to_cloud",
     "transmit_entry_multipart",
-    "verify_entry_in_cloud",
 ]

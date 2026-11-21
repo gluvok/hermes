@@ -406,7 +406,7 @@
           <div class="p-8 rounded-xl bg-zinc-950 border border-zinc-900 text-center space-y-2">
             <span class="text-xs text-muted-foreground uppercase tracking-widest font-mono font-medium">Live Weight Stream</span>
             <div id="scale-page-weight" class="text-6xl font-black font-mono text-emerald-400">0.000 <span class="text-2xl font-normal text-zinc-500">kg</span></div>
-            <div class="text-xs font-mono text-muted-foreground pt-2">Threshold: <span id="scale-thresh-disp" class="text-emerald-400 font-bold">50.0 kg</span> &bull; Tolerance: &plusmn;<span id="scale-tolerance-disp">2.0</span> kg continuous</div>
+            <div class="text-xs font-mono text-muted-foreground pt-2">Threshold: <span id="scale-thresh-disp" class="text-emerald-400 font-bold">-- kg</span> &bull; Tolerance: &plusmn;<span id="scale-tolerance-disp">2.0</span> kg continuous</div>
           </div>
         </div>
       </div>
@@ -1011,9 +1011,9 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
-        document.getElementById('cfg-min-weight').value = data.min_weight ?? 50.0;
+        document.getElementById('cfg-min-weight').value = data.min_weight ?? '';
         document.getElementById('cfg-serial-port').value = data.serial_port ?? '/dev/ttyAMA0';
-        document.getElementById('cfg-serial-baudrate').value = String(data.serial_baudrate ?? 1200);
+        document.getElementById('cfg-serial-baudrate').value = String(data.serial_baudrate ?? '');
         document.getElementById('cfg-stability-duration').value = data.stability_duration ?? 10.0;
         document.getElementById('cfg-stability-tolerance').value = data.stability_tolerance ?? 2.0;
         document.getElementById('cfg-anpr-server-url').value = data.anpr_server_url ?? '';
@@ -1374,7 +1374,7 @@
       if (data.config) {
         const thresh = document.getElementById("scale-thresh-disp");
         const centerId = data.cloud && data.cloud.center_id ? data.cloud.center_id : (data.config.center_id || 1);
-        if (thresh) thresh.textContent = `${(data.config.min_weight || 50).toFixed(1)} kg`;
+        if (thresh && data.config.min_weight != null) thresh.textContent = `${Number(data.config.min_weight).toFixed(1)} kg`;
         const ovCenter = document.getElementById("ov-center-id");
         const cloudCenter = document.getElementById("cloud-center-id-val");
         if (ovCenter) ovCenter.textContent = `Center ID: ${centerId}`;

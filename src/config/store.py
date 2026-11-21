@@ -40,10 +40,3 @@ def set_override(key: str, value: Any, db_path: str | None = None) -> None:
     init_config_table(path)
     with _lock, sqlite3.connect(path) as conn:
         conn.execute("INSERT OR REPLACE INTO runtime_config (key, val) VALUES (?, ?)", (key, json.dumps(value)))
-
-
-def remove_override(key: str, db_path: str | None = None) -> None:
-    path = get_config_db_path(db_path)
-    init_config_table(path)
-    with _lock, sqlite3.connect(path) as conn:
-        conn.execute("DELETE FROM runtime_config WHERE key = ?", (key,))

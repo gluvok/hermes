@@ -1,5 +1,4 @@
 from src.devices.camera import (
-    capture_auxiliary_snapshots,
     fetch_image_bytes,
     log_camera_fleet,
 )
@@ -29,7 +28,6 @@ from src.devices.wifi import (
 __all__ = [
     "LEDColor",
     "ScaleUARTReader",
-    "capture_auxiliary_snapshots",
     "connect_to_wifi",
     "fetch_image_bytes",
     "get_current_baudrate",

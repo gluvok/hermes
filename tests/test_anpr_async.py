@@ -101,7 +101,7 @@ class TestAsyncANPR(unittest.TestCase):
             return ("MH12AB9999", "SUCCESS")
 
         start = time.time()
-        with patch("src.core.session.send_frame_to_anpr_server", side_effect=slow_sender):
+        with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=slow_sender):
             futures = self.sm._capture_and_record_anpr_sample(wait=False)
 
         elapsed = time.time() - start
@@ -122,13 +122,13 @@ class TestAsyncANPR(unittest.TestCase):
         def crashing_sender(_img_bytes, **_kwargs):
             raise ConnectionResetError("Argus server crashed")
 
-        plate, status = send_and_record_anpr_frame(
-            session_id="SESS_ERR_TEST",
-            cam_idx=1,
-            image_bytes=b"crash_frame",
-            callback=recording_callback,
-            sender=crashing_sender,
-        )
+        with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=crashing_sender):
+            plate, status = send_and_record_anpr_frame(
+                session_id="SESS_ERR_TEST",
+                cam_idx=1,
+                image_bytes=b"crash_frame",
+                callback=recording_callback,
+            )
 
         self.assertIsNone(plate)
         self.assertEqual(status, "ANPR_WORKER_ERROR")
@@ -145,7 +145,7 @@ class TestAsyncANPR(unittest.TestCase):
             time.sleep(0.05)
             return ("KA01MM4444", "SUCCESS")
 
-        with patch("src.core.session.send_frame_to_anpr_server", side_effect=slightly_delayed_sender):
+        with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=slightly_delayed_sender):
             self.sm._capture_and_record_anpr_sample(wait=False)
 
             # Trigger stabilization and fast-forward timer

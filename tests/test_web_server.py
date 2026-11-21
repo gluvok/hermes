@@ -112,7 +112,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
 
     def test_api_status_anonymous_omits_sensitive_fields(self):
         body = self.client.get("/api/status").get_json()
-        for key in ("events", "config", "latest_weighment", "error_counts", "spool"):
+        for key in ("events", "config", "latest_weighment", "error_counts"):
             self.assertNotIn(key, body)
         self.assertNotIn("ssid", body["wifi"])
         self.assertNotIn("center_id", body["cloud"])
@@ -131,7 +131,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
     def test_api_status_with_token_includes_sensitive_fields(self):
         res = self.client.get("/api/status", headers={"Authorization": f"Bearer {self.auth_token}"})
         body = res.get_json()
-        for key in ("events", "config", "latest_weighment", "error_counts", "spool"):
+        for key in ("events", "config", "latest_weighment", "error_counts"):
             self.assertIn(key, body)
         self.assertIn("ssid", body["wifi"])
         self.assertIn("center_id", body["cloud"])
