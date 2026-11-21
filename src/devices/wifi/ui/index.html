@@ -92,12 +92,6 @@
         <div style="padding:12px;font-size:0.75rem;color:#71717a;text-align:center">Scanning networks...</div>
       </div>
 
-      <!-- Saved Networks -->
-      <div id="saved-section" class="saved-box" style="display:none">
-        <div class="section-header"><span>Known Networks</span></div>
-        <div id="saved-chips" class="chips"></div>
-      </div>
-
       <!-- Connect Form -->
       <form onsubmit="handleSubmit(event)">
         <div class="form-group">
@@ -110,6 +104,14 @@
             <input type="password" id="passphrase" placeholder="••••••••" autocomplete="current-password" />
             <button type="button" class="eye-btn" onclick="togglePass()">Show</button>
           </div>
+        </div>
+        <div class="form-group">
+          <label for="userid">Admin User ID</label>
+          <input type="text" id="userid" placeholder="Admin user" required autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label for="admin_password">Admin Password</label>
+          <input type="password" id="admin_password" placeholder="••••••••" required autocomplete="current-password" />
         </div>
         <button type="submit" id="submit-btn" class="btn">Connect</button>
       </form>
@@ -167,31 +169,6 @@
       }
     }
 
-    async function loadSaved() {
-      try {
-        const res = await fetch('/saved');
-        const list = await res.json();
-        if (list && list.length > 0) {
-          const sec = document.getElementById('saved-section');
-          const chips = document.getElementById('saved-chips');
-          sec.style.display = 'block';
-          chips.innerHTML = '';
-          list.forEach(item => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'chip';
-            btn.textContent = item.ssid;
-            btn.onclick = () => {
-              document.getElementById('ssid').value = item.ssid;
-              document.getElementById('passphrase').focus();
-            };
-            chips.appendChild(btn);
-          });
-        }
-      } catch (e) {}
-    }
-
-    async function handleSubmit(e) {
       e.preventDefault();
       const ssid = document.getElementById('ssid').value.trim();
       const passphrase = document.getElementById('passphrase').value;
@@ -207,7 +184,11 @@
         const res = await fetch('/connect', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ ssid: ssid, password: passphrase, passphrase: passphrase })
+          body: JSON.stringify({
+            ssid: ssid, password: passphrase, passphrase: passphrase,
+            userid: document.getElementById('userid').value.trim(),
+            admin_password: document.getElementById('admin_password').value
+          })
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.success !== false) {
@@ -228,7 +209,6 @@
     }
 
     loadNetworks();
-    loadSaved();
   </script>
 </body>
 </html>
