@@ -51,8 +51,8 @@ Deploys from your Mac to the Raspberry Pi in one single command — generates th
 ```bash
 uv run python scripts/deploy.py \
     --host gluvok@hermes.local \
-    --device-id pi1 \
-    --device-key hardware123 \
+    --device-id <DEVICE_ID> \
+    --device-key <DEVICE_KEY> \
     --center-id 1 \
     --min-weight 70.0
 ```
@@ -125,15 +125,15 @@ cd /opt/hermes && ./run.sh
 
 - **URL**: `http://localhost:8080` (or `http://hermes.local:8080` / `http://<pi-ip>:8080`)
 - **Native Captive Portal**: Powered purely by Linux `nmcli` (NetworkManager) and built-in Python DNS/HTTP services (zero external binaries like `balena wifi-connect`). Automatically triggers *"Sign in to Wi-Fi"* captive popup sheet on Android & iOS upon connecting to the hotspot.
-- **Emergency Hotspot AP**: `hermes` (Password: `12345678` | Captive Portal: `http://hermes.local` or `http://10.42.0.1`, Web Console: `http://hermes.local:8080/wifi`)
+- **Emergency Hotspot AP**: `hermes` (Password: set via `HERMES_HOTSPOT_PASS` in `data/hermes.env` | Captive Portal: `http://hermes.local` or `http://10.42.0.1`, Web Console: `http://hermes.local:8080/wifi`)
   - *Automated AP Restoration*: If target network connection fails or credentials reject, AP restores instantly so user is never locked out.
   - *Flap-Debounced Watchdog*: Requires consecutive network check failures before engaging emergency portal, preventing flapping from momentary packet drops. Never interrupts active connection handshakes.
   - *Live Network Scanning*: Scans and displays live nearby SSIDs with signal strength (%) and security modes via `/api/networks` and `/networks`.
   - *Persistent Wi-Fi Vault*: Remembers all known networks in local SQLite DB for 1-click reconnection without re-entering passwords.
   - *Local Domain Mapping*: Maps `hermes.local` directly in `/etc/hosts` so browser navigation to `http://hermes.local` works seamlessly without entering IP addresses.
 - **Standalone Wi-Fi CLI**: Run `sudo python3 wifi_setup.py` (or `python3 wifi_setup.py --scan`, `python3 wifi_setup.py --connect --ssid <SSID> --password <PWD>`).
-- **Default Superadmin User**: `superadmin`
-- **Default Superadmin Password**: `Gluvok@241821`
+- **Superadmin User**: `superadmin` (override with `SUPERADMIN_USER`)
+- **Superadmin Password**: set `SUPERADMIN_PASS` in `data/hermes.env`. Hermes refuses to start without `SUPERADMIN_PASS` and `HERMES_HOTSPOT_PASS`; `scripts/deploy.py` reads both from your local environment and writes them to `data/hermes.env` on the Pi.
 - **Dynamic Configuration**: Live tuning of Serial Port path, Baud Rate, Stability Duration (1.0–60.0s), Stability Tolerance (0.1–50.0kg), and ANPR / Auxiliary camera URLs with hot-reload directly from the browser.
 
 ---

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from src.devices.wifi import constants, runner
 from src.devices.wifi.activity import suspend_watchdog
@@ -10,7 +11,8 @@ from src.devices.wifi.portal_capport import setup_nm_capport_config
 
 logger = logging.getLogger(__name__)
 _hotspot_active = False
-C_SSID, C_PASS, C_CON = constants.DEFAULT_HOTSPOT_SSID, constants.DEFAULT_HOTSPOT_PASS, constants.HOTSPOT_CON_NAME
+C_SSID, C_CON = constants.DEFAULT_HOTSPOT_SSID, constants.HOTSPOT_CON_NAME
+C_PASS = os.getenv("HERMES_HOTSPOT_PASS", "")
 
 def is_hotspot_active(con_name: str = C_CON) -> bool:
     sim = runner.SIMULATION_STATE
@@ -20,6 +22,9 @@ def is_hotspot_active(con_name: str = C_CON) -> bool:
 def start_hotspot(ssid: str = C_SSID, password: str = C_PASS, iface: str | None = None, con_name: str = C_CON) -> bool:
     global _hotspot_active
     if _hotspot_active: return True
+    if len(password) < 8:
+        logger.error("[Hotspot] HERMES_HOTSPOT_PASS unset or < 8 chars; hotspot disabled")
+        return False
     suspend_watchdog(10.0)
     if not runner.is_nmcli_available() or runner.SIMULATION_STATE["enabled"]:
         _hotspot_active = runner.SIMULATION_STATE["hotspot_active"] = True; return True

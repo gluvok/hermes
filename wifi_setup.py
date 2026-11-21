@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import sys
 import time
 
 from src.devices.wifi import (
-    DEFAULT_HOTSPOT_PASS,
     DEFAULT_HOTSPOT_SSID,
     connect_to_wifi,
     is_network_connected,
@@ -41,7 +41,7 @@ def main() -> None:
         print(f"[{'SUCCESS' if ok else 'FAILED'}] {msg}"); return
 
     signal.signal(signal.SIGINT, _shutdown); signal.signal(signal.SIGTERM, _shutdown)
-    ssid, pwd = args.ssid or DEFAULT_HOTSPOT_SSID, args.password or DEFAULT_HOTSPOT_PASS
+    ssid, pwd = args.ssid or DEFAULT_HOTSPOT_SSID, args.password or os.getenv("HERMES_HOTSPOT_PASS", "")
 
     if args.hotspot or not is_network_connected():
         print(f"[WiFi Setup] Initiating emergency hotspot '{ssid}'...")

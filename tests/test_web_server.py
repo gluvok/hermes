@@ -4,8 +4,10 @@ import json
 import unittest
 from unittest.mock import patch
 
+from src.config import client_config as cc
 from src.config import config
 from src.core.telemetry import reset_state
+from src.web import auth
 from src.web.app import create_app
 from src.web.auth import reset_auth_state
 from src.web.server import FallbackWebServer
@@ -27,7 +29,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         # Obtain valid superadmin token for protected tests
         res = self.client.post(
             "/api/login",
-            data=json.dumps({"userid": "superadmin", "password": "Gluvok@241821"}),
+            data=json.dumps({"userid": "superadmin", "password": auth.SUPERADMIN_PASS}),
             content_type="application/json",
         )
         self.assertEqual(res.status_code, 200)
@@ -244,8 +246,8 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(config.serial_port, "/dev/ttyUSB0")
         self.assertEqual(config.stability_duration, 8.0)
         self.assertEqual(config.stability_tolerance, 1.5)
-        self.assertIn(config.device_id, ("pi0", "pi1", "pi2"))
-        self.assertEqual(config.device_key, "hardware123")
+        self.assertEqual(config.device_id, cc.DEVICE_ID)
+        self.assertEqual(config.device_key, cc.DEVICE_KEY)
         self.assertIn(config.center_id, (1, 2, 3, 5))
         self.assertEqual(config.anpr_camera_url, "http://192.168.1.150/snapshot")
 

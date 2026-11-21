@@ -39,6 +39,7 @@ from src.devices import (
     stop_wifi_watchdog,
 )
 from src.web import start_web_server, stop_web_server
+from src.web.auth import require_runtime_secrets
 
 
 # ── Graceful shutdown ─────────────────────────────────────────────────────────
@@ -61,6 +62,7 @@ signal.signal(signal.SIGTERM, shutdown)
 #  SETUP
 # ─────────────────────────────────────────────────────────────────────────────
 def setup():
+    require_runtime_secrets()
     logger.info("")
     logger.info("==============================================")
     logger.info("Gluvok Weighment & ANPR System Starting...")
