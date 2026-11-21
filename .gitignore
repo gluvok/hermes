@@ -21,4 +21,4 @@ hermes
 hermes.sh
 
 # Virtual environments
-.venv/
+.venv
