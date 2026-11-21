@@ -82,7 +82,8 @@ def _apply_uart_config_changes(
 @api_bp.route("/login", methods=["POST"])
 def login():
     """Authenticates superadmin credentials and issues a session token."""
-    if is_rate_limited():
+    client_ip = request.remote_addr or "unknown"
+    if is_rate_limited(client_ip):
         return jsonify({
             "success": False,
             "error": "Too many failed login attempts. Please wait 60 seconds.",
@@ -101,8 +102,8 @@ def login():
             "token": token,
         }), 200
 
-    record_failed_login()
-    record_system_event("AUTH", f"Failed authentication attempt for user '{userid}'.")
+    record_failed_login(client_ip)
+    record_system_event("AUTH", f"Failed authentication attempt from {client_ip}.")
     time.sleep(0.5)
     return jsonify({
         "success": False,

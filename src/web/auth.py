@@ -19,7 +19,8 @@ MAX_FAILED_LOGIN_ATTEMPTS = 5
 _active_sessions: dict[str, float] = {}
 _session_lock = threading.Lock()
 
-_failed_login_attempts: list[float] = []
+# ponytail: keyed by IP, pruned per key on check; a LAN host cycling IPs can grow it, add a size cap if that's ever seen
+_failed_login_attempts: dict[str, list[float]] = {}
 _login_lock = threading.Lock()
 
 
@@ -50,20 +51,25 @@ def validate_session_token(token: str | None) -> bool:
         return False
 
 
-def is_rate_limited() -> bool:
-    """Brute force mitigation: max 5 failed logins within 60 seconds."""
+def is_rate_limited(key: str = "") -> bool:
+    """Brute force mitigation: max 5 failed logins per client key within 60 seconds."""
     now = time.time()
     with _login_lock:
-        _failed_login_attempts[:] = [
-            t for t in _failed_login_attempts if now - t < RATE_LIMIT_WINDOW_SECONDS
+        recent = [
+            t for t in _failed_login_attempts.get(key, [])
+            if now - t < RATE_LIMIT_WINDOW_SECONDS
         ]
-        return len(_failed_login_attempts) >= MAX_FAILED_LOGIN_ATTEMPTS
+        if recent:
+            _failed_login_attempts[key] = recent
+        else:
+            _failed_login_attempts.pop(key, None)
+        return len(recent) >= MAX_FAILED_LOGIN_ATTEMPTS
 
 
-def record_failed_login() -> None:
-    """Records a failed authentication attempt timestamp."""
+def record_failed_login(key: str = "") -> None:
+    """Records a failed authentication attempt timestamp for a client key."""
     with _login_lock:
-        _failed_login_attempts.append(time.time())
+        _failed_login_attempts.setdefault(key, []).append(time.time())
 
 
 def require_runtime_secrets() -> None:
