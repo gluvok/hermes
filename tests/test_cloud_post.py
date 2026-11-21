@@ -13,6 +13,10 @@ from src.integrations.gluvok import post_to_cloud
 class TestCloudPost(unittest.TestCase):
     def setUp(self):
         reset_state()
+        for name, value in (("device_id", "test-device"), ("device_key", "test-device-key")):
+            patcher = patch.object(ConfigManager, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def tearDown(self):
         reset_state()

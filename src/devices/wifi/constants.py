@@ -6,7 +6,6 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 
 DEFAULT_HOTSPOT_SSID = "hermes"
-DEFAULT_HOTSPOT_PASS = "12345678"
 HOTSPOT_CON_NAME = "hermes-hotspot"
 
 DEFAULT_GATEWAY_IP = "10.42.0.1"

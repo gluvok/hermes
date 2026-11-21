@@ -162,7 +162,7 @@ Centralized repository of timing windows, timeouts, buffer boundaries, NetworkMa
   - `CLOUD_POST_TIMEOUT = 20.0`: Maximum timeout for Gluvok cloud JSON payload upload.
   - `HOTSPOT_CON_NAME = "hermes-hotspot"`: NetworkManager emergency profile name.
   - `DEFAULT_HOTSPOT_SSID = "hermes"`: Default hotspot SSID.
-  - `DEFAULT_HOTSPOT_PASS = "12345678"`: Default hotspot WPA2 passphrase.
+  - The hotspot passphrase has no default; it is read from `HERMES_HOTSPOT_PASS`.
   - `WIFI_WATCHDOG_INTERVAL = 30.0`: Wi-Fi connectivity poll interval.
 - **Regexes & URLs**:
   - `GLUVOK_BASE_URL = "https://gluvok.vercel.app"`: Production cloud backend endpoint.
@@ -391,7 +391,7 @@ Authentication and security middleware.
 
 - **Constants**:
   - `SUPERADMIN_USER = os.getenv("SUPERADMIN_USER", "superadmin")`
-  - `SUPERADMIN_PASS = os.getenv("SUPERADMIN_PASS", "Gluvok@241821")`
+  - `SUPERADMIN_PASS = os.getenv("SUPERADMIN_PASS", "")`
   - `SESSION_LIFETIME_SECONDS = 7200.0` (2-hour sliding window).
   - `RATE_LIMIT_WINDOW_SECONDS = 60.0`
   - `MAX_FAILED_LOGIN_ATTEMPTS = 5`

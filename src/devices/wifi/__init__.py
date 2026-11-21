@@ -8,7 +8,6 @@ from src.devices.wifi.connection import (
 from src.devices.wifi.connectivity import is_network_connected, is_wifi_connected
 from src.devices.wifi.constants import (
     DEFAULT_GATEWAY_IP,
-    DEFAULT_HOTSPOT_PASS,
     DEFAULT_HOTSPOT_SSID,
     HOTSPOT_CON_NAME,
 )
@@ -35,7 +34,7 @@ from src.devices.wifi.watchdog import (
 )
 
 __all__ = [
-    "DEFAULT_GATEWAY_IP", "DEFAULT_HOTSPOT_PASS", "DEFAULT_HOTSPOT_SSID",
+    "DEFAULT_GATEWAY_IP", "DEFAULT_HOTSPOT_SSID",
     "HOTSPOT_CON_NAME", "SIMULATION_STATE", "PortalService",
     "connect_to_wifi", "connect_wifi", "get_active_wifi_ssid",
     "get_available_networks", "get_existing_profile", "get_hotspot_ip",

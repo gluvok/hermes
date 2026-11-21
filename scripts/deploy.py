@@ -10,13 +10,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 EXCLUDES = ["--exclude=.venv", "--exclude=dist", "--exclude=__pycache__", "--exclude=.git", "--exclude=tests", "--exclude=docs", "--exclude=*.db"]
 
 
-def run_cmd(cmd: list[str]) -> None:
-    if (code := subprocess.run(cmd, check=False).returncode) != 0:
+REQUIRED_SECRETS = ("SUPERADMIN_PASS", "HERMES_HOTSPOT_PASS")
+
+
+def run_cmd(cmd: list[str], input: str | None = None) -> None:
+    if (code := subprocess.run(cmd, check=False, input=input, text=True).returncode) != 0:
         print(f"[Deploy] Command failed: {' '.join(cmd)}", file=sys.stderr)
         sys.exit(code)
 
 
+def secrets_env_text() -> str:
+    """KEY="value" lines for systemd's EnvironmentFile; exits 1 if a required secret is unset (#33)."""
+    missing = [n for n in REQUIRED_SECRETS if not os.environ.get(n)]
+    if missing:
+        print(f"[Deploy] Set {', '.join(missing)} in your local environment first.", file=sys.stderr)
+        sys.exit(1)
+    esc = lambda v: v.replace("\\", "\\\\").replace('"', '\\"')
+    return "".join(f'{n}="{esc(os.environ[n])}"\n' for n in REQUIRED_SECRETS)
+
+
 def deploy_remote(host: str, target: str = "/opt/hermes", lic: str = "data/client.lic") -> None:
+    env_text = secrets_env_text()
     print(f"[Deploy] 1. Preparing {target} on {host}...")
     prep = (
         f"sudo mkdir -p {target} && sudo chown -R $USER:$USER {target}; "
@@ -34,9 +48,10 @@ def deploy_remote(host: str, target: str = "/opt/hermes", lic: str = "data/clien
     )
     run_cmd(["ssh", "-t", host, build])
     print("[Deploy] 4. Provisioning systemd service & client license...")
-    svc = f"[Unit]\nDescription=Hermes\nAfter=network-online.target\n[Service]\nType=simple\nUser=root\nWorkingDirectory={target}\nExecStart={target}/run.sh\nRestart=always\nRestartSec=5\nEnvironment=PYTHONUNBUFFERED=1\n[Install]\nWantedBy=multi-user.target\n"
+    svc = f"[Unit]\nDescription=Hermes\nAfter=network-online.target\n[Service]\nType=simple\nUser=root\nWorkingDirectory={target}\nExecStart={target}/run.sh\nRestart=always\nRestartSec=5\nEnvironment=PYTHONUNBUFFERED=1\nEnvironmentFile={target}/data/hermes.env\n[Install]\nWantedBy=multi-user.target\n"
     os.makedirs("dist", exist_ok=True)
     with open("dist/hermes.service", "w", encoding="utf-8") as f: f.write(svc)
+    run_cmd(["ssh", host, f"umask 077 && mkdir -p {target}/data && cat > {target}/data/hermes.env"], input=env_text)
     run_cmd(["scp", "dist/hermes.service", f"{host}:/tmp/hermes.service"])
     run_cmd(["ssh", "-t", host, f"sudo mv /tmp/hermes.service /etc/systemd/system/hermes.service && sudo systemctl daemon-reload && sudo systemctl enable --now hermes && mkdir -p {target}/data"])
     if os.path.exists(lic):

@@ -53,7 +53,7 @@ graph TD
 - **Multi-Camera ANPR OCR & Consensus Voting**: Concurrently captures frames from all configured ANPR cameras (Front, Rear, etc.) every 1 second during active weighing and elects the highest-frequency plate candidate.
 - **Synchronized Full-Fleet Camera Snapshots & Pre-Compression**: Captures high-resolution snapshots across all cameras in parallel halfway through the stability window (t=5s) and pre-compresses them to high-clarity JPEG (Q85, max 1920px) in RAM, eliminating finalization delays upon weight stabilization.
 - **Non-Blocking Real-Time Threading**: Scale serial reading is completely decoupled from disk spooling and network I/O; cloud uploads and camera captures are dispatched in dedicated background threads.
-- **Gluvok Cloud API Multipart Integration**: Matches curl specification (`curl -X POST ... -u "pi1:hardware123" -F "center_id=..." -F "detected_vehicle_number=..." -F "weight=..." -F "file=@..."`).
+- **Gluvok Cloud API Multipart Integration**: Matches curl specification (`curl -X POST ... -u "$DEVICE_ID:$DEVICE_KEY" -F "center_id=..." -F "detected_vehicle_number=..." -F "weight=..." -F "file=@..."`).
 - **Web Diagnostics Dashboard**: Modular Flask application factory on port `8080` displaying live scale weight, ANPR status, cloud spool queue counts, error monitoring, and configuration.
 - **Pure nmcli Captive Portal**: Direct NetworkManager control via `nmcli` (zero external binaries) with RFC 8910 DHCP Option 114, RFC 8908 captive API, DNS interception, flap-debounced watchdog, live network scanning, persistent SQLite vault, and automatic fallback AP restoration.
 
@@ -165,7 +165,7 @@ hermes/
   - Runs parallel multi-ANPR camera frame grabbing via `capture_anpr_snapshots()`.
   - Logs clear camera fleet topology at startup via `log_camera_fleet()`, distinguishing Main (ANPR active loop) from Auxiliary (post-stability audit) cameras.
 - **`WiFi Manager` (`src/devices/wifi/`)**:
-  - Pure nmcli hotspot management (`nmcli device wifi hotspot`) with automatic fallback hotspot (`hermes` / `12345678`).
+  - Pure nmcli hotspot management (`nmcli device wifi hotspot`) with automatic fallback hotspot (`hermes` / password from `HERMES_HOTSPOT_PASS`).
   - RFC 8910 DHCP Option 114 + RFC 8908 captive portal API for zero-tap automatic Wi-Fi sheet on Android & iOS.
   - Synchronizes online / offline status with the RGB LED state machine.
 - **`RGB LED Controller` (`src/devices/led/`)**:
@@ -353,5 +353,6 @@ Hermes uses a dual-layer configuration pattern:
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
 | `SUPERADMIN_USER` | `superadmin` | Username for web diagnostics console login. |
-| `SUPERADMIN_PASS` | `Gluvok@241821` | Password for web diagnostics console login. |
+| `SUPERADMIN_PASS` | none (required) | Password for web diagnostics console login. Set in `data/hermes.env`. |
+| `HERMES_HOTSPOT_PASS` | none (required) | WPA2 passphrase (8+ chars) for the emergency hotspot. Set in `data/hermes.env`. |
 | `FLASK_SECRET_KEY` | `hermes-insecure-secret-key` | Flask session cryptographic signing key (override in production). |
