@@ -1,6 +1,10 @@
+import logging
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import requests
+
+from src.devices import camera
 from src.devices.camera import capture_all_camera_snapshots
 
 
@@ -55,6 +59,59 @@ class TestCameraDriver(unittest.TestCase):
             mock_cfg.auxiliary_camera_urls = []
             log_camera_fleet()
             mock_logger.warning.assert_called_with("  ├── Main / ANPR Cameras: (None configured)")
+
+
+def test_http_failure_log_masks_credentials(caplog):
+    url = "http://admin:s3cret@10.0.0.9/snap.jpg"
+    with patch("src.devices.camera.requests.get", side_effect=requests.ConnectionError(f"fail {url}")), caplog.at_level(logging.DEBUG):
+        assert camera._fetch_http_snapshot(url, 1.0) is None
+    assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+    assert "//***@" in caplog.text
+
+
+def test_http_bad_status_log_masks_credentials(caplog):
+    url = "http://admin:s3cret@10.0.0.9/snap.jpg"
+    with patch("src.devices.camera.requests.get", return_value=MagicMock(status_code=401, content=b"")), caplog.at_level(logging.DEBUG):
+        assert camera._fetch_http_snapshot(url, 1.0) is None
+    assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+    assert "//***@" in caplog.text
+
+
+def test_rtsp_open_failure_log_masks_credentials(caplog):
+    url = "rtsp://admin:s3cret@10.0.0.9/stream"
+    fake_cap = MagicMock()
+    fake_cap.isOpened.return_value = False
+    with patch("cv2.VideoCapture", return_value=fake_cap), caplog.at_level(logging.DEBUG):
+        assert camera._fetch_rtsp_frame(url, 1.0) is None
+    assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+    assert "//***@" in caplog.text
+
+
+def test_rtsp_read_failure_log_masks_credentials(caplog):
+    url = "rtsp://admin:s3cret@10.0.0.9/stream"
+    fake_cap = MagicMock()
+    fake_cap.isOpened.return_value = True
+    fake_cap.read.return_value = (False, None)
+    with patch("cv2.VideoCapture", return_value=fake_cap), caplog.at_level(logging.DEBUG):
+        assert camera._fetch_rtsp_frame(url, 1.0) is None
+    assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+
+
+def test_rtsp_exception_log_masks_credentials(caplog):
+    url = "rtsp://admin:s3cret@10.0.0.9/stream"
+    with patch("cv2.VideoCapture", side_effect=OSError(f"boom {url}")), caplog.at_level(logging.DEBUG):
+        assert camera._fetch_rtsp_frame(url, 1.0) is None
+    assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+
+
+def test_log_camera_fleet_masks_credentials(caplog):
+    with patch("src.devices.camera.config") as cfg:
+        cfg.anpr_camera_urls = ["rtsp://admin:s3cret@10.0.0.9/stream"]
+        cfg.auxiliary_camera_urls = ["http://admin:s3cret@10.0.0.10/snap.jpg"]
+        with caplog.at_level(logging.DEBUG):
+            camera.log_camera_fleet()
+    assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+    assert "//***@10.0.0.9/stream" in caplog.text
 
 
 if __name__ == "__main__":
