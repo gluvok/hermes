@@ -12,6 +12,7 @@ from src.core.telemetry import (
     get_error_counts,
     get_latest_weighment,
     get_system_events,
+    get_unsent_weighment_count,
     record_system_event,
 )
 from src.web.auth import (
@@ -134,6 +135,7 @@ def status():
         },
         "cloud": {
             "configured": bool(config.device_id and config.device_key),
+            "unsent_weighments": get_unsent_weighment_count(),
         },
         "wifi": {
             "connected": is_wifi_connected(),

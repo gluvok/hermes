@@ -458,6 +458,10 @@
               <span class="text-xs text-muted-foreground font-medium block">Configured Center ID</span>
               <div id="cloud-center-id-val" class="text-xl font-bold font-mono text-foreground">1</div>
             </div>
+            <div id="cloud-unsent-card" class="p-4 rounded-xl border border-border bg-secondary/30 space-y-2">
+              <span class="text-xs text-muted-foreground font-medium block">Unsent Weighments (since startup)</span>
+              <div id="cloud-unsent-val" class="text-xl font-bold font-mono text-foreground">0</div>
+            </div>
             <div class="p-4 rounded-xl border border-border bg-secondary/30 space-y-2">
               <span class="text-xs text-muted-foreground font-medium block">Device Credentials</span>
               <div class="text-sm font-semibold font-mono text-emerald-400 flex items-center gap-2">
@@ -1407,6 +1411,19 @@
       if (ovSbBadge) {
         ovSbBadge.className = cloudClass;
         ovSbBadge.textContent = cloudText;
+      }
+
+      const unsent = Number((data.cloud && data.cloud.unsent_weighments) || 0);
+      const unsentVal = document.getElementById("cloud-unsent-val");
+      const unsentCard = document.getElementById("cloud-unsent-card");
+      if (unsentVal) {
+        unsentVal.textContent = String(unsent);
+        unsentVal.className = "text-xl font-bold font-mono " + (unsent > 0 ? "text-amber-400" : "text-foreground");
+      }
+      if (unsentCard) {
+        unsentCard.className = "p-4 rounded-xl border space-y-2 " + (unsent > 0
+          ? "border-amber-500/40 bg-amber-500/10"
+          : "border-border bg-secondary/30");
       }
 
       const argusBadge = document.getElementById("ov-argus-badge");

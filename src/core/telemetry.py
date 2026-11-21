@@ -25,6 +25,8 @@ _latest_weighment: dict[str, Any] = {
     "status_code": "READY",
 }
 _error_counts: dict[str, int] = {}
+# Weighments that finished but never reached the cloud (offline, failed or errored upload).
+_unsent_weighments = 0
 _live_lock = threading.Lock()
 
 
@@ -66,6 +68,19 @@ def record_error_event(error_code: str, message: str = "") -> None:
         _error_counts[error_code] = _error_counts.get(error_code, 0) + 1
 
 
+def record_unsent_weighment() -> None:
+    """Counts one weighment that was dropped instead of reaching the cloud (#18)."""
+    global _unsent_weighments
+    with _live_lock:
+        _unsent_weighments += 1
+
+
+def get_unsent_weighment_count() -> int:
+    """Returns how many weighments were dropped since startup."""
+    with _live_lock:
+        return _unsent_weighments
+
+
 def get_latest_weighment() -> dict[str, Any]:
     """Returns a snapshot of the latest weighment status."""
     with _live_lock:
@@ -86,9 +101,11 @@ def get_system_events() -> list[dict[str, str]]:
 
 def reset_telemetry() -> None:
     """Resets in-memory telemetry buffers (useful for testing and reset flows)."""
+    global _unsent_weighments
     with _events_lock:
         _system_events.clear()
     with _live_lock:
+        _unsent_weighments = 0
         _latest_weighment["session_id"] = None
         _latest_weighment["plate"] = None
         _latest_weighment["weight"] = 0.0
@@ -105,8 +122,10 @@ __all__ = [
     "get_error_counts",
     "get_latest_weighment",
     "get_system_events",
+    "get_unsent_weighment_count",
     "record_error_event",
     "record_system_event",
+    "record_unsent_weighment",
     "record_weighment_result",
     "reset_state",
     "reset_telemetry",
