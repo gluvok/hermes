@@ -360,7 +360,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
             self.assertFalse(online)
 
     def test_server_lifecycle(self):
-        server = FallbackWebServer(host="127.0.0.1", port=8991)
+        server = FallbackWebServer(host="127.0.0.1", port=0)  # OS-assigned: no clash with parallel runs
         server.start()
         self.assertTrue(server._is_running)
         server.stop()

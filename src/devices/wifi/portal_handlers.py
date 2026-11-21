@@ -53,6 +53,9 @@ class CaptivePortalHandler(http.server.BaseHTTPRequestHandler):
         try: length = int(self.headers.get("Content-Length", 0) or 0)
         except ValueError: length = -1
         if length < 0 or length > _MAX_BODY:
+            # Closing with unread bytes makes the kernel send RST, so the client sees a reset, not 413.
+            # ponytail: drain only modest overshoots; anything bigger is abuse and may get the RST.
+            if 0 < length <= 16 * _MAX_BODY: self.rfile.read(length)
             self.close_connection = True
             self._send_json({"success": False, "message": "Bad request size"}, status=413); return
         try: payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}

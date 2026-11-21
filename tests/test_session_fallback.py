@@ -1,3 +1,4 @@
+import concurrent.futures
 import unittest
 from unittest.mock import patch
 
@@ -92,6 +93,8 @@ class TestSessionErrorFallback(unittest.TestCase):
         self.sm._stop_anpr_event.set()
         if self.sm._anpr_thread and self.sm._anpr_thread.is_alive():
             self.sm._anpr_thread.join(timeout=0.5)
+        # In-flight ANPR futures from the background loop would append a 2nd plate after the clear.
+        concurrent.futures.wait(list(self.sm._pending_anpr_futures), timeout=2.0)
         self.sm._anpr_plates.clear()
         self.sm._anpr_statuses.clear()
         self.sm._capture_and_record_anpr_sample()
