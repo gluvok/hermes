@@ -318,7 +318,7 @@
 
     async function loadStatus() {
       try {
-        const res = await fetch('/api/status');
+        const res = await fetch('/api/status', authToken ? {headers: {'X-Auth-Token': authToken}} : {});
         const data = await res.json();
         const pill = document.getElementById('status-pill');
         if (data.connected) {
