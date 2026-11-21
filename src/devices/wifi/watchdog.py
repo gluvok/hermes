@@ -15,28 +15,42 @@ _watchdog_thread: threading.Thread | None = None
 _running = False
 
 def notify_network_status(online: bool) -> None:
-    """Updates LED indicator and scale stability machine network state."""
-    for mod, attr in (("src.devices.led", "led_controller"), ("src.core.stability", "scale_state_machine")):
-        try: getattr(__import__(mod, fromlist=[attr]), attr).set_network_status(online)
-        except (ImportError, AttributeError) as exc: logger.debug("Status update error: %s", exc)
+    """State machine first, so an LED fault can't stop the weighment from going offline (#13)."""
+    for mod, attr in (("src.core.stability", "scale_state_machine"), ("src.devices.led", "led_controller")):
+        try:
+            getattr(__import__(mod, fromlist=[attr]), attr).set_network_status(online)
+        except Exception:
+            logger.exception("[Watchdog] %s.set_network_status failed", attr)
+
+
+def _watchdog_tick(fails: int, threshold: int) -> int:
+    if is_watchdog_suspended() or is_nmcli_busy():
+        return fails
+    if is_network_connected():
+        notify_network_status(True)
+        if is_hotspot_active():
+            logger.info("[Watchdog] Internet restored. Stopping emergency hotspot...")
+            hotspot.stop_emergency_hotspot()
+        return 0
+    fails += 1
+    if fails >= threshold:
+        notify_network_status(False)
+        if not is_hotspot_active():
+            logger.warning("[Watchdog] Wi-Fi lost (%d fails). Activating hotspot...", fails)
+            hotspot.start_emergency_hotspot()
+    return fails
+
 
 def _watchdog_loop(interval: float = 1.0, threshold: int = 2) -> None:
     fails = 0
     while _running:
         time.sleep(interval)
-        if not _running or is_watchdog_suspended() or is_nmcli_busy(): continue
-        if is_network_connected():
-            fails = 0; notify_network_status(True)
-            if is_hotspot_active():
-                logger.info("[Watchdog] Internet restored. Stopping emergency hotspot...")
-                hotspot.stop_emergency_hotspot()
-        else:
-            fails += 1
-            if fails >= threshold:
-                notify_network_status(False)
-                if not is_hotspot_active():
-                    logger.warning("[Watchdog] Wi-Fi lost (%d fails). Activating hotspot...", fails)
-                    hotspot.start_emergency_hotspot()
+        if not _running:
+            break
+        try:
+            fails = _watchdog_tick(fails, threshold)
+        except Exception:
+            logger.exception("[Watchdog] tick failed; continuing")
 
 def start_wifi_watchdog(interval: float = 1.0) -> bool:
     global _watchdog_thread, _running
