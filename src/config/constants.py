@@ -1,6 +1,8 @@
 """constants.py — Centralized System & Hardware Constants."""
 from __future__ import annotations
 
+import os
+
 INTER_CHAR_TIMEOUT_S = 0.3
 MAX_BUFFER_LEN = 256
 SCALE_TIMEOUT = 0.05
@@ -15,7 +17,7 @@ CAMERA_TIMEOUT = 3.0
 ANPR_SERVER_TIMEOUT = 30.0
 MAX_PARALLEL_CAMERA_WORKERS = 4
 
-GLUVOK_BASE_URL = "https://gluvok.vercel.app"
+GLUVOK_BASE_URL = os.environ.get("GLUVOK_BASE_URL", "https://gluvok.vercel.app").rstrip("/")
 CLOUD_POST_TIMEOUT = 20.0
 DEFAULT_CENTER_ID = 1
 
