@@ -51,6 +51,13 @@ def validate_session_token(token: str | None) -> bool:
         return False
 
 
+def revoke_session_token(token: str | None) -> None:
+    """Removes a single session token; unknown or empty tokens are ignored."""
+    if token:
+        with _session_lock:
+            _active_sessions.pop(token, None)
+
+
 def is_rate_limited(key: str = "") -> bool:
     """Brute force mitigation: max 5 failed logins per client key within 60 seconds."""
     now = time.time()
