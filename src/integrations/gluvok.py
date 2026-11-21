@@ -94,7 +94,7 @@ def transmit_entry_multipart(
     """
     Submits vehicle weighment session to Gluvok API (/api/entries) matching the curl specification:
       curl -X POST "https://gluvok.vercel.app/api/entries" \\
-        -u "pi1:hardware123" \\
+        -u "$DEVICE_ID:$DEVICE_KEY" \\
         -F "center_id=1" \\
         -F "detected_vehicle_number=MH12AB1234" \\
         -F "weight=18540.5" \\
@@ -202,7 +202,7 @@ def verify_entry_in_cloud(
     return None
 
 
-def post_to_cloud(session_payload: dict[str, Any]) -> None:
+def post_to_cloud(session_payload: dict[str, Any]) -> tuple[bool, str | None, str | None, bool]:
     """
     Bridge function: transmits entry from session dictionary and updates telemetry.
     Preserved for direct callers; does NOT wipe session_payload on completion.
@@ -224,7 +224,7 @@ def post_to_cloud(session_payload: dict[str, Any]) -> None:
             if b and isinstance(b, bytes):
                 images_to_send.append((f"truck_{cam_name}.jpg", b))
 
-    transmit_entry_multipart(
+    return transmit_entry_multipart(
         center_id=center_id,
         detected_vehicle_number=plate,
         weight=weight,

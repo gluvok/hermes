@@ -84,8 +84,12 @@ class ScaleStabilityMachine:
             return True
 
         if parsed_weight < config.weight_threshold:
+            was_active = self.state != ScaleState.SCALE_IDLE
             self._reset_candidate_state()
             session_manager.reset_session()
+            if was_active:
+                from src.devices import led_controller
+                led_controller.set_idle()
             return True
 
         return False
@@ -184,11 +188,15 @@ class ScaleStabilityMachine:
 
         session_id = str(session_package.get("session_id", "UNKNOWN"))
         try:
-            post_to_cloud(session_package)
-            led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
-            logger.info(f"[Weighment] Successfully uploaded session {session_id} to cloud.")
+            ok, entry_id, err, _timed_out = post_to_cloud(session_package)
         except (OSError, RuntimeError, ValueError) as exc:
             logger.error(f"[Weighment] Direct cloud upload error for {session_id}: {exc}")
+            return
+        if not ok:
+            logger.error(f"[Weighment] Cloud upload failed for {session_id}: {err}")
+            return
+        led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
+        logger.info(f"[Weighment] Uploaded session {session_id} to cloud (entry {entry_id}).")
 
     def reset(self):
         """Manually reset the state machine."""

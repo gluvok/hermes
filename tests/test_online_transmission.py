@@ -16,7 +16,7 @@ import unittest
 from unittest.mock import patch
 
 from src.core.db import init_db
-from src.core.stability import ScaleStabilityMachine
+from src.core.stability import ScaleStabilityMachine, ScaleState
 from src.core.wifi_vault import get_saved_wifi_networks, save_wifi_network
 
 
@@ -30,7 +30,7 @@ class TestOnlineTransmission(unittest.TestCase):
             "camera_snapshots": {"anpr_1": b"fake_cam1_jpeg"},
         }
 
-    @patch("src.integrations.gluvok.post_to_cloud")
+    @patch("src.integrations.gluvok.post_to_cloud", return_value=(True, "42", None, False))
     @patch("src.devices.is_wifi_connected", return_value=True)
     def test_online_upload_triggers_direct_cloud_post(self, mock_wifi, mock_post):
         with patch("src.devices.led_controller.trigger_cloud_success") as mock_led:
@@ -99,3 +99,29 @@ class TestOnlineTransmission(unittest.TestCase):
         self.assertEqual(self.machine.state.name, "SCALE_STABILIZING")
         self.machine.set_network_status(False)
         self.assertEqual(self.machine.state.name, "SCALE_IDLE")
+
+
+@patch("src.devices.led_controller")
+@patch(
+    "src.integrations.gluvok.post_to_cloud",
+    return_value=(False, None, "HTTP 401: no", False),
+)
+def test_failed_upload_does_not_light_cloud_success(mock_post, mock_led):
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    mock_led.trigger_cloud_success.assert_not_called()
+
+
+@patch("src.devices.led_controller")
+@patch("src.integrations.gluvok.post_to_cloud", return_value=(True, "42", None, False))
+def test_successful_upload_lights_cloud_success(mock_post, mock_led):
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    mock_led.trigger_cloud_success.assert_called_once()
+
+
+@patch("src.devices.led_controller")
+@patch("src.core.stability.session_manager")
+def test_drop_below_threshold_during_session_sets_led_idle(mock_sm, mock_led):
+    m = ScaleStabilityMachine()
+    m.state = ScaleState.SCALE_STABILIZING
+    m._handle_zero_or_subthreshold(1.0)  # > 0, < threshold
+    mock_led.set_idle.assert_called_once()
