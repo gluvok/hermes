@@ -30,4 +30,6 @@ def test_failed_login_event_logs_client_ip(monkeypatch):
     auth.reset_auth_state()
     c = create_app({"TESTING": True}).test_client()
     _login(c, "10.0.0.66", "wrong")
-    assert "10.0.0.66" in c.get("/api/status").get_data(as_text=True)
+    token = _login(c, "10.0.0.5", auth.SUPERADMIN_PASS).get_json()["token"]
+    status = c.get("/api/status", headers={"X-Auth-Token": token})
+    assert "10.0.0.66" in status.get_data(as_text=True)

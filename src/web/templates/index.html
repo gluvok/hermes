@@ -1231,7 +1231,8 @@
 
     async function fetchSavedNetworks() {
       try {
-        const res = await fetch("/api/wifi/saved");
+        if (!authToken) return;
+        const res = await fetch("/api/wifi/saved", { headers: getAuthHeaders() });
         const data = await res.json();
         const section = document.getElementById("saved-wifi-section");
         const container = document.getElementById("saved-wifi-chips");
@@ -1499,7 +1500,7 @@
 
     async function fetchStatus(manual = false) {
       try {
-        const res = await fetch("/api/status");
+        const res = await fetch("/api/status", { headers: getAuthHeaders() });
         if (!res.ok) return;
         const data = await res.json();
         updateScaleUI(data);

@@ -109,8 +109,27 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertNotIn("cameras", data)
         self.assertNotIn("anpr_camera_urls", data.get("config", {}))
         self.assertNotIn("serial_port", data.get("scale", {}))
-        self.assertIn("spool", data)
-        self.assertIn("events", data)
+
+    def test_api_status_anonymous_omits_sensitive_fields(self):
+        body = self.client.get("/api/status").get_json()
+        for key in ("events", "config", "latest_weighment", "error_counts", "spool"):
+            self.assertNotIn(key, body)
+        self.assertNotIn("ssid", body["wifi"])
+        self.assertNotIn("center_id", body["cloud"])
+        self.assertIn("connected", body["wifi"])
+        self.assertIn("hotspot_active", body["wifi"])
+        self.assertIn("configured", body["cloud"])
+
+    def test_api_status_with_token_includes_sensitive_fields(self):
+        res = self.client.get("/api/status", headers={"Authorization": f"Bearer {self.auth_token}"})
+        body = res.get_json()
+        for key in ("events", "config", "latest_weighment", "error_counts", "spool"):
+            self.assertIn(key, body)
+        self.assertIn("ssid", body["wifi"])
+        self.assertIn("center_id", body["cloud"])
+
+    def test_get_saved_wifi_requires_auth(self):
+        self.assertEqual(self.client.get("/api/wifi/saved").status_code, 401)
 
     def test_get_api_config_unauthorized(self):
         res = self.client.get("/api/config")
@@ -143,7 +162,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
 
         # 2. Query /api/wifi/saved
-        saved_res = self.client.get("/api/wifi/saved")
+        saved_res = self.client.get("/api/wifi/saved", headers={"X-Auth-Token": self.auth_token})
         self.assertEqual(saved_res.status_code, 200)
         saved_data = saved_res.get_json()
         self.assertTrue(saved_data.get("success"))
@@ -178,7 +197,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(del_res.status_code, 200)
 
         # Confirm gone
-        saved_res = self.client.get("/api/wifi/saved")
+        saved_res = self.client.get("/api/wifi/saved", headers={"X-Auth-Token": self.auth_token})
         ssids = [n["ssid"] for n in saved_res.get_json().get("networks", [])]
         self.assertNotIn("Delete_Me", ssids)
 
