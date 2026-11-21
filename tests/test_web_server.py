@@ -120,6 +120,14 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertIn("hotspot_active", body["wifi"])
         self.assertIn("configured", body["cloud"])
 
+    def test_api_status_anonymous_reports_unsent_weighments(self):
+        from src.core.telemetry import record_unsent_weighment
+
+        self.assertEqual(self.client.get("/api/status").get_json()["cloud"]["unsent_weighments"], 0)
+        record_unsent_weighment()
+        body = self.client.get("/api/status").get_json()
+        self.assertEqual(body["cloud"]["unsent_weighments"], 1)
+
     def test_api_status_with_token_includes_sensitive_fields(self):
         res = self.client.get("/api/status", headers={"Authorization": f"Bearer {self.auth_token}"})
         body = res.get_json()

@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 from src.core.db import init_db
 from src.core.stability import ScaleStabilityMachine, ScaleState
+from src.core.telemetry import get_unsent_weighment_count, reset_telemetry
 from src.core.wifi_vault import get_saved_wifi_networks, save_wifi_network
 
 
@@ -128,3 +129,48 @@ def test_drop_below_threshold_during_session_sets_led_idle(mock_sm, mock_led):
     m.state = ScaleState.SCALE_STABILIZING
     m._handle_zero_or_subthreshold(1.0)  # > 0, < threshold
     mock_led.set_idle.assert_called_once()
+
+
+@patch("src.devices.led_controller")
+@patch(
+    "src.integrations.gluvok.post_to_cloud",
+    return_value=(False, None, "HTTP 500: boom", False),
+)
+def test_failed_upload_counts_as_unsent(mock_post, mock_led):
+    reset_telemetry()
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    assert get_unsent_weighment_count() == 1
+
+
+@patch("src.devices.led_controller")
+@patch("src.integrations.gluvok.post_to_cloud", side_effect=OSError("link down"))
+def test_upload_exception_counts_as_unsent(mock_post, mock_led):
+    reset_telemetry()
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    assert get_unsent_weighment_count() == 1
+
+
+@patch("src.devices.led_controller")
+@patch("src.integrations.gluvok.post_to_cloud", return_value=(True, "42", None, False))
+def test_successful_upload_does_not_count_as_unsent(mock_post, mock_led):
+    reset_telemetry()
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    assert get_unsent_weighment_count() == 0
+
+
+def test_offline_discard_counts_as_unsent():
+    reset_telemetry()
+    machine = ScaleStabilityMachine()
+    machine._is_online = False
+    machine._trigger_upload({"session_id": "S1"})
+    assert get_unsent_weighment_count() == 1
+
+
+def test_reset_telemetry_zeroes_unsent_count():
+    reset_telemetry()
+    from src.core.telemetry import record_unsent_weighment
+
+    record_unsent_weighment()
+    assert get_unsent_weighment_count() == 1
+    reset_telemetry()
+    assert get_unsent_weighment_count() == 0
