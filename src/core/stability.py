@@ -141,6 +141,7 @@ class ScaleStabilityMachine:
             return
 
         if self.state == ScaleState.SCALE_IDLE:
+            session_manager.start_session()
             self.state = ScaleState.SCALE_STABILIZING
             self._current_stable_candidate = parsed_weight
             self._candidate_start_time = now
@@ -148,7 +149,6 @@ class ScaleStabilityMachine:
                 f"[Scale Session] Vehicle detected: {parsed_weight:.1f} kg "
                 f"(threshold: {config.weight_threshold:.1f} kg). Stabilizing..."
             )
-            session_manager.start_session()
             from src.devices import led_controller
             led_controller.set_active()
             return

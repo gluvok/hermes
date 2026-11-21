@@ -78,6 +78,9 @@ class ScaleUARTReader:
         time.sleep(0.1)
         self.start(port, baudrate)
 
+    def is_alive(self) -> bool:
+        return bool(self._thread and self._thread.is_alive())
+
     def stop(self):
         self._stop_event.set()
         self._close_serial()
