@@ -178,7 +178,7 @@ class WeighbridgeSessionManager:
 
         for cam_idx, _cam_url, img_bytes in snapshots:
             if not img_bytes:
-                logger.warning(f"[ANPR] Camera {cam_idx} frame capture failed from {_cam_url}")
+                logger.warning(f"[ANPR] Camera {cam_idx} frame capture failed")
                 continue
 
             with self._lock:
