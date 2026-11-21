@@ -157,11 +157,9 @@ class ScaleStabilityMachine:
 
     def _trigger_upload(self, session_package: dict[str, Any]) -> str:
         """Transmits session directly to Gluvok Cloud if online; drops if offline."""
-        from src.devices import is_wifi_connected
-
         session_id = str(session_package.get("session_id", "UNKNOWN"))
 
-        if not self._is_online or not is_wifi_connected():
+        if not self._is_online:
             logger.warning(
                 f"[Weighment] Wi-Fi offline. Weighment {session_id} discarded."
             )
