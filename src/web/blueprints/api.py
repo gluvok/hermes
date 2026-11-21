@@ -165,7 +165,6 @@ def status():
                 "stability_tolerance": config.stability_tolerance,
             },
             latest_weighment=get_latest_weighment(),
-            spool={},
             error_counts=get_error_counts(),
             events=get_system_events(),
         )

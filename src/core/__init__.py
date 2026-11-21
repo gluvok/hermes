@@ -1,7 +1,4 @@
-from src.core.db import (
-    get_default_db_path,
-    init_db,
-)
+from src.core.db import init_db
 from src.core.logger import (
     ColoredFormatter,
     setup_colored_logging,
@@ -37,7 +34,6 @@ __all__ = [
     "SessionPhase",
     "WeighbridgeSessionManager",
     "get_current_weight",
-    "get_default_db_path",
     "get_error_counts",
     "get_latest_weighment",
     "get_scale_state",

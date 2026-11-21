@@ -75,7 +75,7 @@ class TestSessionErrorFallback(unittest.TestCase):
         self.assertEqual(pkg["anpr_plate"], "RJ09GA0165")
         self.assertEqual(pkg["camera_snapshots"]["anpr_1"], fake_truck_frame)
 
-    @patch("src.core.session.send_frame_to_anpr_server")
+    @patch("src.integrations.anpr.send_frame_to_anpr_server")
     @patch("src.core.session.capture_anpr_snapshots")
     def test_multi_anpr_camera_ocr_consensus(self, mock_anpr_snaps, mock_send):
         frame_front = b"front_plate_frame"
@@ -86,7 +86,7 @@ class TestSessionErrorFallback(unittest.TestCase):
         ]
         # Front was noisy; Rear clearly detected plate
         mock_send.side_effect = (
-            lambda img: ("HR26DK8333", "SUCCESS") if img == frame_rear else (None, "NO_PLATE_DETECTED")
+            lambda img, **_: ("HR26DK8333", "SUCCESS") if img == frame_rear else (None, "NO_PLATE_DETECTED")
         )
 
         self.sm.start_session()
@@ -134,7 +134,7 @@ class TestSessionErrorFallback(unittest.TestCase):
         self.assertEqual(pkg["camera_snapshots"]["aux_1"], b"cabin_jpeg")
         self.assertEqual(pkg["camera_snapshots"]["aux_2"], b"bed_jpeg")
 
-    @patch("src.core.session.send_frame_to_anpr_server")
+    @patch("src.integrations.anpr.send_frame_to_anpr_server")
     @patch("src.core.session.capture_anpr_snapshots")
     def test_session_empty_results_from_argus_sends_no_plate_detected(self, mock_anpr_snaps, mock_send):
         fake_frame = b"fake_frame_bytes"

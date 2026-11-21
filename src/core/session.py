@@ -210,7 +210,6 @@ class WeighbridgeSessionManager:
             server_url=getattr(config, "anpr_server_url", None),
             callback=self.record_anpr_result,
             session=http_sess,
-            sender=send_frame_to_anpr_server,
         )
 
         with self._lock:

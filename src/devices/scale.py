@@ -17,7 +17,6 @@ import serial
 
 from src.config import config as app_config
 from src.config.constants import (
-    DEFAULT_SERIAL_BAUDRATE,
     DEFAULT_SERIAL_PORT,
     INTER_CHAR_TIMEOUT_S,
     MAX_BUFFER_LEN,
@@ -32,7 +31,7 @@ def get_current_serial_port() -> str:
 
 
 def get_current_baudrate() -> int:
-    return app_config.serial_baudrate or DEFAULT_SERIAL_BAUDRATE
+    return app_config.serial_baudrate
 
 
 class ScaleUARTReader:
@@ -106,10 +105,7 @@ class ScaleUARTReader:
         self.active_baudrate = baudrate
         self._close_serial()
         try:
-            try:
-                ser = serial.Serial(port, baudrate, timeout=SCALE_TIMEOUT, exclusive=True)
-            except TypeError:
-                ser = serial.Serial(port, baudrate, timeout=SCALE_TIMEOUT)
+            ser = serial.Serial(port, baudrate, timeout=SCALE_TIMEOUT, exclusive=True)
             with self._serial_lock:
                 self._serial = ser
             logger.info(f"[Scale] UART opened: {port} @ {baudrate} baud")

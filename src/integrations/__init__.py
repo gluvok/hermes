@@ -9,7 +9,6 @@ from src.integrations.gluvok import (
     GLUVOK_BASE_URL,
     post_to_cloud,
     transmit_entry_multipart,
-    verify_entry_in_cloud,
 )
 
 __all__ = [
@@ -21,5 +20,4 @@ __all__ = [
     "send_and_record_anpr_frame",
     "send_frame_to_anpr_server",
     "transmit_entry_multipart",
-    "verify_entry_in_cloud",
 ]
