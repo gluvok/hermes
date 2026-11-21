@@ -1,155 +1,90 @@
-# Hermes — Weighment & ANPR Integration System
+# Hermes
 
-Industrial weighing bridge integration controller bridging scale serial indicators, multi-camera capture, Argus ANPR, emergency Wi-Fi diagnostics, and Gluvok Cloud sync.
+Weighbridge controller for a Raspberry Pi 5. It reads the scale over UART, captures ANPR and overview camera frames, gets plate readings from the local Argus service, and uploads one entry per weighment to the Gluvok cloud. A Flask console on port 8080 and a fallback hotspot with a captive portal handle diagnostics and Wi-Fi setup.
 
----
+Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Module reference: [docs/CODEBASE_REFERENCE.md](docs/CODEBASE_REFERENCE.md).
 
-## ⚡ Prerequisites
+**Weighments are not queued.** If Hermes is offline, or an upload fails, that weighment is dropped and counted. The count is `cloud.unsent_weighments` on `/api/status` and a card on the dashboard.
 
-- **Python ≥ 3.14** (managed via `.python-version` / `pyproject.toml`)
-- **[uv](https://docs.astral.sh/uv/)** package manager
+## Requirements
 
----
+- Python 3.14 and [uv](https://docs.astral.sh/uv/)
+- Linux with NetworkManager (`nmcli`) for Wi-Fi features
 
-## 🚀 How to Run
+## Run from source
 
-### 1. Local Development (Source Code)
-
-Use this mode for local development, testing, and debugging directly from Python source:
+Hermes exits at startup unless both secrets are set:
 
 ```bash
-# Install dependencies
-uv sync
+export SUPERADMIN_PASS=<console admin password>
+export HERMES_HOTSPOT_PASS=<hotspot WPA2 passphrase, 8+ chars>
 
-# Start controller
+uv sync
 uv run python main.py
 ```
 
----
+Cloud credentials come from `data/client.lic`, not from the environment. Without it, the console works but uploads fail.
 
-### 2. Native Binary Build (Local Test)
-
-Compiles Hermes into a standalone native machine-code binary without exposing Python source:
+## Build a native binary
 
 ```bash
-# Compile and immediately launch:
-uv run python scripts/build.py --run
-
-# Or compile only into dist/hermes:
-uv run python scripts/build.py
+uv run python scripts/build.py --run   # build and launch
+uv run python scripts/build.py         # build into dist/hermes
 ```
 
----
+## Deploy to a Pi
 
-### 3. Production Release & Client Provisioning
-
-Hermes uses native binary compilation with Ed25519 digital signatures. **Source code never remains on client hardware.**
-
-#### 🚀 Single-Command Deployment (Zero Touch)
-Deploys from your Mac to the Raspberry Pi in one single command — generates the signed license on the fly, compiles the native C binary on the Pi, purges all `.py` files, configures `systemd`, and starts Hermes 24/7:
+Set the two secrets in your local shell, then:
 
 ```bash
-uv run python scripts/deploy.py \
-    --host gluvok@hermes.local \
-    --device-id <DEVICE_ID> \
-    --device-key <DEVICE_KEY> \
-    --center-id 1 \
-    --min-weight 70.0
+uv run python scripts/deploy.py --host <user>@<pi-host> \
+    --device-id <DEVICE_ID> --device-key <DEVICE_KEY> --center-id <N> --min-weight 70.0
 ```
 
-> **What this does automatically:**
-> 1. Generates the Ed25519 digitally signed license `data/client.lic`.
-> 2. Syncs source code to `/opt/hermes/` via `rsync`.
-> 3. Installs dependencies in `/opt/hermes/.venv` via `uv sync`.
-> 4. Compiles native machine-code binary into `/opt/hermes/bin/hermes` and creates clean launcher `/opt/hermes/run.sh`.
-> 5. Uploads `data/client.lic` to `/opt/hermes/data/client.lic`.
-> 6. **Purges all `.py` source files, tests, and documentation from the Pi** (0 `.py` files on client hardware).
-> 7. Automatically installs `/etc/systemd/system/hermes.service` and starts Hermes in the background with auto-restart on boot!
+The device flags sign a new `data/client.lic`. If you already have one, pass only `--host`.
 
-*(If you already have `data/client.lic`, you can simply run `uv run python scripts/deploy.py --host gluvok@hermes.local`)*
+The script syncs the code to `/opt/hermes`, builds the binary on the Pi, deletes all `.py` files there, writes `data/hermes.env` from your local secrets, creates the `hermes` system user with a sudoers drop-in, and installs and starts the `hermes` systemd service.
 
----
+**Not yet tested on a Pi:** running as the `hermes` user with the sudoers drop-in. Test a deploy on hardware before relying on it.
 
-#### 🔍 Monitoring & Service Control
-Hermes and the Argus ANPR microservice run as background `systemd` services on the Raspberry Pi:
+Service control on the Pi:
 
-##### 📜 Live Streaming Logs (`journalctl`)
-Run directly on the Pi (`gluvok@hermes:~ $`):
 ```bash
-# Follow Hermes logs:
-sudo journalctl -u hermes -f
-
-# Follow Argus ANPR logs:
-sudo journalctl -u argus -f
-
-# Follow both Hermes & Argus logs combined in a single stream:
-sudo journalctl -u hermes -u argus -f
-
-# Follow both with the last 100 lines of history:
-sudo journalctl -u hermes -u argus -f -n 100
-```
-
-Or remotely from your workstation via SSH:
-```bash
-# Follow Hermes logs:
-ssh gluvok@hermes.local "sudo journalctl -u hermes -f"
-
-# Follow Argus ANPR logs:
-ssh gluvok@hermes.local "sudo journalctl -u argus -f"
-
-# Follow both Hermes & Argus combined:
-ssh gluvok@hermes.local "sudo journalctl -u hermes -u argus -f"
-```
-
-##### ⚙️ Service Management (`systemctl`)
-```bash
-# Check service status:
 sudo systemctl status hermes
-sudo systemctl status argus
-
-# Restart services:
 sudo systemctl restart hermes
-sudo systemctl restart argus
-
-# Stop services:
-sudo systemctl stop hermes
-sudo systemctl stop argus
-
-# Run Hermes manually/interactively in foreground:
-cd /opt/hermes && ./run.sh
+sudo journalctl -u hermes -f
+cd /opt/hermes && ./run.sh        # run in the foreground
 ```
 
----
+## Console
 
-## 🖥️ Web Diagnostics Dashboard & Pure `nmcli` Captive Portal
+`http://<pi-ip>:8080`. Sign in as `superadmin` (override with `SUPERADMIN_USER`) with `SUPERADMIN_PASS`.
 
-- **URL**: `http://localhost:8080` (or `http://hermes.local:8080` / `http://<pi-ip>:8080`)
-- **Native Captive Portal**: Powered purely by Linux `nmcli` (NetworkManager) and built-in Python DNS/HTTP services (zero external binaries like `balena wifi-connect`). Automatically triggers *"Sign in to Wi-Fi"* captive popup sheet on Android & iOS upon connecting to the hotspot.
-- **Emergency Hotspot AP**: `hermes` (Password: set via `HERMES_HOTSPOT_PASS` in `data/hermes.env` | Captive Portal: `http://hermes.local` or `http://10.42.0.1`, Web Console: `http://hermes.local:8080/wifi`)
-  - *Automated AP Restoration*: If target network connection fails or credentials reject, AP restores instantly so user is never locked out.
-  - *Flap-Debounced Watchdog*: Requires consecutive network check failures before engaging emergency portal, preventing flapping from momentary packet drops. Never interrupts active connection handshakes.
-  - *Live Network Scanning*: Scans and displays live nearby SSIDs with signal strength (%) and security modes via `/api/networks` and `/networks`.
-  - *Persistent Wi-Fi Vault*: Remembers all known networks in local SQLite DB for 1-click reconnection without re-entering passwords.
-  - *Local Domain Mapping*: Maps `hermes.local` directly in `/etc/hosts` so browser navigation to `http://hermes.local` works seamlessly without entering IP addresses.
-- **Standalone Wi-Fi CLI**: Run `sudo python3 wifi_setup.py` (or `python3 wifi_setup.py --scan`, `python3 wifi_setup.py --connect --ssid <SSID> --password <PWD>`).
-- **Superadmin User**: `superadmin` (override with `SUPERADMIN_USER`)
-- **Superadmin Password**: set `SUPERADMIN_PASS` in `data/hermes.env`. Hermes refuses to start without `SUPERADMIN_PASS` and `HERMES_HOTSPOT_PASS`; `scripts/deploy.py` reads both from your local environment and writes them to `data/hermes.env` on the Pi.
-- **Dynamic Configuration**: Live tuning of Serial Port path, Baud Rate, Stability Duration (1.0–60.0s), Stability Tolerance (0.1–50.0kg), and ANPR / Auxiliary camera URLs with hot-reload directly from the browser.
+- Without signing in, `/api/status` shows health only.
+- Signed in, you can change the serial port, baud rate, stability window and tolerance, camera URLs, and Wi-Fi.
+- Failed logins are limited to 5 per minute per IP. Use the sign-out button or `POST /api/logout` to end a session.
 
----
+## Wi-Fi fallback
 
-## 💡 Hardware RGB LED Status Indicators
+When connectivity checks fail twice in a row, Hermes starts a hotspot named `hermes` (passphrase `HERMES_HOTSPOT_PASS`) and a captive portal at `http://10.42.0.1` (`http://hermes.local`). Joining a network from the portal requires the admin user ID and password. The hotspot stops when the internet returns. While offline, weighing is blocked.
 
-Hermes provides real-time operational feedback via an RGB LED (GPIO 17 Red, GPIO 27 Green, GPIO 22 Blue):
+Command-line alternative from a source checkout (deploy removes it from the Pi): `sudo python3 wifi_setup.py --scan`, or `--connect --ssid <SSID> --password <PWD>`, or `--hotspot`.
 
-| Color | State | Description |
-| :--- | :--- | :--- |
-| 🟢 **Green** | **Idle & Online** | Scale standby at 0.0 kg; connected to Wi-Fi/Internet and ready for next vehicle. |
-| 🟡 **Yellow / Amber** | **Offline & Blocked** | Not connected to internet / captive portal hotspot active. All weighment operations are immediately stopped and blocked. |
-| 🔴 **Red** | **Active Weighment** | Vehicle on platform (weight > threshold); weighment & ANPR capture in progress (online only). |
-| 🔵 **Blue** | **Cloud Success** | 10-second transient pulse confirming upload to Gluvok Cloud, then reverts to Green (online) or Yellow (offline). |
-| ⚫ **Off** | **Shutdown** | Daemon stopped / cleanup complete. |
+## LED
 
----
+| Color | Meaning |
+| :--- | :--- |
+| Green | Idle and online |
+| Red | Weighment in progress |
+| Yellow | Offline |
+| Blue | Upload succeeded (10 s) |
 
-> For detailed hardware topologies, sequence flows, and system architecture, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+GPIO 17 red, 27 green, 22 blue.
+
+## Development
+
+```bash
+uv run ruff check --fix && uv run ty check && uv run pytest -q
+```
+
+The same checks run in CI and in `.githooks/pre-push`.
