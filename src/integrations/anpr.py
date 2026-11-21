@@ -107,11 +107,8 @@ def _parse_anpr_response(
             logger.info(
                 f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}"
             )
-            text = raw_body.upper()
-            if text and text != "N/A":
-                logger.info(f"[ANPR] Server returned text response: '{text}'")
-                return text, "SUCCESS"
-            logger.warning(f"[ANPR] Failed to parse server response: {parse_err}")
+            logger.warning(f"[ANPR] Failed to parse server response as JSON: {parse_err}. Body: {raw_body}")
+            return None, "ANPR_BAD_RESPONSE"
     else:
         logger.info(
             f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}"
