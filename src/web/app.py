@@ -39,11 +39,6 @@ def _register_security_headers(app: Flask) -> None:
     def set_security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, X-Auth-Token"
-        )
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return response
 
 
