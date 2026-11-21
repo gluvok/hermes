@@ -17,7 +17,7 @@ def is_valid_url(url: str) -> bool:
     if not url:
         return True
     u = url.lower()
-    return u.startswith(("http://", "https://", "rtsp://")) and not any(c in url for c in ("\r", "\n", "\0", " "))
+    return u.startswith(("http://", "https://", "rtsp://")) and not any(c in url for c in ("\r", "\n", "\0", " ", '"', "'", "<", ">"))
 
 
 def _validate_serial(port: Any, baud: Any) -> tuple[bool, str | None]:

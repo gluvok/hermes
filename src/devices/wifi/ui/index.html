@@ -139,6 +139,15 @@
       }
     }
 
+    // Renders "<strong>title</strong>before<em>ssid</em>after" without interpolating ssid into HTML.
+    function setAlertWithSsid(el, title, before, ssid, after) {
+      const strong = document.createElement('strong');
+      strong.textContent = title;
+      const em = document.createElement('em');
+      em.textContent = ssid;
+      el.replaceChildren(strong, before, em, after);
+    }
+
     async function loadNetworks() {
       const box = document.getElementById('networks');
       box.innerHTML = '<div style="padding:12px;font-size:0.75rem;color:#71717a;text-align:center">Scanning for networks...</div>';
@@ -155,7 +164,15 @@
           div.className = 'network-item';
           const sig = net.signal ? `${net.signal}%` : '';
           const bars = net.bars || '';
-          div.innerHTML = `<span class="net-ssid"><strong>${net.ssid}</strong></span><span class="net-meta">${bars} ${sig}</span>`;
+          const ssidEl = document.createElement('span');
+          ssidEl.className = 'net-ssid';
+          const strong = document.createElement('strong');
+          strong.textContent = net.ssid;
+          ssidEl.appendChild(strong);
+          const metaEl = document.createElement('span');
+          metaEl.className = 'net-meta';
+          metaEl.textContent = `${bars} ${sig}`;
+          div.append(ssidEl, metaEl);
           div.onclick = () => {
             document.querySelectorAll('.network-item').forEach(el => el.classList.remove('selected'));
             div.classList.add('selected');
@@ -169,6 +186,7 @@
       }
     }
 
+    async function handleSubmit(e) {
       e.preventDefault();
       const ssid = document.getElementById('ssid').value.trim();
       const passphrase = document.getElementById('passphrase').value;
@@ -193,7 +211,7 @@
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.success !== false) {
           alert.className = 'alert success';
-          alert.innerHTML = `<strong>Connected!</strong> Successfully joined <em>${ssid}</em>. Reconnecting your phone to your local Wi-Fi.`;
+          setAlertWithSsid(alert, 'Connected!', ' Successfully joined ', ssid, '. Reconnecting your phone to your local Wi-Fi.');
           document.getElementById('status-pill').textContent = 'ONLINE';
           document.getElementById('status-pill').className = 'status-badge online';
         } else {
@@ -204,7 +222,7 @@
         }
       } catch (err) {
         alert.className = 'alert success';
-        alert.innerHTML = `<strong>Handshake Sent!</strong> The device is switching to client mode on <em>${ssid}</em>.`;
+        setAlertWithSsid(alert, 'Handshake Sent!', ' The device is switching to client mode on ', ssid, '.');
       }
     }
 
