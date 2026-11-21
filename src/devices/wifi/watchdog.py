@@ -58,7 +58,8 @@ def start_wifi_watchdog(interval: float = 1.0) -> bool:
     if _running and _watchdog_thread and _watchdog_thread.is_alive(): return True
     _running = True
     _watchdog_thread = threading.Thread(target=_watchdog_loop, args=(interval,), name="WiFiWatchdog", daemon=True)
-    _watchdog_thread.start(); return True
+    _watchdog_thread.start()
+    return True
 
 def stop_wifi_watchdog() -> None:
     global _running, _watchdog_thread
