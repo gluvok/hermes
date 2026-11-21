@@ -21,6 +21,7 @@ from src.web.auth import (
     extract_auth_token,
     is_rate_limited,
     record_failed_login,
+    revoke_session_token,
     validate_session_token,
     verify_credentials,
 )
@@ -112,6 +113,13 @@ def login():
         "success": False,
         "error": "Invalid user ID or password.",
     }), 401
+
+
+@api_bp.route("/logout", methods=["POST"])
+def logout():
+    """Revokes the presented session token. Safe to call without a valid token."""
+    revoke_session_token(extract_auth_token())
+    return jsonify({"success": True}), 200
 
 
 @api_bp.route("/status", methods=["GET"])

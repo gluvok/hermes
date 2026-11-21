@@ -966,7 +966,10 @@
     }
 
     function logoutConfig() {
-      lockAdminPanels();
+      // Revoke server-side, but clear local state whether or not the request succeeds.
+      fetch('/api/logout', { method: 'POST', headers: getAuthHeaders() })
+        .catch(() => {})
+        .finally(lockAdminPanels);
     }
 
     function toggleAdminPasswordVisibility() {
