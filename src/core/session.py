@@ -12,6 +12,7 @@ import logging
 import threading
 import time
 import uuid
+from collections import Counter
 from concurrent.futures import Future, ThreadPoolExecutor
 from enum import Enum
 from typing import Any
@@ -361,6 +362,7 @@ class WeighbridgeSessionManager:
 
             total_samples = len(self._anpr_plates)
             total_frames = sum(len(f) for f in self._anpr_frame_buffers.values())
+            status_counts = dict(Counter(self._anpr_statuses))
 
             package = {
                 "session_id": self.session_id,
@@ -369,6 +371,7 @@ class WeighbridgeSessionManager:
                 "camera_snapshots": fleet_copy,
                 "total_anpr_samples": total_samples,
                 "total_anpr_frames": total_frames,
+                "anpr_status_counts": status_counts,
                 "timestamp": time.time(),
             }
 
@@ -381,7 +384,9 @@ class WeighbridgeSessionManager:
                 f"Total Snapshots={len(fleet_copy)}"
             )
             is_err = bool(not self._anpr_plates)
-            _record_session_telemetry(self.session_id, final_anpr_plate, self.stable_weight, is_err)
+            _record_session_telemetry(
+                self.session_id, final_anpr_plate, self.stable_weight, is_err, status_counts
+            )
             return package
 
     def reset_session(self):
@@ -428,6 +433,7 @@ def _record_session_telemetry(
     plate: str,
     weight: float,
     is_error: bool,
+    anpr_status_counts: dict[str, int],
 ) -> None:
     """Bridge completed session outcome to core telemetry store."""
     try:
@@ -441,6 +447,10 @@ def _record_session_telemetry(
         record_system_event(
             "WEIGHMENT",
             f"Session {session_id}: {weight:.3f} kg -> Plate: '{plate}'",
+        )
+        record_system_event(
+            "ANPR",
+            f"Session {session_id} statuses: {anpr_status_counts}",
         )
     except (ImportError, AttributeError, ValueError) as e:
         logger.debug(f"[Session] Error recording live telemetry: {e}")
