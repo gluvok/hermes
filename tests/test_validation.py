@@ -2,7 +2,17 @@ import pytest
 
 from src.config.client_config import SERIAL_PORT
 from src.config.constants import DEFAULT_SERIAL_PORT
-from src.web.validation import validate_config_payload
+from src.web.validation import is_valid_url, validate_config_payload
+
+
+@pytest.mark.parametrize("char", ['"', "'", "<", ">"])
+def test_is_valid_url_rejects_html_metacharacters(char):
+    assert not is_valid_url(f"http://x/{char}onmouseover=1")
+
+
+def test_is_valid_url_accepts_plain_urls():
+    assert is_valid_url("rtsp://admin:pw@192.168.1.10:554/stream")
+    assert is_valid_url("")
 
 
 @pytest.mark.parametrize(
