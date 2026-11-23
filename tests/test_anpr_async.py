@@ -8,10 +8,12 @@ error isolation, and lifecycle cleanup.
 from __future__ import annotations
 
 import concurrent.futures
+import threading
 import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+from src.config.constants import ANPR_MAX_IN_FLIGHT
 from src.core.session import SessionPhase, WeighbridgeSessionManager
 from src.integrations.anpr import (
     dispatch_anpr_batch,
@@ -157,3 +159,35 @@ class TestAsyncANPR(unittest.TestCase):
             assert pkg is not None
             # The delayed future was drained before voting
             self.assertEqual(pkg["anpr_plate"], "KA01MM4444")
+
+    @patch("src.core.session.capture_anpr_snapshots")
+    def test_in_flight_cap_skips_capture_until_futures_finish(self, mock_snaps):
+        mock_snaps.return_value = [(1, "http://cam1/frame", b"jpeg")]
+        self.sm.start_session()
+        self.sm._stop_anpr_event.set()
+        if self.sm._anpr_thread:
+            self.sm._anpr_thread.join(timeout=0.5)
+
+        release = threading.Event()
+
+        def blocked_sender(_img_bytes, **_kwargs):
+            release.wait(timeout=5.0)
+            return ("MH12AB9999", "SUCCESS")
+
+        try:
+            with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=blocked_sender):
+                for _ in range(ANPR_MAX_IN_FLIGHT + 3):
+                    self.sm._capture_and_record_anpr_sample(wait=False)
+
+                self.assertEqual(mock_snaps.call_count, ANPR_MAX_IN_FLIGHT)
+                self.assertLessEqual(len(self.sm._pending_anpr_futures), ANPR_MAX_IN_FLIGHT)
+
+                release.set()
+                concurrent.futures.wait(self.sm._pending_anpr_futures, timeout=2.0)
+
+                futures = self.sm._capture_and_record_anpr_sample(wait=False)
+                self.assertEqual(mock_snaps.call_count, ANPR_MAX_IN_FLIGHT + 1)
+                self.assertEqual(len(futures), 1)
+                concurrent.futures.wait(futures, timeout=2.0)
+        finally:
+            release.set()
