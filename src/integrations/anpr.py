@@ -107,11 +107,8 @@ def _parse_anpr_response(
             logger.info(
                 f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}"
             )
-            text = raw_body.upper()
-            if text and text != "N/A":
-                logger.info(f"[ANPR] Server returned text response: '{text}'")
-                return text, "SUCCESS"
-            logger.warning(f"[ANPR] Failed to parse server response: {parse_err}")
+            logger.warning(f"[ANPR] Failed to parse server response as JSON: {parse_err}. Body: {raw_body}")
+            return None, "ANPR_BAD_RESPONSE"
     else:
         logger.info(
             f"[ANPR] [Argus Response] Status {response.status_code}{latency_str}: {raw_body}"
@@ -167,25 +164,17 @@ def send_and_record_anpr_frame(
     server_url: str | None = None,
     callback: AnprRecordCallback | None = None,
     session: requests.Session | None = None,
-    sender: Callable[..., tuple[str | None, str]] | None = None,
 ) -> tuple[str | None, str]:
     """Execute ANPR request for a single camera frame and invoke record callback."""
-    sender_fn = sender or send_frame_to_anpr_server
     logger.info(
         f"[ANPR] Camera {cam_idx}: Dispatching image ({len(image_bytes)} bytes) "
         f"for session {session_id} to Argus..."
     )
     t0 = time.time()
     try:
-        if session is not None or server_url is not None:
-            try:
-                plate, status_code = sender_fn(
-                    image_bytes, server_url=server_url, session=session
-                )
-            except TypeError:
-                plate, status_code = sender_fn(image_bytes)
-        else:
-            plate, status_code = sender_fn(image_bytes)
+        plate, status_code = send_frame_to_anpr_server(
+            image_bytes, server_url=server_url, session=session
+        )
     except (requests.RequestException, OSError, ValueError, RuntimeError) as exc:
         logger.error(f"[ANPR] Worker error for session {session_id} cam {cam_idx}: {exc}")
         plate, status_code = None, "ANPR_WORKER_ERROR"
@@ -218,7 +207,6 @@ def dispatch_anpr_batch(
     server_url: str | None = None,
     callback: AnprRecordCallback | None = None,
     session: requests.Session | None = None,
-    sender: Callable[..., tuple[str | None, str]] | None = None,
 ) -> list[Future[tuple[str | None, str]]]:
     """Submit a batch of ANPR camera frames concurrently to the worker pool."""
     futures: list[Future[tuple[str | None, str]]] = []
@@ -233,7 +221,6 @@ def dispatch_anpr_batch(
             server_url,
             callback,
             session,
-            sender,
         )
         futures.append(future)
     return futures

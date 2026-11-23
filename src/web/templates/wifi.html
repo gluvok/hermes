@@ -296,15 +296,18 @@
           item.className = 'network-item';
           const signal = net.signal || -60;
           const sec = net.security || 'WPA2';
-          item.innerHTML = `
-            <div class="network-name">
-              <span>${net.ssid}</span>
-            </div>
-            <div class="network-meta">
-              <span>${sec}</span>
-              ${getSignalBars(signal)}
-            </div>
-          `;
+          const name = document.createElement('div');
+          name.className = 'network-name';
+          const ssidEl = document.createElement('span');
+          ssidEl.textContent = net.ssid;
+          name.appendChild(ssidEl);
+          const meta = document.createElement('div');
+          meta.className = 'network-meta';
+          const secEl = document.createElement('span');
+          secEl.textContent = sec;
+          meta.appendChild(secEl);
+          meta.insertAdjacentHTML('beforeend', getSignalBars(signal)); // numeric-only markup
+          item.append(name, meta);
           item.onclick = () => {
             document.getElementById('wifi-ssid').value = net.ssid;
             document.getElementById('wifi-password').focus();
@@ -318,7 +321,7 @@
 
     async function loadStatus() {
       try {
-        const res = await fetch('/api/status');
+        const res = await fetch('/api/status', authToken ? {headers: {'X-Auth-Token': authToken}} : {});
         const data = await res.json();
         const pill = document.getElementById('status-pill');
         if (data.connected) {

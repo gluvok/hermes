@@ -1,357 +1,163 @@
-# Hermes System Architecture Guide
+# Hermes Architecture
 
-`hermes` is an industrial weighing bridge integration controller deployed on a Raspberry Pi. It synchronizes scale serial indicators, automated multi-camera captures, FastAPI-based Argus ANPR (Automatic Number Plate Recognition), emergency fallback Wi-Fi networking, and cloud database persistence via the Gluvok API.
+Hermes runs on a Raspberry Pi 5 at a weighbridge. It reads the scale over UART, captures ANPR and overview camera frames, asks the local Argus service for plate readings, and uploads one entry per weighment to the Gluvok cloud. A Flask console on port 8080 and an nmcli-based hotspot with a captive portal handle diagnostics and Wi-Fi setup.
+
+This document describes what the code does today. For module-level detail see [CODEBASE_REFERENCE.md](CODEBASE_REFERENCE.md).
 
 ---
 
-## 1. High-Level System Architecture
+## 1. Data flow
 
 ```mermaid
 graph TD
-    subgraph Hardware Layer
-        Scale[Indicator Serial Stream /dev/ttyAMA0 @ 1200 Baud]
-        CamANPR[ANPR Cameras 1..N: License Plate Snapshots]
-        CamAux[Auxiliary Cameras 1..M: Overview Snapshots]
-    end
-
-    subgraph Hermes Controller
-        UART[ScaleUARTReader / Line Buffer]
-        Stability[ScaleStabilityMachine 10s Continuous Window]
-        SessionMgr[WeighbridgeSessionManager]
-        ANPRClient[ANPR Client / Argus REST]
-        WebDiag[Fallback HTTP Server :8080]
-        WiFiWatchdog[WiFi Watchdog & Emergency Hotspot]
-    end
-
-    subgraph External & Cloud
-        ArgusMicroservice[Argus ANPR Microservice :8000]
-        GluvokAPI[Gluvok Cloud API gluvok.vercel.app]
-    end
-
-    Scale -->|Serial Bytes| UART
-    UART -->|Weight Float| Stability
-    Stability -->|Weight Threshold Crossed| SessionMgr
-    SessionMgr -->|Continuous Capture Loop| CamANPR
-    CamANPR -->|JPEG Buffer| ANPRClient
-    ANPRClient -->|POST /recognize| ArgusMicroservice
-    ArgusMicroservice -->|Candidate Plate / Error| ANPRClient
-    Stability -->|10s Stability Confirmed| SessionMgr
-    SessionMgr -->|Parallel Fleet Trigger| CamAux
-    SessionMgr -->|Session Package| GluvokAPI
-    WebDiag <-->|Telemetry & Reconfig| SessionMgr
-    WiFiWatchdog <-->|nmcli captive portal & watchdog| WebDiag
+    Scale[Scale indicator, UART] --> UART[ScaleUARTReader]
+    UART -->|weight| Stab[ScaleStabilityMachine]
+    Stab -->|start / stable / reset| Sess[WeighbridgeSessionManager]
+    Sess -->|every 1 s| Cams[Cameras: HTTP snapshot or RTSP]
+    Cams -->|JPEG| Argus[Argus /recognize]
+    Argus -->|plate or status| Sess
+    Sess -->|package| Upload[CloudUpload thread]
+    Upload -->|POST /api/entries| Cloud[Gluvok cloud]
+    Watchdog[WiFiWatchdog] -->|online / offline| Stab
+    Watchdog -->|offline| Hotspot[Hotspot + captive portal]
+    Web[Flask console :8080] --- Sess
 ```
+
+One weighment, in order:
+
+1. The scale reports a weight at or above `min_weight`. The stability machine starts a session, which starts a 1 s ANPR loop: every ANPR camera is grabbed and each frame is sent to Argus in a worker pool.
+2. Halfway through the stability window (`stability_duration / 2`), a background thread grabs every camera (ANPR and auxiliary) and compresses each frame in RAM.
+3. When the weight has stayed within `stability_tolerance` for `stability_duration` (default 10 s, ±2 kg), the stable weight is locked and a 5 s post-stability timer starts.
+4. After 5 s the session is finalized without waiting on slow Argus calls. The plate is the most frequent reading across all samples, or `NO_PLATE_DETECTED`.
+5. If Hermes is online, a `CloudUpload_<session_id>` thread posts the package to the cloud. The state machine then ignores the scale until the weight falls below `min_weight` (one upload per truck).
+
+`main.loop()` and the UART thread both call `check_session_progress()`. The phase change inside it is lock-protected, so only one caller receives the package.
+
+### Offline, failed and errored weighments are dropped
+
+There is no spool, outbox or retry queue. Nothing is written to disk for a weighment.
+
+- While the watchdog reports offline, the state machine ignores scale input and aborts any active session.
+- If the package completes while offline, it is discarded and a `WEIGHMENT_DISCARDED` event is logged.
+- If the upload fails (HTTP error, timeout, network error, exception), it is logged and not retried.
+
+Every dropped weighment increments `cloud.unsent_weighments` in `GET /api/status`. The dashboard shows it on the cloud card, in amber when above 0. The counter is in memory and resets on restart.
+
+### Cloud upload
+
+`POST {GLUVOK_BASE_URL}/api/entries` with HTTP Basic auth (`device_id:device_key`), timeout 20 s, multipart form fields `center_id`, `detected_vehicle_number`, `weight`, and one `file` part per camera (`truck_<label>.jpg`, labels `anpr_1`, `aux_1`, ...). If the server answers 400 with "storage" in the body, the entry is re-posted once without images. HTTP 200/201 is success. Everything else, including 409, is an error recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400) or `CLOUD_UPLOAD_ERROR` (other). On success the LED pulses blue for 10 s.
+
+### Images
+
+HTTP snapshots are used as received. RTSP frames are encoded once at JPEG quality 85. Before upload, every frame is downscaled to at most 1920 px and re-encoded at quality 75 (`src/services/image_compressor.py`). The cloud client sends the bytes as is; it does not compress again.
+
+### ANPR statuses
+
+Each Argus call yields a plate or a status code: `SUCCESS`, `NO_PLATE_DETECTED`, `EMPTY_IMAGE`, `ANPR_BAD_RESPONSE` (HTTP 200 with a non-JSON body), `ANPR_HTTP_<code>`, `ANPR_TIMEOUT`, `ANPR_CONNECTION_ERROR`, `ANPR_REQUEST_ERROR`, `ANPR_WORKER_ERROR`. The session counts every status. The count is in the package as `anpr_status_counts` and is logged as an `ANPR` system event ("Session X statuses: {...}"), so an Argus outage is visible as many non-`SUCCESS` counts and not only as a missing plate.
 
 ---
 
-## 2. Core System Capabilities & Key Features
+## 2. Threads and supervision
 
-- **Write-Ahead SQLite Local Durability**: Weighments and camera frames are committed to a local SQLite database (`data/hermes.db`) in WAL mode *before* any upload is attempted, guaranteeing zero data loss during power outages or extended network downtime.
-- **Edge Anti-Duplication & Idempotency**: Sequential single-flight FIFO dispatcher with atomic task leases (`lease_until`) and a **verify-before-retry** protocol for ambiguous read timeouts, preventing duplicate cloud entries when retrying offline weighments.
-- **Weight Scale Serial Parsing**: Reads continuous raw serial stream from UART (`/dev/ttyAMA0` or USB-to-Serial, configurable baud rate e.g. 1200 or 9600 Baud 8N1).
-- **Weight Stabilization Detection**: Continuous weight stability tracking with dynamic site configuration (`stability_duration`, default `10.0s`; `stability_tolerance`, default `±2.0 kg`).
-- **Multi-Camera ANPR OCR & Consensus Voting**: Concurrently captures frames from all configured ANPR cameras (Front, Rear, etc.) every 1 second during active weighing and elects the highest-frequency plate candidate.
-- **Synchronized Full-Fleet Camera Snapshots & Pre-Compression**: Captures high-resolution snapshots across all cameras in parallel halfway through the stability window (t=5s) and pre-compresses them to high-clarity JPEG (Q85, max 1920px) in RAM, eliminating finalization delays upon weight stabilization.
-- **Non-Blocking Real-Time Threading**: Scale serial reading is completely decoupled from disk spooling and network I/O; cloud uploads and camera captures are dispatched in dedicated background threads.
-- **Gluvok Cloud API Multipart Integration**: Matches curl specification (`curl -X POST ... -u "pi1:hardware123" -F "center_id=..." -F "detected_vehicle_number=..." -F "weight=..." -F "file=@..."`).
-- **Web Diagnostics Dashboard**: Modular Flask application factory on port `8080` displaying live scale weight, ANPR status, cloud spool queue counts, error monitoring, and configuration.
-- **Pure nmcli Captive Portal**: Direct NetworkManager control via `nmcli` (zero external binaries) with RFC 8910 DHCP Option 114, RFC 8908 captive API, DNS interception, flap-debounced watchdog, live network scanning, persistent SQLite vault, and automatic fallback AP restoration.
-
----
-
-## 3. Project Layout & File Structure
-
-```
-hermes/
-├── main.py                    # Application entry point, setup, and loop
-├── pyproject.toml             # Project definition, dependencies, and test config (uv-managed)
-├── uv.lock                    # Dependency lockfile
-├── README.md                  # Streamlined operational runbook
-├── AGENTS.md                  # Code quality, linting, typing, and architectural rules
-├── scripts/
-│   └── build.py               # Local Nuitka compilation script for bespoke client builds
-├── docs/
-│   ├── ARCHITECTURE.md        # Deep architectural design, threading, and hardware interfaces
-│   └── CODEBASE_REFERENCE.md  # Exhaustive function-by-function developer guide
-├── tests/
-│   ├── test_anpr_async.py     # Asynchronous ANPR dispatch, concurrency, and truck session association tests
-│   ├── test_anpr_client.py    # ANPR client, response schemas, and plate voting tests
-│   ├── test_scale_uart.py     # Scale UART parser, framing, and silence flush tests
-│   ├── test_session_fallback.py # Weighbridge session error propagation tests
-│   ├── test_cloud_post.py     # Gluvok API multipart and Basic Auth tests
-│   ├── test_online_transmission.py # Direct online upload, offline discard, and Wi-Fi vault tests
-│   ├── test_threading_isolation.py # Threading concurrency and non-blocking isolation tests
-│   ├── test_web_server.py     # Diagnostics web console & REST API tests
-│   └── test_wifi_manager.py   # Wi-Fi watchdog & emergency hotspot fallback tests
-└── src/
-    ├── config/
-    │   ├── __init__.py        # Subpackage exports (`config`, `ConfigManager`)
-    │   ├── client_config.py   # Bespoke compiled client configuration (credentials, IDs, URLs)
-    │   ├── constants.py       # System timing, timeout constants, buffer sizes & regexes
-    │   ├── manager.py         # Unified thread-safe ConfigManager accessor
-    │   ├── runtime.py         # Runtime configuration override mutator
-    │   └── store.py           # SQLite persistence for runtime overrides (`data/hermes.db`)
-    ├── core/
-    │   ├── __init__.py         # Subpackage exports
-    │   ├── db.py              # SQLite initialization for Wi-Fi credentials vault
-    │   ├── session.py         # Weighbridge session lifecycle & multi-camera coordinator
-    │   ├── stability.py       # 10s continuous weight stability state machine
-    │   └── telemetry.py       # Decoupled thread-safe telemetry and event log buffer
-    ├── devices/
-    │   ├── __init__.py         # Subpackage exports
-    │   ├── scale.py           # UART serial stream reader & line buffer parser
-    │   ├── camera.py          # HTTP snapshot / RTSP frame grabber & parallel aux captures
-    │   └── wifi/              # Pure nmcli subpackage (hotspot, connection, watchdog, scanner, captive portal)
-    ├── integrations/
-    │   ├── __init__.py         # Subpackage exports
-    │   ├── anpr.py            # Argus ANPR server client & plate voting algorithm
-    │   └── gluvok.py          # Gluvok Cloud API client (Basic Auth, multipart upload, verification)
-    └── web/
-        ├── __init__.py         # Subpackage exports
-        ├── app.py             # Flask application factory (create_app)
-        ├── auth.py            # Superadmin auth, token sliding, rate limiting, and decorators
-        ├── validation.py      # Configuration input sanitization and URL validation utilities
-        ├── blueprints/
-        │   ├── api.py         # REST API endpoints (/api/status, /api/config, /api/login, etc.)
-        │   └── views.py       # Page routes serving the dashboard UI
-        ├── server.py          # Threaded WSGI server runner (:8080) & lifecycle management
-        ├── static/            # Offline vendor JS bundles (Tailwind CSS v4 & Lucide Icons)
-        │   ├── lucide.min.js
-        │   └── tailwindcss.js
-        └── templates/
-            └── index.html     # Real-time Tailwind CSS v4 diagnostics & configuration web UI
-```
-
----
-
-## 4. Subsystem Quick Reference
-
-| Subsystem | Primary Responsibilities | Key Components |
+| Thread | Started by | Job |
 | :--- | :--- | :--- |
-| **Core Business Logic & State Machine** (`src/core/`) | Orchestrates weighbridge sessions, 10s continuous weight stability (±2 kg), direct online cloud dispatch, and telemetry store. | `db.py`, `session.py`, `stability.py`, `telemetry.py` |
-| **Physical Hardware Devices** (`src/devices/`) | Direct drivers: reads RS-232 serial stream at 1200 baud, HTTP/RTSP camera snapshot grabbers, and Linux NetworkManager (`nmcli`) Wi-Fi watchdog. | `scale.py`, `camera.py`, `wifi.py` |
-| **External Integrations** (`src/integrations/`) | Integrates external networks: Argus ANPR microservice with consensus voting, and Gluvok Cloud API with Basic Auth (`-u`), multipart form uploads, and anti-duplicate verification. | `anpr.py`, `gluvok.py` |
-| **Diagnostics Web Console** (`src/web/`) | Modular Flask application factory on port `8080` with Tailwind CSS v4 single-page dashboard for live telemetry, spool queue state, system logs, and authenticated configuration. | `create_app`, `FallbackWebServer`, `index.html` |
-| **System Configuration** (`src/config/`) | Thread-safe JSON-backed configuration manager (`RLock`), centralized timing/timeout constants, and fallback defaults. | `config_manager.py`, `constants.py` |
+| main | `main.py` | `loop()` every 1 s: supervise, then `check_session_progress()` |
+| `ScaleUART` | `ScaleUARTReader.start()` | Read serial, parse weights, drive the stability machine. Reopens the port every 5 s after a loss. |
+| `FallbackWebServer` | `start_web_server()` | Flask console, `:8080` |
+| `WiFiWatchdog` | `start_wifi_watchdog()` | Connectivity checks every 1 s |
+| `ANPRLoop_<id>` | session start | Capture ANPR frames every 1 s, dispatch to the Argus worker pool (4 workers) |
+| `FleetCapture_<id>` | mid-stability or stable | Capture all cameras and compress |
+| `CloudUpload_<id>` | session finalized | Upload one entry |
+| `CaptiveHTTP`, `CaptiveDNS` | hotspot start | Captive portal, only while the hotspot is up |
+
+`main.loop()` restarts the UART reader and the watchdog if their threads died. The web server and portal threads are not supervised.
+
+The watchdog is the only code that probes the network (TCP to 1.1.1.1:53, then 8.8.8.8:53, 2 s each). After 2 consecutive failed checks it calls `notify_network_status(False)`, which updates the stability machine first and the LED second, so an LED fault cannot stop the weighment from going offline. The UART thread reuses that verdict and never probes. The stability machine assumes online until the watchdog says otherwise.
+
+Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the session manager, telemetry (`_events_lock`, `_live_lock`), the Wi-Fi vault, nmcli (`nmcli_lock`, serializes all nmcli calls).
 
 ---
 
-## 5. Component Breakdown
+## 3. Console security
 
-### 5.1 Core Business Logic (`src/core/`)
-- **`WeighbridgeSessionManager` (`session.py`)**:
-  - Coordinates the session lifecycle (`PHASE_IDLE` -> `PHASE_STABILIZING` -> `PHASE_POST_STABILITY` -> `PHASE_COMPLETED`).
-  - Runs a 1-second concurrent capture loop across all configured ANPR cameras during the stabilization phase.
-  - Triggers asynchronous full-fleet camera snapshot capture and in-RAM JPEG compression halfway through stability (t=5s).
-  - Enforces a reduced 5-second post-stability window, finalizing the session immediately without waiting on slow in-flight Argus calls.
-  - Assembles the final session package containing stable weight, highest-voted consensus plate, and pre-compressed camera images in `camera_snapshots`.
-- **`ScaleStabilityMachine` (`stability.py`)**:
-  - Requires weight to exceed `min_weight` (default `50.0 kg`) to trigger a weighing session.
-  - Implements continuous stability tracking using dynamic configuration (`stability_tolerance`, default `±2.0 kg`; `stability_duration`, default `10.0s`).
-  - Once stable, transitions to `SCALE_STABLE_RECORDED` to guarantee strictly one upload per truck session.
-  - Resets to `SCALE_IDLE` only when weight drops back to `<= 0.0 kg`.
-- **`Telemetry Store` (`telemetry.py`)**:
-  - Decoupled, thread-safe store for circular system event logs (`max 20 entries`), latest weighment results, and live error counters.
-  - Guards state using dedicated threading locks (`_events_lock`, `_live_lock`).
-
-### 5.2 Physical Hardware Devices (`src/devices/`)
-- **`ScaleUARTReader` (`scale.py`)**:
-  - Connects to the weighing indicator via serial (`/dev/ttyAMA0` or USB serial at 1200 baud, 8N1).
-  - Maintains a thread-safe byte buffer (`bytearray`), handling packet terminators (`\r`, `\n`, STX `\x02`, ETX `\x03`) and an inter-character silence flush (300 ms).
-  - Uses regex extraction (`rb"([0-9]{3,6})MN"` and flexible signed float patterns) to parse numeric weights.
-- **`Camera Manager` (`camera.py`)**:
-  - Low-memory HTTP snapshot grabber with optional OpenCV RTSP single-frame fallback.
-  - Concurrently captures snapshots from all configured cameras (ANPR + Auxiliary) using a bounded `ThreadPoolExecutor` via `capture_all_camera_snapshots()`.
-  - Runs parallel multi-ANPR camera frame grabbing via `capture_anpr_snapshots()`.
-  - Logs clear camera fleet topology at startup via `log_camera_fleet()`, distinguishing Main (ANPR active loop) from Auxiliary (post-stability audit) cameras.
-- **`WiFi Manager` (`src/devices/wifi/`)**:
-  - Pure nmcli hotspot management (`nmcli device wifi hotspot`) with automatic fallback hotspot (`hermes` / `12345678`).
-  - RFC 8910 DHCP Option 114 + RFC 8908 captive portal API for zero-tap automatic Wi-Fi sheet on Android & iOS.
-  - Synchronizes online / offline status with the RGB LED state machine.
-- **`RGB LED Controller` (`src/devices/led/`)**:
-  - Hardware driver (`python-periphery` GPIO) and state machine coordinating visual status signals on GPIO 17 (Red), GPIO 27 (Green), and GPIO 22 (Blue).
-  - 🟢 **Green**: Standby idle at 0.0 kg and connected to Wi-Fi/Internet; ready for vehicle weighing.
-  - 🟡 **Yellow / Amber**: Offline / captive portal hotspot active; weighment operations are immediately stopped and blocked.
-  - 🔴 **Solid Red**: Active weighment session in progress on the platform (online only).
-  - 🔵 **Blue**: 10-second transient pulse on verified cloud upload success.
-
-### 5.3 External Integrations (`src/integrations/`)
-- **`Argus ANPR Client` (`anpr.py`)**:
-  - Sends raw JPEG bytes to the Argus FastAPI microservice endpoint (`/recognize`) with pooled HTTP keep-alive connection reuse.
-  - Implements non-blocking concurrent dispatch (`dispatch_anpr_batch`, `send_and_record_anpr_frame`) via a dedicated `ThreadPoolExecutor`, completely decoupling camera frame grabbing and scale UART polling from Argus network response times.
-  - Correlates each async ANPR recognition request with its originating weighbridge `session_id`; late responses from previously weighed trucks are safely rejected under thread locks.
-  - Supports full Argus `RecognitionResponse` schemas (evaluating `results[0]` directly as the pre-sorted best plate) and flat JSON schemas, producing `NO_PLATE_DETECTED` whenever recognition fails.
-  - Employs a frequency counter (`get_highest_frequency_plate`) to pick the consensus plate candidate across multi-sample captures.
-- **`Gluvok Cloud API Client` (`gluvok.py`)**:
-  - Handles HTTP Basic Authentication (`-u device_id:device_key`) for weighment transmission matching the official Gluvok curl specification.
-  - Submits canonical multi-camera snapshots (`camera_snapshots`: `anpr_1`, `anpr_2`, `aux_1`, etc.) as multipart/form-data files.
-  - Automatically verifies entries against the cloud API before retrying upon ambiguous timeouts to prevent duplicate submissions.
-  - Handles response status codes: `200`/`201` success, `409` idempotent duplicate acknowledgement, `401 Unauthorized`, `403 Forbidden`, `400 Bad Request`, and server/network errors.
-
-### 5.4 Diagnostics Web Dashboard (`src/web/`)
-- **Application Factory (`app.py`)**:
-  - Implements `create_app()` constructing the Flask WSGI application with custom error handlers, templates directory bindings, and global security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`).
-- **Blueprints (`src/web/blueprints/`)**:
-  - `views.py`: Serves the embedded dashboard (`templates/index.html`) across subsystem routes (`/`, `/scale`, `/anpr`, `/cloud`, `/wifi`, `/telemetry`, `/errors`, `/config`).
-  - `api.py`: Implements RESTful endpoints:
-    - `POST /api/login`: Issues session tokens with sliding 2h expiration, brute-force defense (5 attempts/60s), and constant-time credential comparison (`auth.py`).
-    - `GET /api/status`: Real-time operational telemetry snapshot.
-    - `GET /api/config` & `POST /api/config`: Live reconfiguration of threshold weight, serial port/baud, and camera URLs with input sanitization (`validation.py`) and dynamic UART restart.
-    - `POST /api/wifi` & `POST /api/wifi/clear`: Facility Wi-Fi provisioning and credential clearing.
-- **Authentication & Security Middleware (`auth.py`)**:
-  - Cryptographic token generator and `@auth_required` decorator supporting `Authorization: Bearer` and `X-Auth-Token` headers.
-- **Server Runner (`server.py`)**:
-  - `FallbackWebServer` wraps Werkzeug's `make_server` to serve the WSGI application in a background daemon thread with graceful `start()` and `stop()` lifecycle management.
-
-### 5.5 Configuration Management (`src/config/`)
-Hermes employs a dual-layer configuration pattern adhering to NASA JPL Rule 4 (≤ 60 lines per file):
-- **`client_config.py`**:
-  - Bespoke compiled client configuration containing hardcoded, protected values for `DEVICE_ID`, `DEVICE_KEY`, `CENTER_ID`, `MIN_WEIGHT`, `ANPR_SERVER_URL`, and initial hardware defaults.
-- **`store.py`**:
-  - Thread-safe SQLite store managing the `runtime_config` table in `data/hermes.db` to persist field calibrations and on-site Wi-Fi credentials across reboots.
-- **`runtime.py`**:
-  - Mutator managing runtime overrides with thread safety (`threading.RLock()`).
-- **`manager.py`**:
-  - Unified `ConfigManager` exposing system properties with fallback to `client_config`.
-- **`constants.py`**:
-  - System operational constants, timeouts, buffer sizes, and Indian vehicle registration regex.
+- **Credentials**: `SUPERADMIN_USER` (default `superadmin`) and `SUPERADMIN_PASS`. With `SUPERADMIN_PASS` empty, every login fails.
+- **Tokens**: `POST /api/login` returns a random 64-hex token, valid 2 h and renewed on each use. Tokens live in memory and are lost on restart. Send them as `Authorization: Bearer <token>` or `X-Auth-Token`. `POST /api/logout` revokes the token.
+- **Login limit**: 5 failed logins per client IP per 60 s, then HTTP 429. Each failure also sleeps 0.5 s. The captive portal `/connect` shares the same limiter.
+- **Anonymous `GET /api/status`** returns health only: scale state and weight, Argus online, cloud `configured` and `unsent_weighments`, Wi-Fi `connected` and `hotspot_active`. With a valid token it adds center ID, SSID, config values, latest weighment, error counts and the event log.
+- **Headers** on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and a Content-Security-Policy that allows only same-origin resources plus inline scripts and styles.
+- **No CORS**: no CORS headers are sent.
+- **Input**: `serial_port` must match `/dev/ttyAMA*`, `ttyS*`, `ttyUSB*`, `ttyACM*`, `serial0/1` or `serial/by-id/*`. Baud rate must be in a fixed list. Camera URLs must be http, https or rtsp. The dashboard HTML-escapes server-supplied values it renders.
+- **Logs** mask `user:pass@` in camera URLs.
 
 ---
 
-## 6. End-to-End Weighment Data Flow
+## 4. Wi-Fi, hotspot and captive portal
 
-```mermaid
-sequenceDiagram
-    participant Scale as Scale Indicator
-    participant Herm as Hermes Core
-    participant Argus as Argus ANPR
-    participant Cloud as Gluvok API
+Package `src/devices/wifi/` drives NetworkManager through `nmcli` (via `sudo -n` when not root).
 
-    Scale->>Herm: Weight > 50kg (Threshold crossed)
-    Herm->>Herm: Start Weighbridge Session & 2s Multi-ANPR Loop
-    loop Every 2 Seconds
-        Herm->>Argus: POST /recognize (All ANPR Cameras Snapshots)
-        Argus-->>Herm: Plate Candidate / Status (Front, Rear, etc.)
-    end
-    Scale->>Herm: Weight Stable for 10.0s (±2kg)
-    Herm->>Herm: Trigger Full Fleet Snapshots (All ANPR + All Aux Cams)
-    Herm->>Herm: Wait +10s Post-Stability Buffer
-    Herm->>Herm: Finalize Vote & Build Payload (camera_snapshots)
-    Herm->>Cloud: POST /api/entries (Weight, Plate, Images)
-    Cloud-->>Herm: HTTP 200/201 (Entry ID)
-    Scale->>Herm: Weight returns to 0kg
-    Herm->>Herm: Reset Session Manager to IDLE
-```
+- When the watchdog sees 2 failed checks, it starts the emergency hotspot: SSID `hermes`, connection `hermes-hotspot`, gateway `10.42.0.1`, WPA2 passphrase from `HERMES_HOTSPOT_PASS`. If that variable is shorter than 8 characters, the hotspot refuses to start. When connectivity returns, the watchdog stops the hotspot.
+- The portal serves a Wi-Fi setup page on port 80 (falls back to 8088 with iptables redirects), a DNS responder that answers every query with the gateway IP (binds UDP 53, else 5354; iptables also redirects interface port 53 to 5354), DHCP option 114 and `/.well-known/captive-portal` (RFC 8908), and maps `hermes.local` and `hermes.config` in `/etc/hosts`.
+- `POST /connect` on the portal requires `userid` and `admin_password` (the console credentials) in the JSON body, with the shared per-IP limiter. Bodies over 4096 bytes get 413. On success it joins the network, saves it to the vault and stops the hotspot. On failure the hotspot restarts if it was up. Before joining, it deletes an existing profile only if that profile is a station-mode profile for the same SSID.
+- Saved networks are kept in the `wifi_networks` table, password in plain text. `GET /api/wifi/saved` returns SSIDs without passwords and needs a token.
+- All nmcli runs hold a lock, and the watchdog pauses itself during hotspot and connect transitions.
 
 ---
 
-## 7. Threading & Concurrency Architecture (Raspberry Pi 5 & Python 3.14)
+## 5. Configuration
 
-Hermes operates as a real-time industrial appliance controller on a Raspberry Pi 5 (Quad-Core 64-bit Arm Cortex-A76 @ 2.4 GHz) running **Python 3.14**.
-
-### 7.1 Thread Topology & Real-Time Isolation
-
-Because Python 3.14 on a multi-core Pi 5 supports free-threaded CPython (PEP 703 / optional GIL) and releases the GIL during all socket I/O, serial reads, subprocesses, and sleep states, Hermes uses decoupled daemon threads rather than heavyweight multiprocessing:
-
-| Thread Name | Type / Lifecycle | Execution Frequency / Trigger | Non-Blocking Guarantee |
-| :--- | :--- | :--- | :--- |
-| **`ScaleUART`** | Dedicated Daemon Thread | Continuous (50ms read, 300ms flush) | Reads `/dev/ttyAMA0` serial bytes; never blocks on network or camera I/O. |
-| **`FallbackWebServer`** | Werkzeug WSGI Daemon Thread | Persistent on port `:8080` | Serves web UI and REST API asynchronously without delaying scale operations. |
-| **`WiFiWatchdog`** | Dedicated Daemon Thread | Every 1.0s (pauses probing when hotspot AP is active, iptables teardown and backoff) | Runs network checks, prevents hotspot collision, manages captive portal lifecycle, redirects OS probes, and unblocks weighment upon restored connectivity. |
-| **`ANPRLoop_<id>`** | Ephemeral Session Thread | Every 1.0s during weighing | Fetches ANPR snapshots and dispatches async recognition tasks to ThreadPoolExecutor. |
-| **`AuxCapture_<id>`** | Ephemeral Session Worker | Triggered upon 10s stability | Fetches overview angles (Cams 2..N) via `ThreadPoolExecutor(4)` without stalling serial reads. |
-| **`CloudUpload_<id>`** | Ephemeral Daemon Thread | On session finalization (when online) | Directly transmits weighment package and camera snapshots to Gluvok API via multipart POST; non-blocking to scale UART. |
-
-### 7.2 Python 3.14 Free-Threading & Synchronization Invariants
-
-Under Python 3.14, threads execute with true hardware parallelism across all 4 Cortex-A76 cores. To prevent data races in free-threaded mode:
-- **`ConfigManager`**: All mutable properties and disk serialization (`config.json`) are guarded by `threading.RLock()`.
-- **`ScaleUARTReader`**: Line buffer bytearray and inter-character timeout tracking are synchronized via `threading.Lock()`.
-- **`WeighbridgeSessionManager`**: Phase transitions, frame buffers, and candidate plate lists are guarded by `threading.Lock()`.
-- **`telemetry.py`**: Telemetry circular buffer and live error statistics are guarded by `_events_lock` and `_live_lock`.
-- **`db.py`**: SQLite database operations for Wi-Fi credentials are synchronized with `_db_lock`.
-
----
-
-## 8. Direct Online Transmission & Offline Discard Architecture
-
-Weighment transactions are only transmitted when a valid, active Wi-Fi / Internet connection is confirmed. Offline weighment queuing and local database storage are disabled:
-
-```
-WEIGHMENT FINALIZED
-        │
-        ▼
-Is Wi-Fi / Internet Connected?
-        ├── NO  ──► DISCARD WEIGHMENT
-        │           - Do not store locally in SQLite or any database
-        │           - Log warning & record WEIGHMENT_DISCARDED telemetry event
-        │
-        └── YES ──► DIRECT ONLINE CLOUD TRANSMISSION (CloudUpload_<session_id>)
-                    - Asynchronously POST /api/entries with multipart/form-data
-                    - Pulse RGB LED Blue (10s cloud success pulse)
-                    - Record CLOUD upload telemetry event
-```
-
-The local SQLite database (`data/hermes.db`) is retained solely for:
-1. **Wi-Fi Vault (`wifi_networks`)**: Storing saved Wi-Fi SSIDs and WPA passwords for automated reconnects and captive portal management.
-2. **Runtime Configuration (`runtime_config`)**: Storing dynamic hardware/serial/camera overrides modified via the diagnostics web console.
-
----
-
-## 9. Binary Compilation & Asymmetric Ed25519 Client Licensing Architecture
-
-To protect intellectual property and eliminate source code exposure, Hermes compiles Python into native C machine code with Nuitka and uses **Ed25519 digital signatures (RFC 8032)** for licensing:
-
-```
-Developer / Mac Machine
-       ├── 1. Generate Client License: uv run python scripts/keygen.py ...
-       │      └── Generates: data/client.lic (Payload + Ed25519 digital signature)
-       └── 2. One-Command Deploy: uv run python scripts/deploy.py --host <user>@<pi-host>
-              ├── rsyncs source to /opt/hermes
-              ├── Sets up dependencies in /opt/hermes/.venv with uv sync
-              ├── Compiles native binary & hermes.sh via GCC/Nuitka
-              ├── Uploads data/client.lic to /opt/hermes/data/client.lic
-              └── Purges all .py source files in-place (Zero source code on Pi!)
-```
-
-### Runtime Cryptographic Verification
-When Hermes boots on the edge device:
-1. `ConfigManager` reads `data/client.lic`.
-2. Verifies the Ed25519 signature against the embedded company public key (`src/config/license.py`).
-3. If valid, loads `device_id`, `device_key`, `center_id`, and `min_weight` into memory.
-4. If tampered or invalid, Hermes logs an authentication error and refuses to start.
-5. If absent (in local dev or test environments), falls back to `src/config/client_config.py` defaults.
-
----
-
-## 10. System Configuration & Environment Variables
-
-Hermes uses a dual-layer configuration pattern:
-1. **Compiled & Immutable (`src/config/client_config.py`)**: Values baked into native binary; non-configurable via the Web UI.
-2. **Runtime Overrides (`data/hermes.db`)**: Field settings configurable by on-site technicians via the Web UI (:8080) and persisted in SQLite.
-
-### 10.1 Configuration Scope Breakdown
-
-| Parameter | Location | UI Configurable? | Description |
-| :--- | :--- | :--- | :--- |
-| `device_id` | `client.lic` / Compiled | ❌ No (Licensed) | Primary edge device identifier for Gluvok Cloud API. |
-| `device_key` | `client.lic` / Compiled | ❌ No (Licensed) | Pre-shared key for stateless device header authentication. |
-| `center_id` | `client.lic` / Compiled | ❌ No (Licensed) | Collection center identifier for Gluvok Cloud API. |
-| `min_weight` | `client.lic` / Compiled | ❌ No (Licensed) | Minimum threshold weight in kg to trigger active weighing. |
-| `anpr_server_url` | `client_config.py` | ❌ No (Hardcoded) | Local Argus ANPR microservice endpoint (`http://127.0.0.1:8000/recognize`). |
-| `serial_port` | Baseline / SQLite | ✅ Yes (`/config`) | UART serial port connected to weigh scale (e.g. `/dev/ttyUSB0`). |
-| `serial_baudrate` | Baseline / SQLite | ✅ Yes (`/config`) | Baud rate for serial communication (typically `1200`, `9600`). |
-| `stability_duration` | Baseline / SQLite | ✅ Yes (`/config`) | Continuous steady duration in seconds to confirm stable weight (default: `10.0`). |
-| `stability_tolerance` | Baseline / SQLite | ✅ Yes (`/config`) | Allowable weight oscillation range in kg during stabilization (default: `2.0`). |
-| `anpr_camera_urls` | Baseline / SQLite | ✅ Yes (`/config`) | Snapshot URLs of License Plate Cameras (Front, Rear). |
-| `auxiliary_camera_urls` | Baseline / SQLite | ✅ Yes (`/config`) | Snapshot URLs of overview context cameras (2..N). |
-| `wifi_ssid` | Baseline / SQLite | ✅ Yes (`/wifi`) | Facility Wi-Fi SSID. |
-| `wifi_password` | Baseline / SQLite | ✅ Yes (`/wifi`) | Facility Wi-Fi passphrase. |
-
-### 10.2 Environment Variables
-
-| Variable | Default | Purpose |
+| Value | Source | Editable in the console |
 | :--- | :--- | :--- |
-| `SUPERADMIN_USER` | `superadmin` | Username for web diagnostics console login. |
-| `SUPERADMIN_PASS` | `Gluvok@241821` | Password for web diagnostics console login. |
-| `FLASK_SECRET_KEY` | `hermes-insecure-secret-key` | Flask session cryptographic signing key (override in production). |
+| `device_id`, `device_key`, `center_id`, `min_weight` | `data/client.lic` (Ed25519-signed), else `src/config/client_config.py` defaults | No |
+| `anpr_server_url` | `client_config.py` (`http://127.0.0.1:8000/recognize`) | No |
+| `serial_port`, `serial_baudrate`, `stability_duration`, `stability_tolerance`, `anpr_camera_urls`, `auxiliary_camera_urls` | `runtime_config` table in `data/hermes.db`, else `client_config.py` | Yes (`POST /api/config`) |
+| `wifi_ssid`, `wifi_password` | `runtime_config` | Yes (`POST /api/wifi`) |
+
+`client_config.py` holds no credentials: `DEVICE_ID` and `DEVICE_KEY` are empty. Without a valid license, the cloud card shows `configured: false` and uploads fail with `CLOUD_AUTH_FAILED`. An invalid or tampered license is logged and ignored; Hermes still starts. Defaults without a license: `min_weight` 200 kg, serial `/dev/ttyAMA0` at 2400 baud.
+
+### Required environment
+
+| Variable | Purpose |
+| :--- | :--- |
+| `SUPERADMIN_PASS` | Console and portal admin password. Required. |
+| `HERMES_HOTSPOT_PASS` | Hotspot WPA2 passphrase, 8+ characters. Required. |
+| `SUPERADMIN_USER` | Admin user name. Default `superadmin`. |
+| `FLASK_SECRET_KEY` | Read by the app factory (default is a fixed string), but nothing in the app uses Flask sessions. |
+
+`main.setup()` calls `require_runtime_secrets()` and exits if either required variable is missing. On the Pi, systemd loads them from `data/hermes.env`. The file is written by `scripts/deploy.py` from the deployer's local environment. For local runs, export them in your shell.
+
+---
+
+## 6. Build and deploy
+
+`scripts/deploy.py --host <user>@<pi-host>`:
+
+1. Requires `SUPERADMIN_PASS` and `HERMES_HOTSPOT_PASS` in the local environment, or exits.
+2. Optionally signs `data/client.lic` (`--device-id`, `--device-key`, `--center-id`, `--min-weight`) with `scripts/keygen.py`.
+3. Rsyncs the repo to `/opt/hermes`, runs `uv sync`, builds the native binary with Nuitka (`scripts/build.py`), then deletes all `.py` files, `scripts/`, `tests/` and `docs/` on the Pi.
+4. Writes `data/hermes.env` (mode 600) and uploads `data/client.lic`.
+5. Creates the system user `hermes` (groups `dialout`, `gpio`, `netdev`), installs `/etc/sudoers.d/hermes` after `visudo -c`, and installs and restarts the `hermes` systemd unit.
+
+The service runs as user `hermes` with `ProtectSystem=strict`, write access limited to `data/`, `/etc/hosts` and the NetworkManager dnsmasq directory, and `CAP_NET_BIND_SERVICE` for port 80. The sudoers drop-in allows only the commands Hermes runs with `sudo -n`: `nmcli`, the portal's `iptables` rules, `fuser -k -9 80/tcp`, and the `/etc/hosts` and dnsmasq file edits.
+
+**Needs a test on a real Pi.** The non-root user, sudoers drop-in and unit hardening have unit tests but have not been run on hardware.
+
+Licensing: `src/config/license.py` verifies the license signature against an embedded public key.
+
+---
+
+## 7. Local storage
+
+`data/hermes.db` (SQLite, WAL) holds two tables: `runtime_config` (key, JSON value) and `wifi_networks`. Weighments, frames and uploads are never stored.
+
+---
+
+## 8. RGB LED
+
+GPIO 17 red, 27 green, 22 blue (via `python-periphery`, mock mode when no GPIO). Green: idle and online. Red: weighment in progress. Yellow: offline. Blue: 10 s pulse after a successful upload.
+
+---
+
+## 9. Code conventions
+
+- Functions stay within 60 lines (NASA JPL Rule 4). One function, `transmit_entry_multipart`, is 64 lines because of its docstring. Tooling does not enforce this.
+- CI and the pre-push hook run `ruff check`, `ty check` and `pytest`.

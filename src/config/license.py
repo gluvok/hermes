@@ -22,8 +22,11 @@ def sign_license(payload: dict[str, Any], priv_key_hex: str) -> str:
     return json.dumps({"payload": payload, "signature": sig.hex()}, indent=2)
 
 
-def verify_license(data_str: str, pub_key_hex: str = DEFAULT_PUB_KEY) -> dict[str, Any]:
+def verify_license(data_str: str, pub_key_hex: str | None = None) -> dict[str, Any]:
     """Verifies Ed25519 signature of license JSON and returns valid payload."""
+    pub_key_hex = pub_key_hex or DEFAULT_PUB_KEY  # read at call time, not bound at def time
+    if not pub_key_hex:
+        raise ValueError("no license public key configured (DEFAULT_PUB_KEY in src/config/license.py)")
     data = json.loads(data_str)
     payload = data.get("payload", {})
     sig = bytes.fromhex(data.get("signature", ""))

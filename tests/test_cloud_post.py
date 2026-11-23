@@ -3,16 +3,22 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock, patch
 
+import cv2
+import numpy as np
 import requests
 
 from src.config import ConfigManager, config
 from src.core.telemetry import get_error_counts, get_system_events, reset_state
-from src.integrations.gluvok import post_to_cloud
+from src.integrations.gluvok import _build_multipart_files, post_to_cloud
 
 
 class TestCloudPost(unittest.TestCase):
     def setUp(self):
         reset_state()
+        for name, value in (("device_id", "test-device"), ("device_key", "test-device-key")):
+            patcher = patch.object(ConfigManager, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def tearDown(self):
         reset_state()
@@ -140,6 +146,21 @@ class TestCloudPost(unittest.TestCase):
         self.assertEqual(len(files), 3)
         filenames = [f[1][0] for f in files]
         self.assertEqual(filenames, ["truck_anpr_1.jpg", "truck_anpr_2.jpg", "truck_aux_1.jpg"])
+
+    def test_build_multipart_files_passes_bytes_through_untouched(self):
+        # Snapshots are already compressed in session.py; re-encoding is lossy and wastes Pi CPU.
+        img = np.random.default_rng(0).integers(0, 256, (64, 64, 3), dtype=np.uint8)
+        ok, enc = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+        self.assertTrue(ok)
+        jpeg = enc.tobytes()
+
+        files, has_images = _build_multipart_files([("a.jpg", jpeg)], None, "f.jpg")
+        self.assertTrue(has_images)
+        self.assertEqual(files, [("file", ("a.jpg", jpeg, "image/jpeg"))])
+
+        files, has_images = _build_multipart_files(None, jpeg, "f.jpg")
+        self.assertTrue(has_images)
+        self.assertEqual(files, [("file", ("f.jpg", jpeg, "image/jpeg"))])
 
 
 if __name__ == "__main__":

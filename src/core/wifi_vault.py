@@ -5,17 +5,17 @@ import sqlite3
 import threading
 from typing import Any
 
-from src.core.db import get_default_db_path
+from src.config.store import get_config_db_path
+from src.core.db import WIFI_NETWORKS_DDL
 
 _vault_lock = threading.RLock()
-_TABLE_SQL = "CREATE TABLE IF NOT EXISTS wifi_networks (ssid TEXT PRIMARY KEY, password TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, last_connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
 
 
 def _get_conn(db_path: str | None = None) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path or get_default_db_path(), timeout=5.0)
+    conn = sqlite3.connect(db_path or get_config_db_path(), timeout=5.0)
     conn.row_factory = sqlite3.Row
     with conn:
-        conn.execute(_TABLE_SQL)
+        conn.execute(WIFI_NETWORKS_DDL)
     return conn
 
 

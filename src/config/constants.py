@@ -1,44 +1,25 @@
 """constants.py — Centralized System & Hardware Constants."""
 from __future__ import annotations
 
-import re
+import os
 
 INTER_CHAR_TIMEOUT_S = 0.3
 MAX_BUFFER_LEN = 256
 SCALE_TIMEOUT = 0.05
 DEFAULT_SERIAL_PORT = "/dev/ttyAMA0"
-DEFAULT_SERIAL_BAUDRATE = 1200
 
 STABILITY_TOLERANCE = 2.0
 STABILITY_DURATION = 10.0
-DEFAULT_WEIGHT_THRESHOLD = 50.0
 
 ANPR_CAPTURE_INTERVAL = 1.0
 POST_STABILITY_DURATION = 5.0
 CAMERA_TIMEOUT = 3.0
 ANPR_SERVER_TIMEOUT = 30.0
 MAX_PARALLEL_CAMERA_WORKERS = 4
-DEFAULT_ANPR_CAMERA_URLS = ["http://192.168.1.101/cgi-bin/snapshot.cgi"]
-DEFAULT_AUXILIARY_CAMERA_URLS = [
-    "http://192.168.1.102/cgi-bin/snapshot.cgi",
-    "http://192.168.1.103/cgi-bin/snapshot.cgi",
-    "http://192.168.1.104/cgi-bin/snapshot.cgi",
-]
 
-HOTSPOT_CON_NAME = "hermes-hotspot"
-DEFAULT_HOTSPOT_SSID = "hermes"
-DEFAULT_HOTSPOT_PASS = "12345678"
-DEFAULT_WIFI_WATCHDOG_INTERVAL = 1.0
-
-GLUVOK_BASE_URL = "https://gluvok.vercel.app"
+GLUVOK_BASE_URL = os.environ.get("GLUVOK_BASE_URL", "https://gluvok.vercel.app").rstrip("/")
 CLOUD_POST_TIMEOUT = 20.0
-DEFAULT_DEVICE_ID = "pi1"
-DEFAULT_DEVICE_KEY = "hardware123"
 DEFAULT_CENTER_ID = 1
-
-INDIAN_PLATE_REGEX = re.compile(
-    r"^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$|^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$"
-)
 
 DEFAULT_DB_PATH = "data/hermes.db"
 

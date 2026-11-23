@@ -1,9 +1,9 @@
 """client_config.py — Bespoke client deployment configuration."""
 from __future__ import annotations
 
-# Cloud credentials (compiled into binary, non-configurable via UI)
-DEVICE_ID: str | int = "pi1"
-DEVICE_KEY: str = "hardware123"
+# Cloud credentials: no committed defaults; supplied by data/client.lic (#33)
+DEVICE_ID: str | int = ""
+DEVICE_KEY: str = ""
 CENTER_ID: int = 1
 
 # Weighment & OCR thresholds (compiled into binary, non-configurable via UI)
@@ -15,14 +15,9 @@ SERIAL_PORT: str = "/dev/ttyAMA0"
 SERIAL_BAUDRATE: int = 2400
 STABILITY_DURATION: float = 10.0
 STABILITY_TOLERANCE: float = 2.0
-ANPR_CAMERA_URLS: list[str] = [
-    "rtsp://admin:Poly%40123@192.168.10.251:554/video/live?channel=1&subtype=0",
-    "rtsp://admin:Cctv%40222@192.168.10.252:554/video/live?channel=1&subtype=0",
-]
-AUXILIARY_CAMERA_URLS: list[str] = [
-    "rtsp://admin:Poly%40123@192.168.10.250:554/video/live?channel=1&subtype=0",
-]
+ANPR_CAMERA_URLS: list[str] = []
+AUXILIARY_CAMERA_URLS: list[str] = []
 
-# Baseline Wi-Fi credentials (overridable via Web UI, stored in SQLite)
-WIFI_SSID: str = "TestRouter_5G"
-WIFI_PASSWORD: str = "SecretPassword123"
+# Wi-Fi credentials: empty until set via Web UI (stored in SQLite)
+WIFI_SSID: str = ""
+WIFI_PASSWORD: str = ""

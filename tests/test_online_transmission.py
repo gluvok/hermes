@@ -16,7 +16,8 @@ import unittest
 from unittest.mock import patch
 
 from src.core.db import init_db
-from src.core.stability import ScaleStabilityMachine
+from src.core.stability import ScaleStabilityMachine, ScaleState
+from src.core.telemetry import get_unsent_weighment_count, reset_telemetry
 from src.core.wifi_vault import get_saved_wifi_networks, save_wifi_network
 
 
@@ -30,9 +31,10 @@ class TestOnlineTransmission(unittest.TestCase):
             "camera_snapshots": {"anpr_1": b"fake_cam1_jpeg"},
         }
 
-    @patch("src.integrations.gluvok.post_to_cloud")
+    @patch("src.integrations.gluvok.post_to_cloud", return_value=(True, "42", None, False))
     @patch("src.devices.is_wifi_connected", return_value=True)
     def test_online_upload_triggers_direct_cloud_post(self, mock_wifi, mock_post):
+        self.machine._is_online = True
         with patch("src.devices.led_controller.trigger_cloud_success") as mock_led:
             session_id = self.machine._trigger_upload(self.package)
             self.assertEqual(session_id, "SESS_TEST_ONLINE_001")
@@ -40,13 +42,15 @@ class TestOnlineTransmission(unittest.TestCase):
             # Allow daemon thread a moment to execute
             time.sleep(0.1)
 
-            mock_wifi.assert_called_once()
+            # Reuses the watchdog's verdict; never probes on the UART thread (#19).
+            mock_wifi.assert_not_called()
             mock_post.assert_called_once_with(self.package)
             mock_led.assert_called_once()
 
     @patch("src.integrations.gluvok.post_to_cloud")
-    @patch("src.devices.is_wifi_connected", return_value=False)
+    @patch("src.devices.is_wifi_connected", return_value=True)
     def test_offline_weighment_is_discarded_with_zero_db_writes(self, mock_wifi, mock_post):
+        self.machine._is_online = False
         with tempfile.NamedTemporaryFile() as tmp:
             init_db(tmp.name)
             with patch("src.core.telemetry.record_system_event") as mock_event:
@@ -54,7 +58,7 @@ class TestOnlineTransmission(unittest.TestCase):
                 self.assertEqual(session_id, "SESS_TEST_ONLINE_001")
                 time.sleep(0.05)
 
-                mock_wifi.assert_called_once()
+                mock_wifi.assert_not_called()
                 mock_post.assert_not_called()
                 mock_event.assert_called_once_with(
                     "WEIGHMENT_DISCARDED",
@@ -99,3 +103,74 @@ class TestOnlineTransmission(unittest.TestCase):
         self.assertEqual(self.machine.state.name, "SCALE_STABILIZING")
         self.machine.set_network_status(False)
         self.assertEqual(self.machine.state.name, "SCALE_IDLE")
+
+
+@patch("src.devices.led_controller")
+@patch(
+    "src.integrations.gluvok.post_to_cloud",
+    return_value=(False, None, "HTTP 401: no", False),
+)
+def test_failed_upload_does_not_light_cloud_success(mock_post, mock_led):
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    mock_led.trigger_cloud_success.assert_not_called()
+
+
+@patch("src.devices.led_controller")
+@patch("src.integrations.gluvok.post_to_cloud", return_value=(True, "42", None, False))
+def test_successful_upload_lights_cloud_success(mock_post, mock_led):
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    mock_led.trigger_cloud_success.assert_called_once()
+
+
+@patch("src.devices.led_controller")
+@patch("src.core.stability.session_manager")
+def test_drop_below_threshold_during_session_sets_led_idle(mock_sm, mock_led):
+    m = ScaleStabilityMachine()
+    m.state = ScaleState.SCALE_STABILIZING
+    m._handle_zero_or_subthreshold(1.0)  # > 0, < threshold
+    mock_led.set_idle.assert_called_once()
+
+
+@patch("src.devices.led_controller")
+@patch(
+    "src.integrations.gluvok.post_to_cloud",
+    return_value=(False, None, "HTTP 500: boom", False),
+)
+def test_failed_upload_counts_as_unsent(mock_post, mock_led):
+    reset_telemetry()
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    assert get_unsent_weighment_count() == 1
+
+
+@patch("src.devices.led_controller")
+@patch("src.integrations.gluvok.post_to_cloud", side_effect=OSError("link down"))
+def test_upload_exception_counts_as_unsent(mock_post, mock_led):
+    reset_telemetry()
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    assert get_unsent_weighment_count() == 1
+
+
+@patch("src.devices.led_controller")
+@patch("src.integrations.gluvok.post_to_cloud", return_value=(True, "42", None, False))
+def test_successful_upload_does_not_count_as_unsent(mock_post, mock_led):
+    reset_telemetry()
+    ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
+    assert get_unsent_weighment_count() == 0
+
+
+def test_offline_discard_counts_as_unsent():
+    reset_telemetry()
+    machine = ScaleStabilityMachine()
+    machine._is_online = False
+    machine._trigger_upload({"session_id": "S1"})
+    assert get_unsent_weighment_count() == 1
+
+
+def test_reset_telemetry_zeroes_unsent_count():
+    reset_telemetry()
+    from src.core.telemetry import record_unsent_weighment
+
+    record_unsent_weighment()
+    assert get_unsent_weighment_count() == 1
+    reset_telemetry()
+    assert get_unsent_weighment_count() == 0

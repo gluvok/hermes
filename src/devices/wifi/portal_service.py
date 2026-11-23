@@ -30,7 +30,8 @@ class PortalService:
 
     def start(self, ip: str = DEFAULT_GATEWAY_IP, http_port: int = DEFAULT_PORTAL_PORT, dns_port: int = DEFAULT_DNS_PORT, iface: str = "wlan0") -> bool:
         if self._active: return True
-        ensure_local_domain("hermes.local"); ensure_local_domain("hermes.config")
+        ensure_local_domain("hermes.local")
+        ensure_local_domain("hermes.config")
         self._dns = CaptiveDNSServer(ip=ip, port=dns_port)
         self._http = CaptiveHTTPServer(port=http_port, iface=iface, dns_port=dns_port)
         dns_ok, http_ok = self._dns.start(), self._http.start()
@@ -42,8 +43,12 @@ class PortalService:
     def stop(self) -> None:
         if not self._active and not self._dns and not self._http: return
         teardown_nm_capport_config()
-        if self._dns: self._dns.stop(); self._dns = None
-        if self._http: self._http.stop(); self._http = None
+        if self._dns:
+            self._dns.stop()
+            self._dns = None
+        if self._http:
+            self._http.stop()
+            self._http = None
         self._active = False
         logger.info("Captive portal stopped.")
 

@@ -4,8 +4,10 @@ import json
 import unittest
 from unittest.mock import patch
 
+from src.config import client_config as cc
 from src.config import config
 from src.core.telemetry import reset_state
+from src.web import auth
 from src.web.app import create_app
 from src.web.auth import reset_auth_state
 from src.web.server import FallbackWebServer
@@ -27,7 +29,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         # Obtain valid superadmin token for protected tests
         res = self.client.post(
             "/api/login",
-            data=json.dumps({"userid": "superadmin", "password": "Gluvok@241821"}),
+            data=json.dumps({"userid": "superadmin", "password": auth.SUPERADMIN_PASS}),
             content_type="application/json",
         )
         self.assertEqual(res.status_code, 200)
@@ -107,8 +109,35 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertNotIn("cameras", data)
         self.assertNotIn("anpr_camera_urls", data.get("config", {}))
         self.assertNotIn("serial_port", data.get("scale", {}))
-        self.assertIn("spool", data)
-        self.assertIn("events", data)
+
+    def test_api_status_anonymous_omits_sensitive_fields(self):
+        body = self.client.get("/api/status").get_json()
+        for key in ("events", "config", "latest_weighment", "error_counts"):
+            self.assertNotIn(key, body)
+        self.assertNotIn("ssid", body["wifi"])
+        self.assertNotIn("center_id", body["cloud"])
+        self.assertIn("connected", body["wifi"])
+        self.assertIn("hotspot_active", body["wifi"])
+        self.assertIn("configured", body["cloud"])
+
+    def test_api_status_anonymous_reports_unsent_weighments(self):
+        from src.core.telemetry import record_unsent_weighment
+
+        self.assertEqual(self.client.get("/api/status").get_json()["cloud"]["unsent_weighments"], 0)
+        record_unsent_weighment()
+        body = self.client.get("/api/status").get_json()
+        self.assertEqual(body["cloud"]["unsent_weighments"], 1)
+
+    def test_api_status_with_token_includes_sensitive_fields(self):
+        res = self.client.get("/api/status", headers={"Authorization": f"Bearer {self.auth_token}"})
+        body = res.get_json()
+        for key in ("events", "config", "latest_weighment", "error_counts"):
+            self.assertIn(key, body)
+        self.assertIn("ssid", body["wifi"])
+        self.assertIn("center_id", body["cloud"])
+
+    def test_get_saved_wifi_requires_auth(self):
+        self.assertEqual(self.client.get("/api/wifi/saved").status_code, 401)
 
     def test_get_api_config_unauthorized(self):
         res = self.client.get("/api/config")
@@ -141,7 +170,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
 
         # 2. Query /api/wifi/saved
-        saved_res = self.client.get("/api/wifi/saved")
+        saved_res = self.client.get("/api/wifi/saved", headers={"X-Auth-Token": self.auth_token})
         self.assertEqual(saved_res.status_code, 200)
         saved_data = saved_res.get_json()
         self.assertTrue(saved_data.get("success"))
@@ -176,7 +205,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(del_res.status_code, 200)
 
         # Confirm gone
-        saved_res = self.client.get("/api/wifi/saved")
+        saved_res = self.client.get("/api/wifi/saved", headers={"X-Auth-Token": self.auth_token})
         ssids = [n["ssid"] for n in saved_res.get_json().get("networks", [])]
         self.assertNotIn("Delete_Me", ssids)
 
@@ -244,8 +273,8 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
         self.assertEqual(config.serial_port, "/dev/ttyUSB0")
         self.assertEqual(config.stability_duration, 8.0)
         self.assertEqual(config.stability_tolerance, 1.5)
-        self.assertIn(config.device_id, ("pi0", "pi1", "pi2"))
-        self.assertEqual(config.device_key, "hardware123")
+        self.assertEqual(config.device_id, cc.DEVICE_ID)
+        self.assertEqual(config.device_key, cc.DEVICE_KEY)
         self.assertIn(config.center_id, (1, 2, 3, 5))
         self.assertEqual(config.anpr_camera_url, "http://192.168.1.150/snapshot")
 
@@ -339,7 +368,7 @@ class TestFlaskDiagnosticsApp(unittest.TestCase):
             self.assertFalse(online)
 
     def test_server_lifecycle(self):
-        server = FallbackWebServer(host="127.0.0.1", port=8991)
+        server = FallbackWebServer(host="127.0.0.1", port=0)  # OS-assigned: no clash with parallel runs
         server.start()
         self.assertTrue(server._is_running)
         server.stop()

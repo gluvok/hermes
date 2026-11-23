@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import sqlite3
 
 from src.core.wifi_vault import save_wifi_network
@@ -9,6 +10,7 @@ from src.devices.wifi import hotspot, runner
 from src.devices.wifi.activity import suspend_watchdog
 
 logger = logging.getLogger(__name__)
+_MAX_SSID_BYTES = 32
 
 
 def get_active_wifi_ssid(iface: str | None = None) -> str | None:
@@ -31,15 +33,29 @@ def get_existing_profile(ssid: str) -> bool:
     return code == 0 and ssid in [line.strip() for line in out.splitlines()]
 
 
+def _is_client_profile_for(ssid: str) -> bool:
+    """True only for a station-mode Wi-Fi profile named and configured for `ssid` (never the AP)."""
+    code, out = runner.run_nmcli(
+        ["-g", "connection.type,802-11-wireless.ssid,802-11-wireless.mode", "connection", "show", "id", ssid],
+        warn=False,
+    )
+    # -g prints one value per line with ':' and '\' backslash-escaped; run_nmcli strips a trailing
+    # empty line, so an unset mode (infrastructure) may be missing.
+    lines = [re.sub(r"\\(.)", r"\1", ln.strip()) for ln in out.splitlines()]
+    return code == 0 and len(lines) >= 2 and lines[0] == "802-11-wireless" and lines[1] == ssid and (lines[2:3] or [""])[0] != "ap"
+
+
 def connect_wifi(ssid: str, password: str = "", iface: str | None = None) -> tuple[bool, str]:
     if not ssid.strip(): return False, "SSID cannot be empty"
+    if ssid.startswith("-") or len(ssid.encode("utf-8")) > _MAX_SSID_BYTES: return False, "Invalid SSID"
     suspend_watchdog(25.0)
     hotspot.stop_hotspot()
     if not runner.is_nmcli_available() or runner.SIMULATION_STATE["enabled"]:
         runner.SIMULATION_STATE["active_ssid"] = ssid
         return True, f"Connected to '{ssid}'"
     dev = iface or runner.get_wifi_interface()
-    runner.run_nmcli(["connection", "delete", ssid], warn=False)
+    if _is_client_profile_for(ssid):
+        runner.run_nmcli(["connection", "delete", "id", ssid], warn=False)
     cmd = ["device", "wifi", "connect", ssid, "ifname", dev]
     if password: cmd.extend(["password", password])
     code, out = runner.run_nmcli(cmd, timeout=30.0)
@@ -48,11 +64,14 @@ def connect_wifi(ssid: str, password: str = "", iface: str | None = None) -> tup
 
 def connect_to_wifi(ssid: str, password: str = "", iface: str | None = None) -> tuple[bool, str]:
     from src.devices.wifi.watchdog import notify_network_status
-    was_hotspot = hotspot.is_hotspot_active(); ok, msg = connect_wifi(ssid, password, iface)
+    was_hotspot = hotspot.is_hotspot_active()
+    ok, msg = connect_wifi(ssid, password, iface)
     if ok:
         try: save_wifi_network(ssid, password)
         except (sqlite3.Error, OSError) as e: logger.warning("Failed to save to vault: %s", e)
-        hotspot.stop_emergency_hotspot(); notify_network_status(True); return True, msg
+        hotspot.stop_emergency_hotspot()
+        notify_network_status(True)
+        return True, msg
     notify_network_status(False)
     if was_hotspot: hotspot.start_emergency_hotspot()
     return False, msg

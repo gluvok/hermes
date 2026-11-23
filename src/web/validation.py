@@ -5,7 +5,11 @@ import re
 from typing import Any
 
 VALID_BAUDRATES = {300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200}
-SERIAL_PORT_PATTERN = re.compile(r"^[a-zA-Z0-9_\-/\.]{1,64}$")
+SERIAL_PORT_PATTERN = re.compile(
+    r"^/dev/(?:ttyAMA|ttyS|ttyUSB|ttyACM)[0-9]{1,2}$"
+    r"|^/dev/serial[01]$"
+    r"|^/dev/serial/by-id/[A-Za-z0-9][A-Za-z0-9_\-:.]{0,95}$"
+)
 IMMUTABLE_FIELDS = {"center_id", "min_weight", "anpr_server_url", "device_id", "device_key"}
 
 
@@ -13,7 +17,7 @@ def is_valid_url(url: str) -> bool:
     if not url:
         return True
     u = url.lower()
-    return u.startswith(("http://", "https://", "rtsp://")) and not any(c in url for c in ("\r", "\n", "\0", " "))
+    return u.startswith(("http://", "https://", "rtsp://")) and not any(c in url for c in ("\r", "\n", "\0", " ", '"', "'", "<", ">"))
 
 
 def _validate_serial(port: Any, baud: Any) -> tuple[bool, str | None]:
@@ -24,7 +28,7 @@ def _validate_serial(port: Any, baud: Any) -> tuple[bool, str | None]:
         except (ValueError, TypeError):
             return False, "Invalid baud rate value."
     if port is not None and not SERIAL_PORT_PATTERN.match(str(port).strip()):
-        return False, "Invalid serial port path character set."
+        return False, "Serial port must be a serial device such as /dev/ttyAMA0, /dev/ttyUSB0 or /dev/serial/by-id/<name>."
     return True, None
 
 

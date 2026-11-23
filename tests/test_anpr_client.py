@@ -217,6 +217,18 @@ class TestANPRClient(unittest.TestCase):
         self.assertIsNone(plate)
         self.assertEqual(status, "NO_PLATE_DETECTED")
 
+    @patch("src.integrations.anpr.requests.post")
+    def test_send_frame_non_json_200_returns_bad_response(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = "<html><body>502 Bad Gateway from reverse proxy</body></html>"
+        mock_response.json.side_effect = ValueError("No JSON object could be decoded")
+        mock_post.return_value = mock_response
+
+        plate, status = send_frame_to_anpr_server(b"fake-bytes")
+        self.assertIsNone(plate)
+        self.assertEqual(status, "ANPR_BAD_RESPONSE")
+
     def test_highest_frequency_voting(self):
         samples = ["MH12AB1234", "MH12AB1234", "MH12AB1234", "MH12AB1235", "DL01AB9999"]
         winner = get_highest_frequency_plate(samples)

@@ -84,8 +84,12 @@ class ScaleStabilityMachine:
             return True
 
         if parsed_weight < config.weight_threshold:
+            was_active = self.state != ScaleState.SCALE_IDLE
             self._reset_candidate_state()
             session_manager.reset_session()
+            if was_active:
+                from src.devices import led_controller
+                led_controller.set_idle()
             return True
 
         return False
@@ -137,6 +141,7 @@ class ScaleStabilityMachine:
             return
 
         if self.state == ScaleState.SCALE_IDLE:
+            session_manager.start_session()
             self.state = ScaleState.SCALE_STABILIZING
             self._current_stable_candidate = parsed_weight
             self._candidate_start_time = now
@@ -144,7 +149,6 @@ class ScaleStabilityMachine:
                 f"[Scale Session] Vehicle detected: {parsed_weight:.1f} kg "
                 f"(threshold: {config.weight_threshold:.1f} kg). Stabilizing..."
             )
-            session_manager.start_session()
             from src.devices import led_controller
             led_controller.set_active()
             return
@@ -153,15 +157,14 @@ class ScaleStabilityMachine:
 
     def _trigger_upload(self, session_package: dict[str, Any]) -> str:
         """Transmits session directly to Gluvok Cloud if online; drops if offline."""
-        from src.devices import is_wifi_connected
-
         session_id = str(session_package.get("session_id", "UNKNOWN"))
 
-        if not self._is_online or not is_wifi_connected():
+        if not self._is_online:
             logger.warning(
                 f"[Weighment] Wi-Fi offline. Weighment {session_id} discarded."
             )
-            from src.core.telemetry import record_system_event
+            from src.core.telemetry import record_system_event, record_unsent_weighment
+            record_unsent_weighment()
             record_system_event(
                 "WEIGHMENT_DISCARDED",
                 f"Session {session_id} discarded: Wi-Fi offline",
@@ -179,16 +182,23 @@ class ScaleStabilityMachine:
 
     def _transmit_online_weighment(self, session_package: dict[str, Any]) -> None:
         from src.config.constants import LED_CLOUD_SUCCESS_DURATION
+        from src.core.telemetry import record_unsent_weighment
         from src.devices import led_controller
         from src.integrations.gluvok import post_to_cloud
 
         session_id = str(session_package.get("session_id", "UNKNOWN"))
         try:
-            post_to_cloud(session_package)
-            led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
-            logger.info(f"[Weighment] Successfully uploaded session {session_id} to cloud.")
+            ok, entry_id, err, _timed_out = post_to_cloud(session_package)
         except (OSError, RuntimeError, ValueError) as exc:
             logger.error(f"[Weighment] Direct cloud upload error for {session_id}: {exc}")
+            record_unsent_weighment()
+            return
+        if not ok:
+            logger.error(f"[Weighment] Cloud upload failed for {session_id}: {err}")
+            record_unsent_weighment()
+            return
+        led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
+        logger.info(f"[Weighment] Uploaded session {session_id} to cloud (entry {entry_id}).")
 
     def reset(self):
         """Manually reset the state machine."""

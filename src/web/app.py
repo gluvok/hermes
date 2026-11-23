@@ -39,11 +39,12 @@ def _register_security_headers(app: Flask) -> None:
     def set_security_headers(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, X-Auth-Token"
+        # ponytail: 'unsafe-inline' stays because the pages use inline scripts and on*= handlers;
+        # move to nonces if those are ever extracted.
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
         )
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return response
 
 

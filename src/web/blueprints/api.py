@@ -12,13 +12,17 @@ from src.core.telemetry import (
     get_error_counts,
     get_latest_weighment,
     get_system_events,
+    get_unsent_weighment_count,
     record_system_event,
 )
 from src.web.auth import (
     auth_required,
     create_session_token,
+    extract_auth_token,
     is_rate_limited,
     record_failed_login,
+    revoke_session_token,
+    validate_session_token,
     verify_credentials,
 )
 from src.web.validation import validate_config_payload
@@ -82,7 +86,8 @@ def _apply_uart_config_changes(
 @api_bp.route("/login", methods=["POST"])
 def login():
     """Authenticates superadmin credentials and issues a session token."""
-    if is_rate_limited():
+    client_ip = request.remote_addr or "unknown"
+    if is_rate_limited(client_ip):
         return jsonify({
             "success": False,
             "error": "Too many failed login attempts. Please wait 60 seconds.",
@@ -101,13 +106,20 @@ def login():
             "token": token,
         }), 200
 
-    record_failed_login()
-    record_system_event("AUTH", f"Failed authentication attempt for user '{userid}'.")
+    record_failed_login(client_ip)
+    record_system_event("AUTH", f"Failed authentication attempt from {client_ip}.")
     time.sleep(0.5)
     return jsonify({
         "success": False,
         "error": "Invalid user ID or password.",
     }), 401
+
+
+@api_bp.route("/logout", methods=["POST"])
+def logout():
+    """Revokes the presented session token. Safe to call without a valid token."""
+    revoke_session_token(extract_auth_token())
+    return jsonify({"success": True}), 200
 
 
 @api_bp.route("/status", methods=["GET"])
@@ -120,7 +132,7 @@ def status():
     target_argus_url = resolve_anpr_endpoint(config.anpr_server_url)
     argus_online = _get_cached_argus_status(target_argus_url)
 
-    return jsonify({
+    body: dict[str, Any] = {
         "status": "healthy",
         "scale": {
             "state": get_scale_state().name,
@@ -130,28 +142,33 @@ def status():
             "online": argus_online,
         },
         "cloud": {
-            "center_id": config.center_id,
             "configured": bool(config.device_id and config.device_key),
+            "unsent_weighments": get_unsent_weighment_count(),
         },
         "wifi": {
             "connected": is_wifi_connected(),
             "hotspot_active": is_hotspot_active(),
-            "ssid": config.wifi_ssid,
         },
-        "config": {
-            "wifi_ssid": config.wifi_ssid,
-            "center_id": config.center_id,
-            "min_weight": config.weight_threshold,
-            "serial_port": config.serial_port,
-            "serial_baudrate": config.serial_baudrate,
-            "stability_duration": config.stability_duration,
-            "stability_tolerance": config.stability_tolerance,
-        },
-        "latest_weighment": get_latest_weighment(),
-        "spool": {},
-        "error_counts": get_error_counts(),
-        "events": get_system_events(),
-    }), 200
+    }
+    # Anonymous viewers get health only; identifiers, config and event text need a session (#31).
+    if validate_session_token(extract_auth_token()):
+        body.update(
+            cloud={**body["cloud"], "center_id": config.center_id},
+            wifi={**body["wifi"], "ssid": config.wifi_ssid},
+            config={
+                "wifi_ssid": config.wifi_ssid,
+                "center_id": config.center_id,
+                "min_weight": config.weight_threshold,
+                "serial_port": config.serial_port,
+                "serial_baudrate": config.serial_baudrate,
+                "stability_duration": config.stability_duration,
+                "stability_tolerance": config.stability_tolerance,
+            },
+            latest_weighment=get_latest_weighment(),
+            error_counts=get_error_counts(),
+            events=get_system_events(),
+        )
+    return jsonify(body), 200
 
 
 @api_bp.route("/config", methods=["GET"])
@@ -217,6 +234,7 @@ def get_scanned_networks():
 
 
 @api_bp.route("/wifi/saved", methods=["GET"])
+@auth_required
 def get_saved_wifi():
     """Returns saved Wi-Fi networks (SSID and metadata, no passwords)."""
     from src.core.wifi_vault import get_saved_wifi_networks

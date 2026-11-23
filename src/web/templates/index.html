@@ -406,7 +406,7 @@
           <div class="p-8 rounded-xl bg-zinc-950 border border-zinc-900 text-center space-y-2">
             <span class="text-xs text-muted-foreground uppercase tracking-widest font-mono font-medium">Live Weight Stream</span>
             <div id="scale-page-weight" class="text-6xl font-black font-mono text-emerald-400">0.000 <span class="text-2xl font-normal text-zinc-500">kg</span></div>
-            <div class="text-xs font-mono text-muted-foreground pt-2">Threshold: <span id="scale-thresh-disp" class="text-emerald-400 font-bold">50.0 kg</span> &bull; Tolerance: &plusmn;<span id="scale-tolerance-disp">2.0</span> kg continuous</div>
+            <div class="text-xs font-mono text-muted-foreground pt-2">Threshold: <span id="scale-thresh-disp" class="text-emerald-400 font-bold">-- kg</span> &bull; Tolerance: &plusmn;<span id="scale-tolerance-disp">2.0</span> kg continuous</div>
           </div>
         </div>
       </div>
@@ -457,6 +457,10 @@
             <div class="p-4 rounded-xl border border-border bg-secondary/30 space-y-2">
               <span class="text-xs text-muted-foreground font-medium block">Configured Center ID</span>
               <div id="cloud-center-id-val" class="text-xl font-bold font-mono text-foreground">1</div>
+            </div>
+            <div id="cloud-unsent-card" class="p-4 rounded-xl border border-border bg-secondary/30 space-y-2">
+              <span class="text-xs text-muted-foreground font-medium block">Unsent Weighments (since startup)</span>
+              <div id="cloud-unsent-val" class="text-xl font-bold font-mono text-foreground">0</div>
             </div>
             <div class="p-4 rounded-xl border border-border bg-secondary/30 space-y-2">
               <span class="text-xs text-muted-foreground font-medium block">Device Credentials</span>
@@ -938,7 +942,7 @@
         } else {
           if (errorEl) {
             errorEl.classList.remove('hidden');
-            errorEl.innerHTML = `<strong>Login Failed:</strong> ${resp.error || 'Invalid credentials'}`;
+            errorEl.innerHTML = `<strong>Login Failed:</strong> ${escapeHtml(resp.error || 'Invalid credentials')}`;
           }
         }
       } catch (err) {
@@ -962,7 +966,10 @@
     }
 
     function logoutConfig() {
-      lockAdminPanels();
+      // Revoke server-side, but clear local state whether or not the request succeeds.
+      fetch('/api/logout', { method: 'POST', headers: getAuthHeaders() })
+        .catch(() => {})
+        .finally(lockAdminPanels);
     }
 
     function toggleAdminPasswordVisibility() {
@@ -1004,9 +1011,9 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
-        document.getElementById('cfg-min-weight').value = data.min_weight ?? 50.0;
+        document.getElementById('cfg-min-weight').value = data.min_weight ?? '';
         document.getElementById('cfg-serial-port').value = data.serial_port ?? '/dev/ttyAMA0';
-        document.getElementById('cfg-serial-baudrate').value = String(data.serial_baudrate ?? 1200);
+        document.getElementById('cfg-serial-baudrate').value = String(data.serial_baudrate ?? '');
         document.getElementById('cfg-stability-duration').value = data.stability_duration ?? 10.0;
         document.getElementById('cfg-stability-tolerance').value = data.stability_tolerance ?? 2.0;
         document.getElementById('cfg-anpr-server-url').value = data.anpr_server_url ?? '';
@@ -1048,7 +1055,7 @@
       div.className = 'flex items-center gap-2';
       div.innerHTML = `
         <span class="text-xs font-mono text-muted-foreground w-28 shrink-0">${labelText}</span>
-        <input type="text" value="${value}" placeholder="rtsp://admin:pass@192.168.1.${100 + num}:554/stream"
+        <input type="text" value="${escapeHtml(value)}" placeholder="rtsp://admin:pass@192.168.1.${100 + num}:554/stream"
           class="cfg-anpr-cam-url flex-1 px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
         <button type="button" onclick="removeAnprField(this)" class="p-2 rounded-lg border border-border hover:bg-destructive/10 hover:border-destructive/30 text-muted-foreground hover:text-destructive transition" title="Remove camera">
           <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -1076,7 +1083,7 @@
       div.className = 'flex items-center gap-2';
       div.innerHTML = `
         <span class="text-xs font-mono text-muted-foreground w-28 shrink-0">Overview ${num}</span>
-        <input type="text" value="${value}" placeholder="rtsp://admin:pass@192.168.1.${200 + num}:554/stream"
+        <input type="text" value="${escapeHtml(value)}" placeholder="rtsp://admin:pass@192.168.1.${200 + num}:554/stream"
           class="cfg-aux-cam-url flex-1 px-3 py-2 rounded-lg bg-background border border-input font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring transition" />
         <button type="button" onclick="this.parentElement.remove()" class="p-2 rounded-lg border border-border hover:bg-destructive/10 hover:border-destructive/30 text-muted-foreground hover:text-destructive transition" title="Remove camera">
           <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -1126,14 +1133,14 @@
 
         if (res.ok && resp.success) {
           alert.className = 'p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 block text-xs';
-          alert.innerHTML = `<strong>Saved:</strong> ${resp.message}`;
+          alert.innerHTML = `<strong>Saved:</strong> ${escapeHtml(resp.message)}`;
         } else if (res.status === 401) {
           alert.className = 'p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive block text-xs';
           alert.innerHTML = `<strong>Unauthorized:</strong> Session expired. Please sign in again.`;
           logoutConfig();
         } else {
           alert.className = 'p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive block text-xs';
-          alert.innerHTML = `<strong>Error:</strong> ${resp.error || resp.message || 'Save failed'}`;
+          alert.innerHTML = `<strong>Error:</strong> ${escapeHtml(resp.error || resp.message || 'Save failed')}`;
         }
         fetchStatus();
       } catch (err) {
@@ -1231,7 +1238,8 @@
 
     async function fetchSavedNetworks() {
       try {
-        const res = await fetch("/api/wifi/saved");
+        if (!authToken) return;
+        const res = await fetch("/api/wifi/saved", { headers: getAuthHeaders() });
         const data = await res.json();
         const section = document.getElementById("saved-wifi-section");
         const container = document.getElementById("saved-wifi-chips");
@@ -1243,18 +1251,25 @@
 
         if (hasSaved) {
           section.classList.remove("hidden");
-          container.innerHTML = data.networks.map(n => {
-            const safeSsid = escapeHtml(n.ssid);
-            return `
-              <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-xs text-foreground cursor-pointer transition" onclick="selectSavedNetwork('${safeSsid}')">
-                <i data-lucide="wifi" class="w-3.5 h-3.5 text-emerald-400"></i>
-                <span class="font-medium">${safeSsid}</span>
-                <button type="button" title="Forget network" class="ml-1 text-muted-foreground hover:text-destructive transition p-0.5 rounded" onclick="deleteSavedNetwork(event, '${safeSsid}')">
-                  <i data-lucide="x" class="w-3 h-3"></i>
-                </button>
-              </div>
-            `;
-          }).join("");
+          // Built with DOM APIs: an HTML-escaped SSID inside an inline onclick string is
+          // decoded by the attribute parser before the JS runs, so escaping is not enough.
+          container.replaceChildren(...data.networks.map(n => {
+            const chip = document.createElement("div");
+            chip.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary border border-border text-xs text-foreground cursor-pointer transition";
+            chip.addEventListener("click", () => selectSavedNetwork(n.ssid));
+            chip.insertAdjacentHTML("beforeend", '<i data-lucide="wifi" class="w-3.5 h-3.5 text-emerald-400"></i>');
+            const name = document.createElement("span");
+            name.className = "font-medium";
+            name.textContent = n.ssid;
+            const del = document.createElement("button");
+            del.type = "button";
+            del.title = "Forget network";
+            del.className = "ml-1 text-muted-foreground hover:text-destructive transition p-0.5 rounded";
+            del.addEventListener("click", (e) => deleteSavedNetwork(e, n.ssid));
+            del.insertAdjacentHTML("beforeend", '<i data-lucide="x" class="w-3 h-3"></i>');
+            chip.append(name, del);
+            return chip;
+          }));
           lucide.createIcons();
         } else {
           section.classList.add("hidden");
@@ -1359,7 +1374,7 @@
       if (data.config) {
         const thresh = document.getElementById("scale-thresh-disp");
         const centerId = data.cloud && data.cloud.center_id ? data.cloud.center_id : (data.config.center_id || 1);
-        if (thresh) thresh.textContent = `${(data.config.min_weight || 50).toFixed(1)} kg`;
+        if (thresh && data.config.min_weight != null) thresh.textContent = `${Number(data.config.min_weight).toFixed(1)} kg`;
         const ovCenter = document.getElementById("ov-center-id");
         const cloudCenter = document.getElementById("cloud-center-id-val");
         if (ovCenter) ovCenter.textContent = `Center ID: ${centerId}`;
@@ -1399,6 +1414,19 @@
       if (ovSbBadge) {
         ovSbBadge.className = cloudClass;
         ovSbBadge.textContent = cloudText;
+      }
+
+      const unsent = Number((data.cloud && data.cloud.unsent_weighments) || 0);
+      const unsentVal = document.getElementById("cloud-unsent-val");
+      const unsentCard = document.getElementById("cloud-unsent-card");
+      if (unsentVal) {
+        unsentVal.textContent = String(unsent);
+        unsentVal.className = "text-xl font-bold font-mono " + (unsent > 0 ? "text-amber-400" : "text-foreground");
+      }
+      if (unsentCard) {
+        unsentCard.className = "p-4 rounded-xl border space-y-2 " + (unsent > 0
+          ? "border-amber-500/40 bg-amber-500/10"
+          : "border-border bg-secondary/30");
       }
 
       const argusBadge = document.getElementById("ov-argus-badge");
@@ -1490,16 +1518,16 @@
       if (!logDiv) return;
       logDiv.innerHTML = data.events.map(ev => `
         <div class="flex items-start gap-2">
-          <span class="text-zinc-600 flex-shrink-0">[${ev.time || 'NOW'}]</span>
-          <span class="text-emerald-400 font-bold flex-shrink-0">[${ev.source || 'SYSTEM'}]</span>
-          <span class="text-zinc-300 break-words">${ev.message}</span>
+          <span class="text-zinc-600 flex-shrink-0">[${escapeHtml(ev.time || 'NOW')}]</span>
+          <span class="text-emerald-400 font-bold flex-shrink-0">[${escapeHtml(ev.source || 'SYSTEM')}]</span>
+          <span class="text-zinc-300 break-words">${escapeHtml(ev.message)}</span>
         </div>
       `).join("");
     }
 
     async function fetchStatus(manual = false) {
       try {
-        const res = await fetch("/api/status");
+        const res = await fetch("/api/status", { headers: getAuthHeaders() });
         if (!res.ok) return;
         const data = await res.json();
         updateScaleUI(data);

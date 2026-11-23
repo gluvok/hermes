@@ -31,6 +31,7 @@ from src.core import (
 )
 from src.devices import (
     get_uart_reader,
+    is_watchdog_running,
     is_wifi_connected,
     led_controller,
     log_camera_fleet,
@@ -39,6 +40,7 @@ from src.devices import (
     stop_wifi_watchdog,
 )
 from src.web import start_web_server, stop_web_server
+from src.web.auth import require_runtime_secrets
 
 
 # ── Graceful shutdown ─────────────────────────────────────────────────────────
@@ -61,6 +63,7 @@ signal.signal(signal.SIGTERM, shutdown)
 #  SETUP
 # ─────────────────────────────────────────────────────────────────────────────
 def setup():
+    require_runtime_secrets()
     logger.info("")
     logger.info("==============================================")
     logger.info("Gluvok Weighment & ANPR System Starting...")
@@ -100,7 +103,18 @@ def setup():
         logger.warning("[Auth] Gluvok device credentials (device_id, device_key) not configured in client_config.py.")
 
 
+def _supervise_threads() -> None:
+    reader = get_uart_reader()
+    if not reader.is_alive():
+        logger.error("[Main] UART reader thread is dead. Restarting...")
+        reader.start()
+    if not is_watchdog_running():
+        logger.error("[Main] Wi-Fi watchdog thread is dead. Restarting...")
+        start_wifi_watchdog(interval=1.0)
+
+
 def loop():
+    _supervise_threads()
     completed_package = session_manager.check_session_progress()
     if completed_package:
         scale_state_machine._trigger_upload(completed_package)
