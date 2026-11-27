@@ -6,10 +6,14 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from unittest.mock import MagicMock
 
 import pytest
 import requests
 
+from src.core import stability
+from src.core.stability import ScaleStabilityMachine, ScaleState
+from src.devices.scale import ScaleUARTReader
 from src.integrations.anpr import dispatch_anpr_batch
 from src.web.blueprints import api
 
@@ -89,3 +93,59 @@ def test_shared_http_session_is_safe_across_anpr_workers(argus_url):
 
     assert results == [("KA01AB1234", "SUCCESS")] * 400
     assert len(recorded) == 400
+
+
+def test_offline_abort_is_not_lost_while_session_is_starting(monkeypatch):
+    machine = ScaleStabilityMachine()
+    entered, release = threading.Event(), threading.Event()
+    fake_sessions = MagicMock()
+    fake_sessions.check_session_progress.return_value = None
+    fake_sessions.start_session.side_effect = lambda: (entered.set(), release.wait(2.0))
+    monkeypatch.setattr(stability, "session_manager", fake_sessions)
+
+    uart = threading.Thread(target=machine.process_new_weight, args=(25000.0,))
+    uart.start()
+    assert entered.wait(2.0)
+    watchdog = threading.Thread(target=machine.set_network_status, args=(False,))
+    watchdog.start()
+    watchdog.join(0.2)  # unlocked: the abort runs now, sees SCALE_IDLE and does nothing
+    release.set()
+    uart.join(2.0)
+    watchdog.join(2.0)
+
+    assert machine.state == ScaleState.SCALE_IDLE  # offline machine must not be left mid-session
+    fake_sessions.reset_session.assert_called()
+
+
+def test_concurrent_uart_start_spawns_one_reader_loop(monkeypatch):
+    reader = ScaleUARTReader()
+    loops: list[str] = []
+    stop_loops = threading.Event()
+
+    def fake_loop() -> None:
+        loops.append(threading.current_thread().name)
+        stop_loops.wait(2.0)
+
+    monkeypatch.setattr(reader, "_read_loop", fake_loop)
+    both_checked = threading.Barrier(2, timeout=0.3)
+    real_clear = reader._stop_event.clear
+
+    def clear_after_rendezvous() -> None:
+        try:
+            both_checked.wait()  # unlocked: both callers passed the is_alive() check
+        except threading.BrokenBarrierError:
+            pass  # locked: the second caller is still waiting on the lifecycle lock
+        real_clear()
+
+    monkeypatch.setattr(reader._stop_event, "clear", clear_after_rendezvous)
+    callers = [threading.Thread(target=reader.start, args=("/dev/null", 9600)) for _ in range(2)]
+    try:
+        for t in callers:
+            t.start()
+        for t in callers:
+            t.join(2.0)
+    finally:
+        stop_loops.set()
+        reader.stop()
+
+    assert len(loops) == 1  # two loops would fight over one exclusive serial port
