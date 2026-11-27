@@ -17,7 +17,7 @@ graph TD
     Cams -->|JPEG| Argus[Argus /recognize]
     Argus -->|plate or status| Sess
     Sess -->|package| Upload[CloudUpload thread]
-    Upload -->|POST /api/entries| Cloud[Gluvok cloud]
+    Upload -->|POST /api/entries/automatic| Cloud[Gluvok cloud]
     Watchdog[WiFiWatchdog] -->|online / offline| Stab
     Watchdog -->|offline| Hotspot[Hotspot + captive portal]
     Web[Flask console :8080] --- Sess
@@ -45,7 +45,7 @@ Every dropped weighment increments `cloud.unsent_weighments` in `GET /api/status
 
 ### Cloud upload
 
-`POST {GLUVOK_BASE_URL}/api/entries` with an `x-api-key: <device_key>` header, timeout 20 s, multipart form fields `center_id`, `detected_vehicle_number`, `weight`, and one `file` part per camera (`truck_<label>.jpg`, labels `anpr_1`, `aux_1`, ...). If the server answers 400 with "storage" in the body, the entry is re-posted once without images. HTTP 200/201 is success. Everything else, including 409, is an error recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400) or `CLOUD_UPLOAD_ERROR` (other). On success the LED pulses blue for 10 s.
+`POST {GLUVOK_BASE_URL}/api/entries/automatic` with headers `x-api-key: <device_key>` and `Idempotency-Key: <UUIDv7>` (one per weighment, reused by every retry and fallback), timeout 20 s per attempt, redirects not followed. Multipart fields: `vehicle_number`, `weight`, and up to 3 `file` parts (`truck_<label>.jpg`, sorted so ANPR cameras come first). The center comes from the key; no `center_id` is sent. `429`, `500`, `502`, `503`, `504`, connection errors and timeouts are retried 3 times (0 s, 4 s, 8 s, or the server's `Retry-After` on `429`/`503`). A `400` naming the vehicle registration is re-posted once as `NO_PLATE_DETECTED`; a `400` with "storage" in the body is re-posted once without images. HTTP 200 (replay) or 201 is success. Other statuses are recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400), `CLOUD_RATE_LIMITED` (429) or `CLOUD_UPLOAD_ERROR`. On success the LED pulses blue for 10 s.
 
 ### Images
 

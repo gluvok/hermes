@@ -19,6 +19,8 @@ MAX_PARALLEL_CAMERA_WORKERS = 4
 
 GLUVOK_BASE_URL = os.environ.get("GLUVOK_BASE_URL", "https://gluvok.vercel.app").rstrip("/")
 CLOUD_POST_TIMEOUT = 20.0
+CLOUD_POST_RETRIES = 3  # retries after the first attempt
+CLOUD_MAX_IMAGES = 3  # janus ingest rejects more than 3 file parts
 DEFAULT_CENTER_ID = 1
 
 DEFAULT_DB_PATH = "data/hermes.db"
