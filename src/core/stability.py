@@ -36,6 +36,9 @@ class ScaleStabilityMachine:
         self._mid_stability_triggered = False
         self._last_printed_weight = -9999.0
         self._is_online = True
+        # UART thread (process_new_weight) and Wi-Fi watchdog (set_network_status) mutate state in parallel on 3.14t
+        # ponytail: one coarse lock; an offline abort holds it while reset_session() joins threads (<=0.6s), split if UART latency matters
+        self._lock = threading.RLock()
 
     @property
     def is_online(self) -> bool:
@@ -43,18 +46,20 @@ class ScaleStabilityMachine:
 
     def set_network_status(self, is_online: bool) -> None:
         """Immediately blocks and cancels active weighment session when offline."""
-        self._is_online = is_online
-        if not is_online:
-            self.abort_offline_session()
+        with self._lock:
+            self._is_online = is_online
+            if not is_online:
+                self.abort_offline_session()
 
     def abort_offline_session(self) -> None:
         """Aborts active weighment session and resets session manager."""
-        if self.state != ScaleState.SCALE_IDLE:
-            logger.warning("[Scale] Wi-Fi lost. Immediately aborting active weighment session.")
-            self._reset_candidate_state()
-            session_manager.reset_session()
-            from src.devices import led_controller
-            led_controller.set_idle()
+        with self._lock:
+            if self.state != ScaleState.SCALE_IDLE:
+                logger.warning("[Scale] Wi-Fi lost. Immediately aborting active weighment session.")
+                self._reset_candidate_state()
+                session_manager.reset_session()
+                from src.devices import led_controller
+                led_controller.set_idle()
 
     def _reset_candidate_state(self):
         self.state = ScaleState.SCALE_IDLE
@@ -123,6 +128,10 @@ class ScaleStabilityMachine:
             self._mid_stability_triggered = False
 
     def process_new_weight(self, parsed_weight: float):
+        with self._lock:
+            self._process_new_weight(parsed_weight)
+
+    def _process_new_weight(self, parsed_weight: float):
         if not self._is_online:
             return
 
@@ -202,14 +211,15 @@ class ScaleStabilityMachine:
 
     def reset(self):
         """Manually reset the state machine."""
-        self.state = ScaleState.SCALE_IDLE
-        self.last_weight = 0.0
-        self._current_stable_candidate = 0.0
-        self._candidate_start_time = 0.0
-        self._last_printed_weight = -9999.0
-        session_manager.reset_session()
-        from src.devices import led_controller
-        led_controller.set_idle()
+        with self._lock:
+            self.state = ScaleState.SCALE_IDLE
+            self.last_weight = 0.0
+            self._current_stable_candidate = 0.0
+            self._candidate_start_time = 0.0
+            self._last_printed_weight = -9999.0
+            session_manager.reset_session()
+            from src.devices import led_controller
+            led_controller.set_idle()
 
 
 # Module-level singleton

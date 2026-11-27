@@ -65,16 +65,16 @@ Each Argus call yields a plate or a status code: `SUCCESS`, `NO_PLATE_DETECTED`,
 | `ScaleUART` | `ScaleUARTReader.start()` | Read serial, parse weights, drive the stability machine. Reopens the port every 5 s after a loss. |
 | `FallbackWebServer` | `start_web_server()` | Flask console, `:8080` |
 | `WiFiWatchdog` | `start_wifi_watchdog()` | Connectivity checks every 1 s |
-| `ANPRLoop_<id>` | session start | Capture ANPR frames every 1 s, dispatch to the Argus worker pool (4 workers) |
+| `ANPRLoop_<id>` | session start | Capture ANPR frames every 1 s, dispatch to the Argus worker pool (2 workers, max 2 in flight) |
 | `FleetCapture_<id>` | mid-stability or stable | Capture all cameras and compress |
 | `CloudUpload_<id>` | session finalized | Upload one entry |
 | `CaptiveHTTP`, `CaptiveDNS` | hotspot start | Captive portal, only while the hotspot is up |
 
 `main.loop()` restarts the UART reader and the watchdog if their threads died. The web server and portal threads are not supervised.
 
-The watchdog is the only code that probes the network (TCP to 1.1.1.1:53, then 8.8.8.8:53, 2 s each). After 2 consecutive failed checks it calls `notify_network_status(False)`, which updates the stability machine first and the LED second, so an LED fault cannot stop the weighment from going offline. The UART thread reuses that verdict and never probes. The stability machine assumes online until the watchdog says otherwise.
+The watchdog is the only code that probes the network (TCP to the Gluvok cloud host first, then 1.1.1.1:53 and 8.8.8.8:53, 1.5 s each). After 5 consecutive failed checks (about 5 s if the link refuses connections, up to about 30 s if it silently drops packets) it calls `notify_network_status(False)`, which updates the stability machine first and the LED second, so an LED fault cannot stop the weighment from going offline. The UART thread reuses that verdict and never probes. The stability machine assumes online until the watchdog says otherwise.
 
-Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the session manager, telemetry (`_events_lock`, `_live_lock`), the Wi-Fi vault, nmcli (`nmcli_lock`, serializes all nmcli calls).
+Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the session manager, telemetry (`_events_lock`, `_live_lock`), the Wi-Fi vault, nmcli (`nmcli_lock`, serializes all nmcli calls), `ScaleStabilityMachine` (`RLock`), `ScaleUARTReader._lifecycle_lock` (`RLock`), `_argus_probe_lock` (`Lock`).
 
 ---
 
@@ -95,7 +95,7 @@ Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the sess
 
 Package `src/devices/wifi/` drives NetworkManager through `nmcli` (via `sudo -n` when not root).
 
-- When the watchdog sees 2 failed checks, it starts the emergency hotspot: SSID `hermes`, connection `hermes-hotspot`, gateway `10.42.0.1`, WPA2 passphrase from `HERMES_HOTSPOT_PASS`. If that variable is shorter than 8 characters, the hotspot refuses to start. When connectivity returns, the watchdog stops the hotspot.
+- When the watchdog sees 5 failed checks, it starts the emergency hotspot: SSID `hermes`, connection `hermes-hotspot`, gateway `10.42.0.1`, WPA2 passphrase from `HERMES_HOTSPOT_PASS`. If that variable is shorter than 8 characters, the hotspot refuses to start. When connectivity returns, the watchdog stops the hotspot.
 - The portal serves a Wi-Fi setup page on port 80 (falls back to 8088 with iptables redirects), a DNS responder that answers every query with the gateway IP (binds UDP 53, else 5354; iptables also redirects interface port 53 to 5354), DHCP option 114 and `/.well-known/captive-portal` (RFC 8908), and maps `hermes.local` and `hermes.config` in `/etc/hosts`.
 - `POST /connect` on the portal requires `userid` and `admin_password` (the console credentials) in the JSON body, with the shared per-IP limiter. Bodies over 4096 bytes get 413. On success it joins the network, saves it to the vault and stops the hotspot. On failure the hotspot restarts if it was up. Before joining, it deletes an existing profile only if that profile is a station-mode profile for the same SSID.
 - Saved networks are kept in the `wifi_networks` table, password in plain text. `GET /api/wifi/saved` returns SSIDs without passwords and needs a token.
@@ -134,7 +134,7 @@ Package `src/devices/wifi/` drives NetworkManager through `nmcli` (via `sudo -n`
 1. Requires `SUPERADMIN_PASS` and `HERMES_HOTSPOT_PASS` in the local environment, or exits.
 2. Optionally signs `data/client.lic` (`--device-id`, `--device-key`, `--center-id`, `--min-weight`) with `scripts/keygen.py`.
 3. Rsyncs the repo to `/opt/hermes`, runs `uv sync`, builds the native binary with Nuitka (`scripts/build.py`), then deletes all `.py` files, `scripts/`, `tests/` and `docs/` on the Pi.
-4. Writes `data/hermes.env` (mode 600) and uploads `data/client.lic`.
+4. Writes `data/hermes.env` (mode 600; required secrets plus `GLUVOK_BASE_URL`/`ANPR_SERVER_TIMEOUT` when set locally) and uploads `data/client.lic`.
 5. Creates the system user `hermes` (groups `dialout`, `gpio`, `netdev`), installs `/etc/sudoers.d/hermes` after `visudo -c`, and installs and restarts the `hermes` systemd unit.
 
 The service runs as user `hermes` with `ProtectSystem=strict`, write access limited to `data/`, `/etc/hosts` and the NetworkManager dnsmasq directory, and `CAP_NET_BIND_SERVICE` for port 80. The sudoers drop-in allows only the commands Hermes runs with `sudo -n`: `nmcli`, the portal's `iptables` rules, `fuser -k -9 80/tcp`, and the `/etc/hosts` and dnsmasq file edits.

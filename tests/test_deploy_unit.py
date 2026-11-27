@@ -12,6 +12,7 @@ from scripts.deploy import (
     build_service_unit,
     build_sudoers,
     provision_script,
+    secrets_env_text,
 )
 from src.devices.wifi import portal_capport, portal_hosts, portal_redirect, runner
 
@@ -128,3 +129,29 @@ def test_sudoers_covers_every_sudo_argv_the_code_runs(monkeypatch: pytest.Monkey
         binary = argv[0] if argv[0].startswith("/") else f"/usr/bin/{argv[0]}"
         assert " ".join([binary, *argv[1:]]) in allowed or binary == "/usr/bin/nmcli", argv
     assert "/usr/bin/nmcli" in allowed
+
+
+def test_secrets_env_text_forwards_optional_runtime_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SUPERADMIN_PASS", "admin-pw")
+    monkeypatch.setenv("HERMES_HOTSPOT_PASS", "hotspot-pw")
+    monkeypatch.setenv("GLUVOK_BASE_URL", "https://staging.gluvok.example")
+    monkeypatch.setenv("ANPR_SERVER_TIMEOUT", "12")
+
+    env_text = secrets_env_text()
+    assert 'SUPERADMIN_PASS="admin-pw"\n' in env_text
+    assert 'HERMES_HOTSPOT_PASS="hotspot-pw"\n' in env_text
+    assert 'GLUVOK_BASE_URL="https://staging.gluvok.example"\n' in env_text
+    assert 'ANPR_SERVER_TIMEOUT="12"\n' in env_text
+
+    monkeypatch.delenv("GLUVOK_BASE_URL", raising=False)
+    monkeypatch.delenv("ANPR_SERVER_TIMEOUT", raising=False)
+    assert secrets_env_text() == 'SUPERADMIN_PASS="admin-pw"\nHERMES_HOTSPOT_PASS="hotspot-pw"\n'
+
+
+@pytest.mark.parametrize(("name", "value"), [("GLUVOK_BASE_URL", "https://x\nEVIL=1"), *(("ANPR_SERVER_TIMEOUT", v) for v in ("abc", "0", "-1", "inf", "nan"))])
+def test_secrets_env_text_rejects_unsafe_values(monkeypatch: pytest.MonkeyPatch, name: str, value: str) -> None:
+    monkeypatch.setenv("SUPERADMIN_PASS", "admin-pw")
+    monkeypatch.setenv("HERMES_HOTSPOT_PASS", "hotspot-pw")
+    monkeypatch.setenv(name, value)
+    with pytest.raises(SystemExit):
+        secrets_env_text()

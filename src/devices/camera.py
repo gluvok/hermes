@@ -2,18 +2,19 @@
 camera.py — IP Camera Frame Grabber & Parallel Snapshot Driver
 ==============================================================
 Low-resource IP camera frame capture module.
-Supports HTTP JPEG Snapshots and on-demand OpenCV RTSP stream frame grabbing.
+Supports HTTP JPEG Snapshots and on-demand PyAV (FFmpeg) RTSP single-frame grabbing.
 Uses ThreadPoolExecutor for concurrent multi-camera snapshot capture.
 """
 
 from __future__ import annotations
 
+import io
 import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import cv2
+import av
 import requests
 import urllib3
 
@@ -40,7 +41,7 @@ def fetch_image_bytes(camera_url: str, timeout: float = CAMERA_TIMEOUT) -> bytes
     """
     Fetch raw JPEG image bytes from a camera URL.
     Prefers HTTP JPEG Snapshots for low CPU/RAM footprint.
-    Falls back to on-demand OpenCV RTSP single-frame capture if URL starts with 'rtsp://'.
+    Falls back to on-demand PyAV RTSP single-frame capture if URL starts with 'rtsp://'.
     """
     if not camera_url:
         return None
@@ -67,27 +68,18 @@ def _fetch_http_snapshot(url: str, timeout: float) -> bytes | None:
 
 
 def _fetch_rtsp_frame(rtsp_url: str, timeout: float) -> bytes | None:
-    """On-demand single frame capture from RTSP stream using OpenCV."""
+    """On-demand single frame capture from RTSP stream using PyAV (bundled FFmpeg)."""
     try:
-        cap = cv2.VideoCapture(rtsp_url, cv2.CAP_FFMPEG)
-        if not cap.isOpened():
-            logger.warning(f"[Camera] Unable to open RTSP stream: {_mask(rtsp_url)}")
-            return None
-
-        # Set low buffer size if supported
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        ret, frame = cap.read()
-        cap.release()
-
-        if ret and frame is not None:
-            # Encode frame to JPEG byte buffer in RAM
-            success, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            if success:
-                return buffer.tobytes()
-        logger.warning(f"[Camera] Failed to read frame from RTSP stream: {_mask(rtsp_url)}")
-        return None
-    except (cv2.error, OSError, ValueError) as e:
-        logger.error(f"[Camera] OpenCV RTSP exception for {_mask(rtsp_url)}: {_mask(e)}")
+        with av.open(rtsp_url, timeout=timeout) as container:
+            frame = next(container.decode(video=0), None)
+            if frame is None:
+                logger.warning(f"[Camera] Failed to read frame from RTSP stream: {_mask(rtsp_url)}")
+                return None
+            buf = io.BytesIO()
+            frame.to_image().save(buf, "JPEG", quality=85)
+            return buf.getvalue()
+    except (av.FFmpegError, IndexError, OSError, ValueError) as e:
+        logger.error(f"[Camera] RTSP exception for {_mask(rtsp_url)}: {_mask(e)}")
         return None
 
 

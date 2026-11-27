@@ -1,8 +1,11 @@
+import io
 import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
+import av
 import requests
+from PIL import Image
 
 from src.devices import camera
 from src.devices.camera import capture_all_camera_snapshots
@@ -79,9 +82,8 @@ def test_http_bad_status_log_masks_credentials(caplog):
 
 def test_rtsp_open_failure_log_masks_credentials(caplog):
     url = "rtsp://admin:s3cret@10.0.0.9/stream"
-    fake_cap = MagicMock()
-    fake_cap.isOpened.return_value = False
-    with patch("cv2.VideoCapture", return_value=fake_cap), caplog.at_level(logging.DEBUG):
+    err = av.FFmpegError(111, "Connection refused", url)
+    with patch("src.devices.camera.av.open", side_effect=err), caplog.at_level(logging.DEBUG):
         assert camera._fetch_rtsp_frame(url, 1.0) is None
     assert "s3cret" not in caplog.text and "admin:" not in caplog.text
     assert "//***@" in caplog.text
@@ -89,19 +91,45 @@ def test_rtsp_open_failure_log_masks_credentials(caplog):
 
 def test_rtsp_read_failure_log_masks_credentials(caplog):
     url = "rtsp://admin:s3cret@10.0.0.9/stream"
-    fake_cap = MagicMock()
-    fake_cap.isOpened.return_value = True
-    fake_cap.read.return_value = (False, None)
-    with patch("cv2.VideoCapture", return_value=fake_cap), caplog.at_level(logging.DEBUG):
+    container = MagicMock()
+    container.__enter__.return_value.decode.return_value = iter(())
+    with patch("src.devices.camera.av.open", return_value=container), caplog.at_level(logging.DEBUG):
         assert camera._fetch_rtsp_frame(url, 1.0) is None
     assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+    assert "//***@" in caplog.text
 
 
 def test_rtsp_exception_log_masks_credentials(caplog):
     url = "rtsp://admin:s3cret@10.0.0.9/stream"
-    with patch("cv2.VideoCapture", side_effect=OSError(f"boom {url}")), caplog.at_level(logging.DEBUG):
+    with patch("src.devices.camera.av.open", side_effect=OSError(f"boom {url}")), caplog.at_level(logging.DEBUG):
         assert camera._fetch_rtsp_frame(url, 1.0) is None
     assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+
+
+def test_rtsp_no_video_stream_returns_none(caplog):
+    url = "rtsp://admin:s3cret@10.0.0.9/audio_only"
+    container = MagicMock()
+    container.__enter__.return_value.decode.side_effect = IndexError("no video stream")
+    with patch("src.devices.camera.av.open", return_value=container), caplog.at_level(logging.DEBUG):
+        assert camera._fetch_rtsp_frame(url, 1.0) is None
+    assert "s3cret" not in caplog.text and "admin:" not in caplog.text
+    assert "//***@" in caplog.text
+
+
+def test_rtsp_grab_decodes_real_stream_to_jpeg(tmp_path):
+    clip = tmp_path / "clip.mp4"  # local file stands in for rtsp://; same av.open/decode path
+    with av.open(str(clip), "w") as out:
+        stream = out.add_stream("mpeg4", rate=10)
+        stream.width, stream.height, stream.pix_fmt = 320, 240, "yuv420p"
+        for i in range(3):
+            frame = av.VideoFrame.from_image(Image.new("RGB", (320, 240), (i * 60, 90, 180)))
+            for pkt in stream.encode(frame):
+                out.mux(pkt)
+        for pkt in stream.encode():
+            out.mux(pkt)
+    jpeg = camera._fetch_rtsp_frame(str(clip), 3.0)
+    assert jpeg is not None and jpeg[:2] == b"\xff\xd8"
+    assert Image.open(io.BytesIO(jpeg)).size == (320, 240)
 
 
 def test_log_camera_fleet_masks_credentials(caplog):

@@ -141,7 +141,9 @@ class TestSessionErrorFallback(unittest.TestCase):
         mock_anpr_snaps.return_value = [(1, "http://anpr1/front", fake_frame)]
         mock_send.return_value = (None, "NO_PLATE_DETECTED")
 
-        self.sm.start_session()
+        # No background loop: on 3.14t it captures in parallel and records a second status
+        with patch.object(self.sm, "_anpr_loop"):
+            self.sm.start_session()
         self.sm._capture_and_record_anpr_sample()
 
         self.assertEqual(len(self.sm._anpr_plates), 0)

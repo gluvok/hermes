@@ -8,10 +8,12 @@ error isolation, and lifecycle cleanup.
 from __future__ import annotations
 
 import concurrent.futures
+import threading
 import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+from src.config.constants import ANPR_MAX_IN_FLIGHT, ANPR_WORKERS
 from src.core.session import SessionPhase, WeighbridgeSessionManager
 from src.integrations.anpr import (
     dispatch_anpr_batch,
@@ -103,14 +105,13 @@ class TestAsyncANPR(unittest.TestCase):
         start = time.time()
         with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=slow_sender):
             futures = self.sm._capture_and_record_anpr_sample(wait=False)
+            elapsed = time.time() - start
+            # Wait inside the patch: without a GIL the worker may run after the with-block exits (3.14t)
+            concurrent.futures.wait(futures, timeout=1.0)
 
-        elapsed = time.time() - start
         # Non-blocking dispatch must return almost immediately (< 0.05s)
         self.assertLess(elapsed, 0.05)
         self.assertEqual(len(futures), 1)
-
-        # Wait for the future to verify result eventually landed
-        concurrent.futures.wait(futures, timeout=1.0)
         self.assertEqual(self.sm._anpr_plates, ["MH12AB9999"])
 
     def test_error_isolation_on_worker_crash(self):
@@ -157,3 +158,58 @@ class TestAsyncANPR(unittest.TestCase):
             assert pkg is not None
             # The delayed future was drained before voting
             self.assertEqual(pkg["anpr_plate"], "KA01MM4444")
+
+    @patch("src.core.session.capture_anpr_snapshots")
+    def test_in_flight_cap_skips_capture_until_futures_finish(self, mock_snaps):
+        mock_snaps.return_value = [(1, "http://cam1/frame", b"jpeg")]
+        with patch.object(self.sm, "_anpr_loop"):
+            self.sm.start_session()
+
+        release = threading.Event()
+
+        def blocked_sender(_img_bytes, **_kwargs):
+            release.wait(timeout=5.0)
+            return ("MH12AB9999", "SUCCESS")
+
+        with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=blocked_sender):
+            for _ in range(ANPR_MAX_IN_FLIGHT + 3):
+                self.sm._capture_and_record_anpr_sample(wait=False)
+
+            self.assertEqual(mock_snaps.call_count, ANPR_MAX_IN_FLIGHT)
+            self.assertLessEqual(len(self.sm._pending_anpr_futures), ANPR_MAX_IN_FLIGHT)
+
+            release.set()
+            concurrent.futures.wait(list(self.sm._pending_anpr_futures), timeout=2.0)
+
+            futures = self.sm._capture_and_record_anpr_sample(wait=False)
+            concurrent.futures.wait(futures, timeout=2.0)
+            self.assertEqual(mock_snaps.call_count, ANPR_MAX_IN_FLIGHT + 1)
+
+        assert self.sm._anpr_pool is not None
+        self.assertEqual(self.sm._anpr_pool._max_workers, ANPR_WORKERS)
+
+    @patch("src.core.session.capture_anpr_snapshots")
+    def test_in_flight_cap_survives_session_reset(self, mock_snaps):
+        mock_snaps.return_value = [(1, "http://cam1/frame", b"jpeg")]
+        release = threading.Event()
+
+        def blocked_sender(_img_bytes, **_kwargs):
+            release.wait(timeout=5.0)
+            return ("MH12AB9999", "SUCCESS")
+
+        with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=blocked_sender):
+            with patch.object(self.sm, "_anpr_loop"):
+                self.sm.start_session()
+            for _ in range(ANPR_MAX_IN_FLIGHT):
+                self.sm._capture_and_record_anpr_sample(wait=False)
+            stale = list(self.sm._pending_anpr_futures)
+
+            # Truck A aborts mid-request; truck B must not stack more requests on Argus.
+            self.sm.reset_session()
+            with patch.object(self.sm, "_anpr_loop"):
+                self.sm.start_session()
+            self.assertEqual(self.sm._capture_and_record_anpr_sample(wait=False), [])
+            self.assertEqual(mock_snaps.call_count, ANPR_MAX_IN_FLIGHT)
+
+            release.set()
+            concurrent.futures.wait(stale, timeout=2.0)
