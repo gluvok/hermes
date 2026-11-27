@@ -20,6 +20,7 @@ from src.config.constants import (
     CLOUD_MAX_IMAGES,
     CLOUD_POST_RETRIES,
     CLOUD_POST_TIMEOUT,
+    CLOUD_RETRY_AFTER_MAX_S,
     GLUVOK_BASE_URL,
 )
 from src.core.telemetry import (
@@ -38,6 +39,7 @@ _RETRY = Retry(
     status_forcelist=(429, 500, 502, 503, 504),
     allowed_methods=frozenset({"POST"}),
     respect_retry_after_header=True,
+    retry_after_max=CLOUD_RETRY_AFTER_MAX_S,  # urllib3 clamps longer Retry-After values to this
     raise_on_status=False,  # hand the last response to _parse_cloud_response
 )
 

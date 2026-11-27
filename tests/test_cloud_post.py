@@ -14,6 +14,7 @@ from src.config import ConfigManager, config
 from src.config.constants import GLUVOK_BASE_URL
 from src.core.telemetry import get_error_counts, get_system_events, reset_state
 from src.integrations.gluvok import (
+    _RETRY,
     _build_multipart_files,
     post_to_cloud,
     transmit_entry_multipart,
@@ -327,6 +328,10 @@ class TestCloudPost(unittest.TestCase):
 
         self.assertTrue(result[0])
         self.assertEqual(len(seen), 2)
+
+    def test_retry_after_is_capped_at_sixty_seconds(self):
+        self.assertEqual(_RETRY.parse_retry_after("3600"), 60)
+        self.assertEqual(_RETRY.parse_retry_after("5"), 5)
 
     def test_transmit_does_not_retry_400(self):
         url, seen = self._serve_script([(400, {}, b"bad weight")])

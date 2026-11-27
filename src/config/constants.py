@@ -22,6 +22,7 @@ MAX_PARALLEL_CAMERA_WORKERS = 4
 GLUVOK_BASE_URL = os.environ.get("GLUVOK_BASE_URL", "https://gluvok.vercel.app").rstrip("/")
 CLOUD_POST_TIMEOUT = 20.0
 CLOUD_POST_RETRIES = 3  # retries after the first attempt
+CLOUD_RETRY_AFTER_MAX_S = 60  # janus sends <=60 s; never park an upload thread longer for a stray proxy
 CLOUD_MAX_IMAGES = 3  # janus ingest rejects more than 3 file parts
 CLOUD_AUTH_ALERT_THRESHOLD = 3  # consecutive 401/403 replies before /api/status flags auth_failing
 OUTBOX_MAX_ROWS = 500  # ~250 KB per weighment: bounds the outbox near 125 MB of SD card
