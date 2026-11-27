@@ -56,6 +56,21 @@ class TestWiFiManager(unittest.TestCase):
 
         self.assertEqual(attempted, [("gluvok.vercel.app", 443), ("1.1.1.1", 53)])
 
+    def test_is_network_connected_tolerates_malformed_base_url(self) -> None:
+        attempted: list[tuple[str, int]] = []
+
+        def fake_conn(addr: tuple[str, int], timeout: float = 1.5) -> MagicMock:
+            attempted.append(addr)
+            raise OSError("Unreachable")
+
+        with (
+            patch("src.config.constants.GLUVOK_BASE_URL", "https://host:abc"),
+            patch("socket.create_connection", side_effect=fake_conn),
+        ):
+            self.assertFalse(connectivity.is_network_connected())
+
+        self.assertEqual(attempted, [("1.1.1.1", 53), ("8.8.8.8", 53)])
+
     def test_connect_to_wifi_empty_ssid(self) -> None:
         ok, msg = connection.connect_to_wifi("", "password")
         self.assertFalse(ok)

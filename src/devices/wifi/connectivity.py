@@ -10,10 +10,13 @@ CHECK_TARGETS = (("1.1.1.1", 53), ("8.8.8.8", 53))
 
 
 def _check_targets() -> tuple[tuple[str, int], ...]:
-    parsed = urlparse(constants.GLUVOK_BASE_URL)
-    if parsed.hostname:
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        return ((parsed.hostname, port), *CHECK_TARGETS)
+    try:
+        parsed = urlparse(constants.GLUVOK_BASE_URL)
+        if parsed.hostname:
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            return ((parsed.hostname, port), *CHECK_TARGETS)
+    except ValueError:  # malformed URL/port must not kill offline detection
+        pass
     return CHECK_TARGETS
 
 
