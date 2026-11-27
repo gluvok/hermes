@@ -87,4 +87,8 @@ GPIO 17 red, 27 green, 22 blue.
 uv run ruff check --fix && uv run ty check && uv run pytest -q
 ```
 
-The same checks run in CI and in `.githooks/pre-push`.
+The same checks run in CI and in `.githooks/pre-push`. Git does not run that hook until you enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
