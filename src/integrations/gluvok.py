@@ -123,7 +123,8 @@ def transmit_entry_multipart(
 
     try:
         response = requests.post(
-            entries_url, headers=headers, data=data, files=files, timeout=CLOUD_POST_TIMEOUT
+            entries_url, headers=headers, data=data, files=files, timeout=CLOUD_POST_TIMEOUT,
+            allow_redirects=False,
         )
         if response.status_code == 400 and has_images and "storage" in response.text.lower():
             logger.warning(
@@ -131,7 +132,8 @@ def transmit_entry_multipart(
             )
             fallback_files = [("file", (filename, b"", "image/jpeg"))]
             response = requests.post(
-                entries_url, headers=headers, data=data, files=fallback_files, timeout=CLOUD_POST_TIMEOUT
+                entries_url, headers=headers, data=data, files=fallback_files, timeout=CLOUD_POST_TIMEOUT,
+                allow_redirects=False,
             )
         return _parse_cloud_response(response, safe_plate, weight)
 
