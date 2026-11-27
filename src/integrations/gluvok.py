@@ -1,7 +1,7 @@
 """
 gluvok.py — Gluvok Cloud API Integration Client
 ===============================================
-Authenticates with the device key in an x-api-key header, sends multipart/form-data
+Handles HTTP Basic Authentication (-u device_id:device_key), multipart/form-data
 weighment transmission matching the official curl specification (/api/entries).
 """
 
@@ -93,7 +93,7 @@ def transmit_entry_multipart(
     """
     Submits vehicle weighment session to Gluvok API (/api/entries) matching the curl specification:
       curl -X POST "https://gluvok.vercel.app/api/entries" \\
-        -H "x-api-key: $DEVICE_KEY" \\
+        -u "$DEVICE_ID:$DEVICE_KEY" \\
         -F "center_id=1" \\
         -F "detected_vehicle_number=MH12AB1234" \\
         -F "weight=18540.5" \\
@@ -107,7 +107,7 @@ def transmit_entry_multipart(
         return False, None, msg, False
 
     entries_url = f"{GLUVOK_BASE_URL}/api/entries"
-    headers = {"x-api-key": str(config.device_key)}
+    auth = (str(config.device_id), config.device_key)
     safe_plate = _safe_plate(detected_vehicle_number)
     data = {
         "center_id": str(center_id),
@@ -123,7 +123,7 @@ def transmit_entry_multipart(
 
     try:
         response = requests.post(
-            entries_url, headers=headers, data=data, files=files, timeout=CLOUD_POST_TIMEOUT
+            entries_url, auth=auth, data=data, files=files, timeout=CLOUD_POST_TIMEOUT
         )
         if response.status_code == 400 and has_images and "storage" in response.text.lower():
             logger.warning(
@@ -131,7 +131,7 @@ def transmit_entry_multipart(
             )
             fallback_files = [("file", (filename, b"", "image/jpeg"))]
             response = requests.post(
-                entries_url, headers=headers, data=data, files=fallback_files, timeout=CLOUD_POST_TIMEOUT
+                entries_url, auth=auth, data=data, files=fallback_files, timeout=CLOUD_POST_TIMEOUT
             )
         return _parse_cloud_response(response, safe_plate, weight)
 

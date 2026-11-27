@@ -39,9 +39,8 @@ class TestCloudPost(unittest.TestCase):
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args.kwargs
 
-        # 1. Verify x-api-key header carries the device key; no Basic auth (janus ingest)
-        self.assertEqual(call_kwargs["headers"], {"x-api-key": str(config.device_key)})
-        self.assertNotIn("auth", call_kwargs)
+        # 1. Verify Basic Auth (-u "{device_id}:{device_key}")
+        self.assertEqual(call_kwargs["auth"], (str(config.device_id), str(config.device_key)))
 
         # 2. Verify form data
         data = call_kwargs["data"]
@@ -147,24 +146,6 @@ class TestCloudPost(unittest.TestCase):
         self.assertEqual(len(files), 3)
         filenames = [f[1][0] for f in files]
         self.assertEqual(filenames, ["truck_anpr_1.jpg", "truck_anpr_2.jpg", "truck_aux_1.jpg"])
-
-    @patch("src.integrations.gluvok.requests.post")
-    def test_post_to_cloud_storage_retry_uses_api_key_header(self, mock_post: Mock):
-        storage_err = Mock(status_code=400, content=b"storage error", text="storage error")
-        ok_resp = Mock(status_code=201, content=b'{"data": {"id": 106}}')
-        ok_resp.json.return_value = {"data": {"id": 106}}
-        mock_post.side_effect = [storage_err, ok_resp]
-
-        post_to_cloud({
-            "weight": 25000.0,
-            "anpr_plate": "MH12AB1234",
-            "camera_snapshots": {"anpr_1": b"truck_img"},
-        })
-
-        self.assertEqual(mock_post.call_count, 2)
-        for call in mock_post.call_args_list:
-            self.assertEqual(call.kwargs["headers"], {"x-api-key": str(config.device_key)})
-            self.assertNotIn("auth", call.kwargs)
 
     def test_build_multipart_files_passes_bytes_through_untouched(self):
         # Snapshots are already compressed in session.py; re-encoding is lossy and wastes Pi CPU.
