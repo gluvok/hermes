@@ -146,3 +146,12 @@ def test_secrets_env_text_forwards_optional_runtime_overrides(monkeypatch: pytes
     monkeypatch.delenv("GLUVOK_BASE_URL", raising=False)
     monkeypatch.delenv("ANPR_SERVER_TIMEOUT", raising=False)
     assert secrets_env_text() == 'SUPERADMIN_PASS="admin-pw"\nHERMES_HOTSPOT_PASS="hotspot-pw"\n'
+
+
+@pytest.mark.parametrize(("name", "value"), [("GLUVOK_BASE_URL", "https://x\nEVIL=1"), ("ANPR_SERVER_TIMEOUT", "abc")])
+def test_secrets_env_text_rejects_unsafe_values(monkeypatch: pytest.MonkeyPatch, name: str, value: str) -> None:
+    monkeypatch.setenv("SUPERADMIN_PASS", "admin-pw")
+    monkeypatch.setenv("HERMES_HOTSPOT_PASS", "hotspot-pw")
+    monkeypatch.setenv(name, value)
+    with pytest.raises(SystemExit):
+        secrets_env_text()

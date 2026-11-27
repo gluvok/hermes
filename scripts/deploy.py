@@ -32,9 +32,17 @@ def secrets_env_text() -> str:
         print(f"[Deploy] Set {', '.join(missing)} in your local environment first.", file=sys.stderr)
         sys.exit(1)
     esc = lambda v: v.replace("\\", "\\\\").replace('"', '\\"')
-    lines = [f'{n}="{esc(os.environ[n])}"\n' for n in REQUIRED_SECRETS]
-    lines += [f'{n}="{esc(v)}"\n' for n in OPTIONAL_ENV_VARS if (v := os.environ.get(n))]
-    return "".join(lines)
+    env = {n: v for n in (*REQUIRED_SECRETS, *OPTIONAL_ENV_VARS) if (v := os.environ.get(n))}
+    for n, v in env.items():
+        if any(c in v for c in "\r\n\0"):  # a newline would inject extra EnvironmentFile lines
+            print(f"[Deploy] {n} must not contain newlines.", file=sys.stderr)
+            sys.exit(1)
+    try:
+        float(env.get("ANPR_SERVER_TIMEOUT", "0"))
+    except ValueError:
+        print("[Deploy] ANPR_SERVER_TIMEOUT must be a number.", file=sys.stderr)
+        sys.exit(1)
+    return "".join(f'{n}="{esc(v)}"\n' for n, v in env.items())
 
 
 def build_service_unit(target: str) -> str:
