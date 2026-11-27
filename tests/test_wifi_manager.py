@@ -22,6 +22,40 @@ class TestWiFiManager(unittest.TestCase):
     def test_is_wifi_connected_false(self, mock_conn: MagicMock) -> None:
         self.assertFalse(connectivity.is_wifi_connected())
 
+    def test_is_network_connected_probes_cloud_host_first(self) -> None:
+        attempted: list[tuple[str, int]] = []
+
+        def fake_conn(addr: tuple[str, int], timeout: float = 1.5) -> MagicMock:
+            attempted.append(addr)
+            if addr == ("staging.example.com", 8443):
+                return MagicMock()
+            raise OSError("DNS blocked")
+
+        with (
+            patch("src.config.constants.GLUVOK_BASE_URL", "https://staging.example.com:8443"),
+            patch("socket.create_connection", side_effect=fake_conn),
+        ):
+            self.assertTrue(connectivity.is_network_connected())
+
+        self.assertEqual(attempted, [("staging.example.com", 8443)])
+
+    def test_is_network_connected_falls_back_to_dns_when_cloud_unreachable(self) -> None:
+        attempted: list[tuple[str, int]] = []
+
+        def fake_conn(addr: tuple[str, int], timeout: float = 1.5) -> MagicMock:
+            attempted.append(addr)
+            if addr == ("1.1.1.1", 53):
+                return MagicMock()
+            raise OSError("Cloud down")
+
+        with (
+            patch("src.config.constants.GLUVOK_BASE_URL", "https://gluvok.vercel.app"),
+            patch("socket.create_connection", side_effect=fake_conn),
+        ):
+            self.assertTrue(connectivity.is_network_connected())
+
+        self.assertEqual(attempted, [("gluvok.vercel.app", 443), ("1.1.1.1", 53)])
+
     def test_connect_to_wifi_empty_ssid(self) -> None:
         ok, msg = connection.connect_to_wifi("", "password")
         self.assertFalse(ok)
