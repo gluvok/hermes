@@ -12,6 +12,7 @@ EXCLUDES = ["--exclude=.venv", "--exclude=dist", "--exclude=__pycache__", "--exc
 
 
 REQUIRED_SECRETS = ("SUPERADMIN_PASS", "HERMES_HOTSPOT_PASS")
+OPTIONAL_ENV_VARS = ("GLUVOK_BASE_URL", "ANPR_SERVER_TIMEOUT")  # forwarded only when set locally
 SERVICE_USER = "hermes"
 SERVICE_GROUPS = ("dialout", "gpio", "netdev")  # UART, /dev/gpiochip*, NetworkManager polkit
 SUDOERS_PATH = "/etc/sudoers.d/hermes"
@@ -25,13 +26,15 @@ def run_cmd(cmd: list[str], input: str | None = None) -> None:
 
 
 def secrets_env_text() -> str:
-    """KEY="value" lines for systemd's EnvironmentFile; exits 1 if a required secret is unset (#33)."""
+    """KEY="value" lines for systemd's EnvironmentFile (secrets + set optional overrides); exits 1 if a required secret is unset (#33)."""
     missing = [n for n in REQUIRED_SECRETS if not os.environ.get(n)]
     if missing:
         print(f"[Deploy] Set {', '.join(missing)} in your local environment first.", file=sys.stderr)
         sys.exit(1)
     esc = lambda v: v.replace("\\", "\\\\").replace('"', '\\"')
-    return "".join(f'{n}="{esc(os.environ[n])}"\n' for n in REQUIRED_SECRETS)
+    lines = [f'{n}="{esc(os.environ[n])}"\n' for n in REQUIRED_SECRETS]
+    lines += [f'{n}="{esc(v)}"\n' for n in OPTIONAL_ENV_VARS if (v := os.environ.get(n))]
+    return "".join(lines)
 
 
 def build_service_unit(target: str) -> str:
