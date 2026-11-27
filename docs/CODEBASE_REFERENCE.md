@@ -46,8 +46,9 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
   - `check_session_progress()`: after 5 s post-stability, marks completed and returns the package.
   - Package keys: `session_id`, `weight`, `anpr_plate`, `camera_snapshots`, `total_anpr_samples`, `total_anpr_frames`, `anpr_status_counts`, `timestamp`. The last 5 frames per ANPR camera are kept as a fallback for a missing fleet snapshot.
   - `reset_session()`: stops threads and clears state.
-- **`stability.py`**: `ScaleStabilityMachine` (singleton `scale_state_machine`). States `SCALE_IDLE`, `SCALE_STABILIZING`, `SCALE_STABLE_RECORDED`. `process_new_weight`, `set_network_status`, `abort_offline_session`, `_trigger_upload`, `_transmit_online_weighment`. Calls `record_unsent_weighment()` when it drops a weighment.
-- **`telemetry.py`**: in-memory store. Event log (last 20), latest weighment, error counts, unsent-weighment counter. `record_system_event`, `record_weighment_result`, `record_error_event`, `record_unsent_weighment`, `get_*`, `reset_telemetry`.
+- **`stability.py`**: `ScaleStabilityMachine` (singleton `scale_state_machine`). States `SCALE_IDLE`, `SCALE_STABILIZING`, `SCALE_STABLE_RECORDED`. `process_new_weight`, `set_network_status`, `abort_offline_session`, `_trigger_upload`, `_transmit_online_weighment`. Mints one `Idempotency-Key` per weighment; queues a failed upload in the outbox, or calls `record_unsent_weighment()` when it drops one.
+- **`outbox.py`**: SQLite outbox for failed uploads (`upload_outbox`, `upload_outbox_images`). `enqueue`, `next_row`, `remove`, `drain_once`, `start_outbox_drain`, `stop_outbox_drain`. Bounded by `OUTBOX_MAX_ROWS`.
+- **`telemetry.py`**: in-memory store. Event log (last 20), latest weighment, error counts, unsent-weighment counter, outbox size, 401/403 streak. `record_system_event`, `record_weighment_result`, `record_error_event`, `record_unsent_weighment`, `set_outbox_pending`, `record_cloud_auth`, `get_*`, `reset_telemetry`.
 - **`db.py`**: `init_db()` sets WAL and creates `wifi_networks`.
 - **`wifi_vault.py`**: save, list (no passwords), get, delete and clear saved networks.
 - **`logger.py`**: `setup_colored_logging`.
@@ -104,7 +105,7 @@ Files: `app.py` (`create_app`, security headers, error handlers), `server.py` (`
 | `POST /wifi` | Token | Save and connect `{ssid, password}` |
 | `POST /wifi/clear` | Token | Clear saved credentials and vault |
 
-`GET /api/status` fields: `status`, `scale{state,current_weight}`, `argus{online}` (cached 5 s), `cloud{configured,unsent_weighments}`, `wifi{connected,hotspot_active}`. With a token it adds `cloud.center_id`, `wifi.ssid`, `config`, `latest_weighment`, `error_counts`, `events`.
+`GET /api/status` fields: `status`, `scale{state,current_weight}`, `argus{online}` (cached 5 s), `cloud{configured,unsent_weighments,outbox_pending,auth_failing}`, `wifi{connected,hotspot_active}`. With a token it adds `cloud.center_id`, `wifi.ssid`, `config`, `latest_weighment`, `error_counts`, `events`.
 
 ### Pages and probes (`views.py`)
 

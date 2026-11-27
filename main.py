@@ -29,6 +29,11 @@ from src.core import (
     scale_state_machine,
     session_manager,
 )
+from src.core.outbox import (
+    is_outbox_drain_running,
+    start_outbox_drain,
+    stop_outbox_drain,
+)
 from src.devices import (
     get_uart_reader,
     is_watchdog_running,
@@ -50,6 +55,7 @@ def shutdown(signum, frame):
     get_uart_reader().stop()
     stop_web_server()
     stop_wifi_watchdog()
+    stop_outbox_drain()
     stop_emergency_hotspot()
     session_manager.reset_session()
     sys.exit(0)
@@ -92,6 +98,8 @@ def setup():
     # Initialize SQLite database for Wi-Fi credentials and system settings
     init_db()
 
+    # Replay weighments whose upload failed (survives restarts: rows live in SQLite)
+    start_outbox_drain()
 
     # Log active client settings
     logger.info(
@@ -118,6 +126,9 @@ def _supervise_threads() -> None:
     if not is_watchdog_running():
         logger.error("[Main] Wi-Fi watchdog thread is dead. Restarting...")
         start_wifi_watchdog(interval=1.0)
+    if not is_outbox_drain_running():
+        logger.error("[Main] Outbox drain thread is dead. Restarting...")
+        start_outbox_drain()
 
 
 def loop():

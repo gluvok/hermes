@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+import uuid
 from enum import Enum
 from typing import Any
 
@@ -191,23 +192,31 @@ class ScaleStabilityMachine:
 
     def _transmit_online_weighment(self, session_package: dict[str, Any]) -> None:
         from src.config.constants import LED_CLOUD_SUCCESS_DURATION
+        from src.core import outbox
         from src.core.telemetry import record_unsent_weighment
         from src.devices import led_controller
-        from src.integrations.gluvok import post_to_cloud
+        from src.integrations.gluvok import (
+            is_validation_rejection,
+            package_to_entry,
+            post_to_cloud,
+        )
 
         session_id = str(session_package.get("session_id", "UNKNOWN"))
+        # One key per weighment, minted before the first attempt: the outbox replays it unchanged.
+        key = str(uuid.uuid7())
         try:
-            ok, entry_id, err, _timed_out = post_to_cloud(session_package)
+            ok, entry_id, err, _timed_out = post_to_cloud(session_package, idempotency_key=key)
         except (OSError, RuntimeError, ValueError) as exc:
-            logger.error(f"[Weighment] Direct cloud upload error for {session_id}: {exc}")
-            record_unsent_weighment()
+            ok, entry_id, err = False, None, f"{type(exc).__name__}: {exc}"
+        if ok:
+            led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
+            logger.info(f"[Weighment] Uploaded session {session_id} to cloud (entry {entry_id}).")
             return
-        if not ok:
-            logger.error(f"[Weighment] Cloud upload failed for {session_id}: {err}")
-            record_unsent_weighment()
-            return
-        led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
-        logger.info(f"[Weighment] Uploaded session {session_id} to cloud (entry {entry_id}).")
+        logger.error(f"[Weighment] Cloud upload failed for {session_id}: {err}")
+        if is_validation_rejection(err):
+            record_unsent_weighment()  # a replay of a rejected entry can never succeed
+        else:
+            outbox.enqueue(key, *package_to_entry(session_package))
 
     def reset(self):
         """Manually reset the state machine."""

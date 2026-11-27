@@ -9,9 +9,12 @@ import requests
 from flask import Blueprint, jsonify, request
 
 from src.config import config
+from src.config.constants import CLOUD_AUTH_ALERT_THRESHOLD
 from src.core.telemetry import (
+    get_cloud_auth_failures,
     get_error_counts,
     get_latest_weighment,
+    get_outbox_pending,
     get_system_events,
     get_unsent_weighment_count,
     record_system_event,
@@ -151,6 +154,8 @@ def status():
         "cloud": {
             "configured": bool(config.device_id and config.device_key),
             "unsent_weighments": get_unsent_weighment_count(),
+            "outbox_pending": get_outbox_pending(),
+            "auth_failing": get_cloud_auth_failures() >= CLOUD_AUTH_ALERT_THRESHOLD,
         },
         "wifi": {
             "connected": is_wifi_connected(),

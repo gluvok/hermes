@@ -13,11 +13,15 @@ import sqlite3
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 from src.core.db import init_db
 from src.core.stability import ScaleStabilityMachine, ScaleState
-from src.core.telemetry import get_unsent_weighment_count, reset_telemetry
+from src.core.telemetry import (
+    get_outbox_pending,
+    get_unsent_weighment_count,
+    reset_telemetry,
+)
 from src.core.wifi_vault import get_saved_wifi_networks, save_wifi_network
 
 
@@ -44,7 +48,7 @@ class TestOnlineTransmission(unittest.TestCase):
 
             # Reuses the watchdog's verdict; never probes on the UART thread (#19).
             mock_wifi.assert_not_called()
-            mock_post.assert_called_once_with(self.package)
+            mock_post.assert_called_once_with(self.package, idempotency_key=ANY)
             mock_led.assert_called_once()
 
     @patch("src.integrations.gluvok.post_to_cloud")
@@ -136,18 +140,20 @@ def test_drop_below_threshold_during_session_sets_led_idle(mock_sm, mock_led):
     "src.integrations.gluvok.post_to_cloud",
     return_value=(False, None, "HTTP 500: boom", False),
 )
-def test_failed_upload_counts_as_unsent(mock_post, mock_led):
+def test_failed_upload_is_queued_not_lost(mock_post, mock_led):
     reset_telemetry()
     ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
-    assert get_unsent_weighment_count() == 1
+    assert get_unsent_weighment_count() == 0
+    assert get_outbox_pending() == 1
 
 
 @patch("src.devices.led_controller")
 @patch("src.integrations.gluvok.post_to_cloud", side_effect=OSError("link down"))
-def test_upload_exception_counts_as_unsent(mock_post, mock_led):
+def test_upload_exception_is_queued_not_lost(mock_post, mock_led):
     reset_telemetry()
     ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
-    assert get_unsent_weighment_count() == 1
+    assert get_unsent_weighment_count() == 0
+    assert get_outbox_pending() == 1
 
 
 @patch("src.devices.led_controller")

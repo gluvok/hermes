@@ -22,7 +22,11 @@ from src.config.constants import (
     CLOUD_POST_TIMEOUT,
     GLUVOK_BASE_URL,
 )
-from src.core.telemetry import record_error_event, record_system_event
+from src.core.telemetry import (
+    record_cloud_auth,
+    record_error_event,
+    record_system_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +93,7 @@ def _parse_cloud_response(
     if response.status_code in (200, 201):
         res_data = response.json() if response.content else {}
         entry_id = str(res_data.get("data", {}).get("id") or res_data.get("id") or "N/A")
+        record_cloud_auth(accepted=True)
         logger.info(f"[Gluvok API] Entry #{entry_id} created successfully (HTTP {response.status_code})")
         _record_cloud_event("CLOUD", f"Entry #{entry_id} created: {safe_plate} @ {weight:.3f} kg")
         return True, entry_id, None, False
@@ -100,10 +105,17 @@ def _parse_cloud_response(
         400: "CLOUD_VALIDATION_ERROR",
         429: "CLOUD_RATE_LIMITED",
     }
+    if response.status_code in (401, 403):
+        record_cloud_auth(accepted=False)
     event_type = event_map.get(response.status_code, "CLOUD_UPLOAD_ERROR")
     _record_cloud_event(event_type, err_msg, is_error=True)
     logger.error(f"[Gluvok API] POST /api/entries/automatic failed {err_msg}")
     return False, None, err_msg, False
+
+
+def is_validation_rejection(err: str | None) -> bool:
+    """True for the HTTP 400 that survived the fallbacks: replaying it can never succeed."""
+    return bool(err) and str(err).startswith("HTTP 400:")  # text built in _parse_cloud_response
 
 
 def transmit_entry_multipart(
@@ -112,6 +124,7 @@ def transmit_entry_multipart(
     image_bytes: bytes | None = None,
     filename: str = "truck_001.jpg",
     images: list[tuple[str, bytes]] | None = None,
+    idempotency_key: str | None = None,
 ) -> tuple[bool, str | None, str | None, bool]:
     """
     Submits vehicle weighment session to Gluvok API (/api/entries/automatic) matching the curl specification:
@@ -122,6 +135,8 @@ def transmit_entry_multipart(
         -F "weight=18540.5" \\
         -F "file=@/home/pi/captures/truck_anpr_1.jpg;type=image/jpeg" \\
         -F "file=@/home/pi/captures/truck_aux_2.jpg;type=image/jpeg" ...
+    Pass idempotency_key (a UUIDv7 minted once per weighment) to replay a stored weighment safely;
+    without one a fresh key is minted for this call.
     """
     if not config.device_id or not config.device_key:
         msg = "Device credentials (device_id, device_key) not configured."
@@ -130,8 +145,8 @@ def transmit_entry_multipart(
         return False, None, msg, False
 
     entries_url = f"{GLUVOK_BASE_URL}/api/entries/automatic"
-    # One key per weighment: fallbacks (and any retry) replay it, so janus never double-counts.
-    headers = {"x-api-key": str(config.device_key), "Idempotency-Key": str(uuid.uuid7())}
+    # One key per weighment: fallbacks, retries and outbox replays reuse it, so janus never double-counts.
+    headers = {"x-api-key": str(config.device_key), "Idempotency-Key": idempotency_key or str(uuid.uuid7())}
     safe_plate = _safe_plate(detected_vehicle_number)
     data = {"vehicle_number": safe_plate, "weight": str(round(weight, 3))}
     files, has_images = _build_multipart_files(images, image_bytes, filename)
@@ -185,11 +200,8 @@ def transmit_entry_multipart(
         return False, None, err_msg, False
 
 
-def post_to_cloud(session_payload: dict[str, Any]) -> tuple[bool, str | None, str | None, bool]:
-    """
-    Bridge function: transmits entry from session dictionary and updates telemetry.
-    Preserved for direct callers; does NOT wipe session_payload on completion.
-    """
+def package_to_entry(session_payload: dict[str, Any]) -> tuple[str, float, list[tuple[str, bytes]]]:
+    """Extracts (plate, weight, images) from a session package; ANPR cameras sort first."""
     plate = _safe_plate(session_payload.get("anpr_plate"))
     weight = float(session_payload.get("weight", 0.0))
 
@@ -200,16 +212,29 @@ def post_to_cloud(session_payload: dict[str, Any]) -> tuple[bool, str | None, st
             b = fleet_dict[cam_name]
             if b and isinstance(b, bytes):
                 images_to_send.append((f"truck_{cam_name}.jpg", b))
+    return plate, weight, images_to_send
 
+
+def post_to_cloud(
+    session_payload: dict[str, Any], idempotency_key: str | None = None
+) -> tuple[bool, str | None, str | None, bool]:
+    """
+    Bridge function: transmits entry from session dictionary and updates telemetry.
+    Preserved for direct callers; does NOT wipe session_payload on completion.
+    """
+    plate, weight, images_to_send = package_to_entry(session_payload)
     return transmit_entry_multipart(
         detected_vehicle_number=plate,
         weight=weight,
         images=images_to_send,
+        idempotency_key=idempotency_key,
     )
 
 
 __all__ = [
     "GLUVOK_BASE_URL",
+    "is_validation_rejection",
+    "package_to_entry",
     "post_to_cloud",
     "transmit_entry_multipart",
 ]

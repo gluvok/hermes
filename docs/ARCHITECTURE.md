@@ -33,15 +33,15 @@ One weighment, in order:
 
 `main.loop()` and the UART thread both call `check_session_progress()`. The phase change inside it is lock-protected, so only one caller receives the package.
 
-### Offline, failed and errored weighments are dropped
-
-There is no spool, outbox or retry queue. Nothing is written to disk for a weighment.
+### Offline weighments are dropped; failed uploads are queued
 
 - While the watchdog reports offline, the state machine ignores scale input and aborts any active session.
 - If the package completes while offline, it is discarded and a `WEIGHMENT_DISCARDED` event is logged.
-- If the upload fails (HTTP error, timeout, network error, exception), it is logged and not retried.
+- If the upload fails in a way the cloud may accept later (network error, timeout, 5xx, 429, 401/403, after the in-call retries), `src/core/outbox.py` stores plate, weight, up to 3 JPEGs, `created_at`, `attempts` and the `Idempotency-Key` in SQLite (`upload_outbox`, `upload_outbox_images` in `data/hermes.db`). The key is minted once per weighment, before the first attempt.
+- The `OutboxDrain` thread (started and supervised by `main.py`) replays the oldest row every 30 s, stops the pass at the first failure, and deletes a row on 200 or 201. janus dedupes on (center, key), so a replay is safe.
+- A `400` that survives the plate and storage fallbacks is logged, dropped and counted. A full outbox (500 rows) refuses the new weighment with a critical log, an `OUTBOX_FULL` event and a count.
 
-Every dropped weighment increments `cloud.unsent_weighments` in `GET /api/status`. The dashboard shows it on the cloud card, in amber when above 0. The counter is in memory and resets on restart.
+`cloud.unsent_weighments` in `GET /api/status` counts weighments lost for good (offline discard, 400, full or unwritable outbox). It is in memory and resets on restart. `cloud.outbox_pending` is the queue size (it survives restarts) and `cloud.auth_failing` is true after 3 consecutive 401/403 replies, until the next accepted upload.
 
 ### Cloud upload
 
@@ -83,7 +83,7 @@ Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the sess
 - **Credentials**: `SUPERADMIN_USER` (default `superadmin`) and `SUPERADMIN_PASS`. With `SUPERADMIN_PASS` empty, every login fails.
 - **Tokens**: `POST /api/login` returns a random 64-hex token, valid 2 h and renewed on each use. Tokens live in memory and are lost on restart. Send them as `Authorization: Bearer <token>` or `X-Auth-Token`. `POST /api/logout` revokes the token.
 - **Login limit**: 5 failed logins per client IP per 60 s, then HTTP 429. Each failure also sleeps 0.5 s. The captive portal `/connect` shares the same limiter.
-- **Anonymous `GET /api/status`** returns health only: scale state and weight, Argus online, cloud `configured` and `unsent_weighments`, Wi-Fi `connected` and `hotspot_active`. With a valid token it adds center ID, SSID, config values, latest weighment, error counts and the event log.
+- **Anonymous `GET /api/status`** returns health only: scale state and weight, Argus online, cloud `configured`, `unsent_weighments`, `outbox_pending` and `auth_failing`, Wi-Fi `connected` and `hotspot_active`. With a valid token it adds center ID, SSID, config values, latest weighment, error counts and the event log.
 - **Headers** on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and a Content-Security-Policy that allows only same-origin resources plus inline scripts and styles.
 - **No CORS**: no CORS headers are sent.
 - **Input**: `serial_port` must match `/dev/ttyAMA*`, `ttyS*`, `ttyUSB*`, `ttyACM*`, `serial0/1` or `serial/by-id/*`. Baud rate must be in a fixed list. Camera URLs must be http, https or rtsp. The dashboard HTML-escapes server-supplied values it renders.
