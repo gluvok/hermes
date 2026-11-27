@@ -133,7 +133,7 @@ Package `src/devices/wifi/` drives NetworkManager through `nmcli` (via `sudo -n`
 
 1. Requires `SUPERADMIN_PASS` and `HERMES_HOTSPOT_PASS` in the local environment, or exits.
 2. Optionally signs `data/client.lic` (`--device-id`, `--device-key`, `--center-id`, `--min-weight`) with `scripts/keygen.py`.
-3. Rsyncs the repo to `/opt/hermes`, runs `uv sync`, builds the native binary with Nuitka (`scripts/build.py`), then deletes all `.py` files, `scripts/`, `tests/` and `docs/` on the Pi.
+3. Rsyncs the repo to `/opt/hermes`, runs `uv sync --locked`, builds the native binary with Nuitka (`scripts/build.py`), then deletes all `.py` files, `scripts/`, `tests/` and `docs/` on the Pi.
 4. Writes `data/hermes.env` (mode 600; required secrets plus `GLUVOK_BASE_URL`/`ANPR_SERVER_TIMEOUT` when set locally) and uploads `data/client.lic`.
 5. Creates the system user `hermes` (groups `dialout`, `gpio`, `netdev`), installs `/etc/sudoers.d/hermes` after `visudo -c`, and installs and restarts the `hermes` systemd unit.
 

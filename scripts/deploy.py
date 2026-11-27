@@ -124,7 +124,7 @@ def deploy_remote(host: str, target: str = "/opt/hermes", lic: str = "data/clien
     run_cmd(["rsync", "-avz", "--delete", *EXCLUDES, "./", f"{host}:{target}/"])
     print(f"[Deploy] 3. Compiling binary into {target}/bin/ and purging source...")
     build = (
-        f"set -e; export PATH=\"$HOME/.local/bin:$PATH\"; cd {target} && uv sync && uv run python scripts/build.py --output-dir={target}/bin && chmod +x {target}/run.sh {target}/bin/hermes; "
+        f"set -e; export PATH=\"$HOME/.local/bin:$PATH\"; cd {target} && uv sync --locked && uv run python scripts/build.py --output-dir={target}/bin && chmod +x {target}/run.sh {target}/bin/hermes; "
         f"rm -f {target}/bin/hermes.sh; find {target} -maxdepth 1 -name '*.py' -delete && find {target}/src -name '*.py' -delete; rm -rf {target}/scripts {target}/tests {target}/docs; "
         f"echo '[Deploy] Source purged! Only bin/hermes and run.sh remain at {target}.'"
     )

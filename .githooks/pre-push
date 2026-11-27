@@ -2,12 +2,12 @@
 set -eo pipefail
 
 echo "==> [pre-push] Running Ruff linter..."
-uv run ruff check
+uv run --locked ruff check
 
 echo "==> [pre-push] Running Ty type checker..."
-uv run ty check
+uv run --locked ty check
 
 echo "==> [pre-push] Running Pytest suite..."
-uv run pytest
+uv run --locked pytest
 
 echo "==> [pre-push] All checks passed successfully. Pushing..."
