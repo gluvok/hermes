@@ -167,7 +167,7 @@ class WeighbridgeSessionManager:
         self, wait: bool = True
     ) -> list[Future[tuple[str | None, str]]]:
         """Fetch frames from ANPR cameras and dispatch asynchronously to Argus worker pool."""
-        # ponytail: cap is per Hermes process; a shared Argus across several Hermes units needs a server-side queue limit.
+        # ponytail: cap counts futures (one per camera) per Hermes process; a shared Argus across several Hermes units needs a server-side queue limit.
         with self._lock:
             self._pending_anpr_futures = [f for f in self._pending_anpr_futures if not f.done()]
             in_flight = len(self._pending_anpr_futures)

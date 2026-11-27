@@ -179,9 +179,10 @@ class TestAsyncANPR(unittest.TestCase):
             self.assertLessEqual(len(self.sm._pending_anpr_futures), ANPR_MAX_IN_FLIGHT)
 
             release.set()
-            concurrent.futures.wait(self.sm._pending_anpr_futures, timeout=2.0)
+            concurrent.futures.wait(list(self.sm._pending_anpr_futures), timeout=2.0)
 
-            self.sm._capture_and_record_anpr_sample(wait=False)
+            futures = self.sm._capture_and_record_anpr_sample(wait=False)
+            concurrent.futures.wait(futures, timeout=2.0)
             self.assertEqual(mock_snaps.call_count, ANPR_MAX_IN_FLIGHT + 1)
 
         assert self.sm._anpr_pool is not None
