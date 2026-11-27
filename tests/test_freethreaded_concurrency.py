@@ -1,7 +1,9 @@
 """test_freethreaded_concurrency.py — Races that only bite once threads truly run in parallel (3.14t)."""
 from __future__ import annotations
 
+import io
 import json
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -10,11 +12,17 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
+from PIL import Image
 
+from src.config import ConfigManager
 from src.core import stability
+from src.core.session import WeighbridgeSessionManager
 from src.core.stability import ScaleStabilityMachine, ScaleState
 from src.devices.scale import ScaleUARTReader
 from src.integrations.anpr import dispatch_anpr_batch
+from src.services.image_compressor import compress_image_bytes
+from src.web import auth
+from src.web.app import create_app
 from src.web.blueprints import api
 
 
@@ -149,3 +157,119 @@ def test_concurrent_uart_start_spawns_one_reader_loop(monkeypatch):
         reader.stop()
 
     assert len(loops) == 1  # two loops would fight over one exclusive serial port
+
+
+# ── Stress: hammer real code paths from many threads; any race shows up as an error or a lost update ──
+
+
+def test_parallel_compression_is_deterministic():
+    img = Image.radial_gradient("L").resize((3840, 2160)).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=90)
+    expected = compress_image_bytes(buf.getvalue())
+
+    with ThreadPoolExecutor(8) as ex:
+        outs = list(ex.map(compress_image_bytes, [buf.getvalue()] * 64))
+
+    assert expected is not None and outs == [expected] * 64
+
+
+def test_parallel_anpr_capture_records_every_result(monkeypatch, argus_url):
+    monkeypatch.setattr(ConfigManager, "anpr_server_url", property(lambda _self: argus_url))
+    monkeypatch.setattr(
+        "src.core.session.capture_anpr_snapshots",
+        lambda: [(cam, f"http://cam{cam}", b"\xff\xd8" + bytes(5_000)) for cam in (1, 2)],
+    )
+    sm = WeighbridgeSessionManager()
+    sm.start_session()  # real ANPR loop thread keeps capturing alongside the hammer below
+    try:
+        with ThreadPoolExecutor(8) as ex:
+            batches = list(ex.map(lambda _: sm._capture_and_record_anpr_sample(wait=True), range(40)))
+        sm.on_weight_stabilized(25000.0)
+        sm._post_stability_start_time = 0.0
+        pkg = sm.check_session_progress()
+    finally:
+        sm.reset_session()
+
+    assert all(len(b) == 2 for b in batches)
+    assert pkg is not None and pkg["anpr_plate"] == "KA01AB1234"
+    assert pkg["total_anpr_samples"] >= 80  # 40 x 2 cameras from the hammer, plus the loop's own
+    assert pkg["anpr_status_counts"] == {"SUCCESS": pkg["total_anpr_samples"]}
+
+
+def test_stability_machine_survives_parallel_weights_and_network_flaps(monkeypatch):
+    machine = ScaleStabilityMachine()
+    fake_sessions = MagicMock()
+    fake_sessions.check_session_progress.return_value = None
+    monkeypatch.setattr(stability, "session_manager", fake_sessions)
+    stop = threading.Event()
+    errors: list[BaseException] = []
+
+    def feed() -> None:
+        try:
+            while not stop.is_set():
+                for w in (0.0, 25000.0, 25000.5, 25001.0, 0.0):
+                    machine.process_new_weight(w)
+        except BaseException as e:  # noqa: BLE001 - any escape is the failure under test
+            errors.append(e)
+
+    def flap() -> None:
+        try:
+            while not stop.is_set():
+                machine.set_network_status(False)
+                machine.set_network_status(True)
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+
+    threads = [threading.Thread(target=f) for f in (feed, feed, flap)]
+    for t in threads:
+        t.start()
+    time.sleep(1.0)
+    stop.set()
+    for t in threads:
+        t.join(2.0)
+    assert not any(t.is_alive() for t in threads)
+    machine.set_network_status(True)
+    machine.process_new_weight(0.0)
+
+    assert errors == []
+    assert machine.state == ScaleState.SCALE_IDLE
+
+
+def test_login_limiter_and_tokens_lose_no_updates():
+    auth.reset_auth_state()
+    try:
+        with ThreadPoolExecutor(16) as ex:
+            list(ex.map(lambda _: [auth.record_failed_login("10.0.0.7") for _ in range(100)], range(16)))
+            tokens = list(ex.map(lambda _: auth.create_session_token(), range(400)))
+            valid = list(ex.map(auth.validate_session_token, tokens))
+            list(ex.map(auth.revoke_session_token, tokens))
+
+        assert len(auth._failed_login_attempts["10.0.0.7"]) == 1600
+        assert auth.is_rate_limited("10.0.0.7")
+        assert len(set(tokens)) == 400 and all(valid)
+        assert not any(auth.validate_session_token(t) for t in tokens)
+    finally:
+        auth.reset_auth_state()
+
+
+def test_api_status_under_parallel_load(monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setattr(api, "_check_argus_online", lambda url: calls.append(url) or time.sleep(0.1) or True)
+    monkeypatch.setattr(api, "_last_argus_check_time", float("-inf"))
+    monkeypatch.setattr(api, "_last_argus_online_status", False)
+    monkeypatch.setattr("src.devices.wifi.is_wifi_connected", lambda: True)
+    app = create_app({"TESTING": True})
+
+    def get_status(_: int) -> int:
+        return app.test_client().get("/api/status").status_code
+
+    with ThreadPoolExecutor(16) as ex:
+        codes = list(ex.map(get_status, range(200)))
+
+    assert codes == [200] * 200
+    assert len(calls) == 1
+
+
+def test_gil_still_disabled_after_stress():
+    assert not sys._is_gil_enabled()
