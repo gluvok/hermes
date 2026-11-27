@@ -80,7 +80,7 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
 ## `src/integrations/`
 
 - **`anpr.py`**: `send_frame_to_anpr_server` returns `(plate, status)`; `dispatch_anpr_batch` and `send_and_record_anpr_frame` run it in a pool; `get_highest_frequency_plate` votes; `resolve_anpr_endpoint` maps `0.0.0.0` to `127.0.0.1` and appends `/recognize`. Reads `results[0].plate` from Argus responses, or flat keys (`plate`, `number_plate`, `plate_number`, `text`, `result`).
-- **`gluvok.py`**: `post_to_cloud(package)` builds the image list and calls `transmit_entry_multipart(...)`, which returns `(ok, entry_id, error, timed_out)`. Single attempt, no verification step. Plates that are empty or placeholders (`UNKNOWN`, `NONE`, `NULL`, `SUCCESS`, ...) are sent as `NO_PLATE_DETECTED`.
+- **`gluvok.py`**: `post_to_cloud(package)` builds the image list and calls `transmit_entry_multipart(...)`, which returns `(ok, entry_id, error, timed_out)`. Retries 429/5xx/timeouts up to 3 times with one `Idempotency-Key`; sends at most 3 images. Plates that are empty or placeholders (`UNKNOWN`, `NONE`, `NULL`, `SUCCESS`, ...) are sent as `NO_PLATE_DETECTED`.
 
 ## `src/services/image_compressor.py`
 
