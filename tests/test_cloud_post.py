@@ -8,8 +8,9 @@ import numpy as np
 import requests
 
 from src.config import ConfigManager, config
+from src.config.constants import CLOUD_POST_MAX_ATTEMPTS
 from src.core.telemetry import get_error_counts, get_system_events, reset_state
-from src.integrations.gluvok import _build_multipart_files, post_to_cloud
+from src.integrations.gluvok import _build_multipart_files, _post_entry, post_to_cloud
 
 
 class TestCloudPost(unittest.TestCase):
@@ -109,8 +110,10 @@ class TestCloudPost(unittest.TestCase):
         mock_post.return_value = mock_resp
 
         session = {"weight": 5000.0, "anpr_plate": "MH12AB1234"}
-        post_to_cloud(session)
+        with patch.object(_post_entry.retry, "sleep", lambda _s: None):
+            post_to_cloud(session)
 
+        self.assertEqual(mock_post.call_count, CLOUD_POST_MAX_ATTEMPTS)
         error_counts = get_error_counts()
         self.assertGreaterEqual(error_counts.get("CLOUD_UPLOAD_ERROR", 0), 1)
 
@@ -119,8 +122,10 @@ class TestCloudPost(unittest.TestCase):
         mock_post.side_effect = requests.ConnectionError("Connection refused")
 
         session = {"weight": 5000.0, "anpr_plate": "MH12AB1234"}
-        post_to_cloud(session)
+        with patch.object(_post_entry.retry, "sleep", lambda _s: None):
+            post_to_cloud(session)
 
+        self.assertEqual(mock_post.call_count, CLOUD_POST_MAX_ATTEMPTS)
         error_counts = get_error_counts()
         self.assertGreaterEqual(error_counts.get("CLOUD_UPLOAD_ERROR", 0), 1)
 

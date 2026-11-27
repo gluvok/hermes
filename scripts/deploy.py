@@ -12,6 +12,7 @@ EXCLUDES = ["--exclude=.venv", "--exclude=dist", "--exclude=__pycache__", "--exc
 
 
 REQUIRED_SECRETS = ("SUPERADMIN_PASS", "HERMES_HOTSPOT_PASS")
+OPTIONAL_ENV = ("HERMES_OFFLINE_QUEUE",)  # written only when set locally (#42)
 SERVICE_USER = "hermes"
 SERVICE_GROUPS = ("dialout", "gpio", "netdev")  # UART, /dev/gpiochip*, NetworkManager polkit
 SUDOERS_PATH = "/etc/sudoers.d/hermes"
@@ -31,7 +32,7 @@ def secrets_env_text() -> str:
         print(f"[Deploy] Set {', '.join(missing)} in your local environment first.", file=sys.stderr)
         sys.exit(1)
     esc = lambda v: v.replace("\\", "\\\\").replace('"', '\\"')
-    return "".join(f'{n}="{esc(os.environ[n])}"\n' for n in REQUIRED_SECRETS)
+    return "".join(f'{n}="{esc(os.environ[n])}"\n' for n in (*REQUIRED_SECRETS, *filter(os.environ.get, OPTIONAL_ENV)))
 
 
 def build_service_unit(target: str) -> str:

@@ -50,7 +50,13 @@ def init_db(db_path: str | None = None) -> None:
         logger.info(f"[DB] Initialized SQLite database at: {_db_path}")
 
 
+def get_db_path() -> str:
+    """Path set by init_db(), else the default data/hermes.db."""
+    return _db_path or get_config_db_path()
+
+
 __all__ = [
     "WIFI_NETWORKS_DDL",
+    "get_db_path",
     "init_db",
 ]

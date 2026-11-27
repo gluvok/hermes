@@ -6,6 +6,7 @@ import logging
 import threading
 import time
 
+from src.config.constants import OFFLINE_QUEUE_ENABLED
 from src.devices.led.colors import LEDColor
 from src.devices.led.driver import LEDHardwareDriver
 
@@ -58,6 +59,8 @@ class RGBLedController:
         """Updates network status. When offline, turns Yellow immediately."""
         with self._lock:
             self._is_online = is_online
+            if not is_online and OFFLINE_QUEUE_ENABLED and self._is_active_session:
+                return  # weighing continues offline (#42): stay red
             if not is_online:
                 self._is_active_session = False
                 if self._timer is not None:
@@ -68,9 +71,9 @@ class RGBLedController:
                 self._apply_color(LEDColor.GREEN)
 
     def set_active(self) -> None:
-        """Sets LED to Red when vehicle weight detected (only when online)."""
+        """Sets LED to Red when vehicle weight detected (only when online, or when queueing offline, #42)."""
         with self._lock:
-            if not self._is_online:
+            if not self._is_online and not OFFLINE_QUEUE_ENABLED:
                 self._is_active_session = False
                 self._apply_color(LEDColor.YELLOW)
                 return

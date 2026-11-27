@@ -33,19 +33,29 @@ One weighment, in order:
 
 `main.loop()` and the UART thread both call `check_session_progress()`. The phase change inside it is lock-protected, so only one caller receives the package.
 
-### Offline, failed and errored weighments are dropped
+### Offline, failed and errored weighments (`HERMES_OFFLINE_QUEUE`)
 
-There is no spool, outbox or retry queue. Nothing is written to disk for a weighment.
+The flag is read once at start from the environment (systemd loads it from `data/hermes.env`). It is off by default.
+
+**Flag off (default).** There is no spool, outbox or retry queue. Nothing is written to disk for a weighment.
 
 - While the watchdog reports offline, the state machine ignores scale input and aborts any active session.
 - If the package completes while offline, it is discarded and a `WEIGHMENT_DISCARDED` event is logged.
-- If the upload fails (HTTP error, timeout, network error, exception), it is logged and not retried.
+- If the upload fails (HTTP error, timeout, network error, exception), it is logged and dropped, after the in-request retries described under Cloud upload.
 
 Every dropped weighment increments `cloud.unsent_weighments` in `GET /api/status`. The dashboard shows it on the cloud card, in amber when above 0. The counter is in memory and resets on restart.
 
+**Flag on (`HERMES_OFFLINE_QUEUE=1`).** Weighments are never discarded for being offline.
+
+- The state machine and the LED keep weighing while offline (red, not yellow). No `CloudUpload_<id>` thread runs: a finished session is stored in the `outbox` table of `data/hermes.db` (center, plate, weight, JPEGs as base64) with a random `Idempotency-Key`.
+- One `OutboxWorker` thread wakes every 5 s. It sends the oldest row, then the next, while Hermes is online and the scale is not stabilizing, so a queued entry's blue LED never cuts into a measurement. Each delivered entry pulses the LED blue and is deleted. A row keeps its key across every retry and cycle.
+- A transient failure (network error, timeout, 5xx, 408, 429) or an auth failure (401, 403) leaves the row at the head and it is retried next cycle. Any other 4xx marks the row `failed` (kept in the table, skipped from then on) and logs an `OUTBOX` event, so it cannot block the rows behind it.
+- If the row cannot be stored (SQLite error), it is logged with a traceback and counted in `cloud.unsent_weighments`.
+- `main.loop()` restarts the worker if its thread died, and shutdown stops it.
+
 ### Cloud upload
 
-`POST {GLUVOK_BASE_URL}/api/entries` with HTTP Basic auth (`device_id:device_key`), timeout 20 s, multipart form fields `center_id`, `detected_vehicle_number`, `weight`, and one `file` part per camera (`truck_<label>.jpg`, labels `anpr_1`, `aux_1`, ...). If the server answers 400 with "storage" in the body, the entry is re-posted once without images. HTTP 200/201 is success. Everything else, including 409, is an error recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400) or `CLOUD_UPLOAD_ERROR` (other). On success the LED pulses blue for 10 s.
+`POST {GLUVOK_BASE_URL}/api/entries` with HTTP Basic auth (`device_id:device_key`), timeout 20 s, an `Idempotency-Key` header (one UUID per entry, the same on every attempt), multipart form fields `center_id`, `detected_vehicle_number`, `weight`, and one `file` part per camera (`truck_<label>.jpg`, labels `anpr_1`, `aux_1`, ...). If the server answers 400 with "storage" in the body, the entry is re-posted once without images. HTTP 200/201 is success. Network errors, timeouts, 5xx, 408 and 429 are retried up to 3 times with exponential backoff (max 30 s); other 4xx are not. Everything else, including 409, is an error recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400) or `CLOUD_UPLOAD_ERROR` (other). On success the LED pulses blue for 10 s.
 
 ### Images
 
@@ -67,10 +77,11 @@ Each Argus call yields a plate or a status code: `SUCCESS`, `NO_PLATE_DETECTED`,
 | `WiFiWatchdog` | `start_wifi_watchdog()` | Connectivity checks every 1 s |
 | `ANPRLoop_<id>` | session start | Capture ANPR frames every 1 s, dispatch to the Argus worker pool (4 workers) |
 | `FleetCapture_<id>` | mid-stability or stable | Capture all cameras and compress |
-| `CloudUpload_<id>` | session finalized | Upload one entry |
+| `CloudUpload_<id>` | session finalized | Upload one entry (flag off only) |
+| `OutboxWorker` | `main.setup()` when `HERMES_OFFLINE_QUEUE=1` | Send queued weighments oldest first while online and not stabilizing |
 | `CaptiveHTTP`, `CaptiveDNS` | hotspot start | Captive portal, only while the hotspot is up |
 
-`main.loop()` restarts the UART reader and the watchdog if their threads died. The web server and portal threads are not supervised.
+`main.loop()` restarts the UART reader, the watchdog and (flag on) the outbox worker if their threads died. The web server and portal threads are not supervised.
 
 The watchdog is the only code that probes the network (TCP to 1.1.1.1:53, then 8.8.8.8:53, 2 s each). After 2 consecutive failed checks it calls `notify_network_status(False)`, which updates the stability machine first and the LED second, so an LED fault cannot stop the weighment from going offline. The UART thread reuses that verdict and never probes. The stability machine assumes online until the watchdog says otherwise.
 
@@ -121,6 +132,7 @@ Package `src/devices/wifi/` drives NetworkManager through `nmcli` (via `sudo -n`
 | `SUPERADMIN_PASS` | Console and portal admin password. Required. |
 | `HERMES_HOTSPOT_PASS` | Hotspot WPA2 passphrase, 8+ characters. Required. |
 | `SUPERADMIN_USER` | Admin user name. Default `superadmin`. |
+| `HERMES_OFFLINE_QUEUE` | Optional. `1` queues weighments in SQLite while offline and sends them one by one when online. Anything else, or unset, keeps the default (offline weighments are dropped). `scripts/deploy.py` copies it into `data/hermes.env` when set locally. |
 | `FLASK_SECRET_KEY` | Read by the app factory (default is a fixed string), but nothing in the app uses Flask sessions. |
 
 `main.setup()` calls `require_runtime_secrets()` and exits if either required variable is missing. On the Pi, systemd loads them from `data/hermes.env`. The file is written by `scripts/deploy.py` from the deployer's local environment. For local runs, export them in your shell.
@@ -147,7 +159,7 @@ Licensing: `src/config/license.py` verifies the license signature against an emb
 
 ## 7. Local storage
 
-`data/hermes.db` (SQLite, WAL) holds two tables: `runtime_config` (key, JSON value) and `wifi_networks`. Weighments, frames and uploads are never stored.
+`data/hermes.db` (SQLite, WAL) holds two tables: `runtime_config` (key, JSON value) and `wifi_networks`. With `HERMES_OFFLINE_QUEUE=1` it also holds `outbox`, the queued weighments with their JPEGs (see section 1). With the flag off, weighments, frames and uploads are never stored.
 
 ---
 

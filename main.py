@@ -24,10 +24,16 @@ logger = logging.getLogger(__name__)
 
 # ── Import decoupled layer modules ───────────────────────────────────────────
 from src.config import config
+from src.config.constants import OFFLINE_QUEUE_ENABLED
 from src.core import (
     init_db,
     scale_state_machine,
     session_manager,
+)
+from src.core.outbox import (
+    is_outbox_worker_running,
+    start_outbox_worker,
+    stop_outbox_worker,
 )
 from src.devices import (
     get_uart_reader,
@@ -50,6 +56,7 @@ def shutdown(signum, frame):
     get_uart_reader().stop()
     stop_web_server()
     stop_wifi_watchdog()
+    stop_outbox_worker()
     stop_emergency_hotspot()
     session_manager.reset_session()
     sys.exit(0)
@@ -84,7 +91,8 @@ def setup():
 
     # Initialize SQLite database for Wi-Fi credentials and system settings
     init_db()
-
+    if OFFLINE_QUEUE_ENABLED:
+        start_outbox_worker()
 
     # Log active client settings
     logger.info(
@@ -111,6 +119,9 @@ def _supervise_threads() -> None:
     if not is_watchdog_running():
         logger.error("[Main] Wi-Fi watchdog thread is dead. Restarting...")
         start_wifi_watchdog(interval=1.0)
+    if OFFLINE_QUEUE_ENABLED and not is_outbox_worker_running():
+        logger.error("[Main] Outbox worker thread is dead. Restarting...")
+        start_outbox_worker()
 
 
 def loop():

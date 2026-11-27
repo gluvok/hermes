@@ -8,15 +8,51 @@ weighment transmission matching the official curl specification (/api/entries).
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 import requests
+from tenacity import (
+    RetryCallState,
+    retry,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from src.config import config
-from src.config.constants import CLOUD_POST_TIMEOUT, GLUVOK_BASE_URL
+from src.config.constants import (
+    CLOUD_POST_MAX_ATTEMPTS,
+    CLOUD_POST_TIMEOUT,
+    CLOUD_RETRY_WAIT_MAX,
+    GLUVOK_BASE_URL,
+)
 from src.core.telemetry import record_error_event, record_system_event
 
 logger = logging.getLogger(__name__)
+
+
+def _is_transient(response: requests.Response) -> bool:
+    return response.status_code >= 500 or response.status_code in (408, 429)
+
+
+def _last_outcome(state: RetryCallState) -> requests.Response:
+    """Out of attempts: return the last response, or re-raise the last exception."""
+    assert state.outcome is not None
+    return state.outcome.result()
+
+
+@retry(
+    stop=stop_after_attempt(CLOUD_POST_MAX_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, max=CLOUD_RETRY_WAIT_MAX),
+    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout))
+    | retry_if_result(_is_transient),
+    retry_error_callback=_last_outcome,
+)
+def _post_entry(url: str, **kwargs: Any) -> requests.Response:
+    """POST with retries on network errors, timeouts and 5xx/408/429; other 4xx fail at once."""
+    return requests.post(url, **kwargs)
 
 
 _NO_PLATE_VALUES = ("UNKNOWN_PLATE", "UNKNOWN", "NONE", "NULL", "SUCCESS")
@@ -89,9 +125,12 @@ def transmit_entry_multipart(
     image_bytes: bytes | None = None,
     filename: str = "truck_001.jpg",
     images: list[tuple[str, bytes]] | None = None,
+    idempotency_key: str | None = None,
 ) -> tuple[bool, str | None, str | None, bool]:
     """
-    Submits vehicle weighment session to Gluvok API (/api/entries) matching the curl specification:
+    Submits vehicle weighment session to Gluvok API (/api/entries) matching the curl specification.
+    Every attempt, including retries and the storage fallback, carries the same Idempotency-Key
+    header (generated when not given) so the server can de-duplicate:
       curl -X POST "https://gluvok.vercel.app/api/entries" \\
         -u "$DEVICE_ID:$DEVICE_KEY" \\
         -F "center_id=1" \\
@@ -115,6 +154,7 @@ def transmit_entry_multipart(
         "weight": str(round(weight, 3)),
     }
     files, has_images = _build_multipart_files(images, image_bytes, filename)
+    headers = {"Idempotency-Key": idempotency_key or str(uuid.uuid4())}
 
     logger.info(
         f"[Gluvok API] Transmitting multipart entry to {entries_url}: "
@@ -122,16 +162,21 @@ def transmit_entry_multipart(
     )
 
     try:
-        response = requests.post(
-            entries_url, auth=auth, data=data, files=files, timeout=CLOUD_POST_TIMEOUT
+        response = _post_entry(
+            entries_url, auth=auth, data=data, files=files, headers=headers, timeout=CLOUD_POST_TIMEOUT
         )
         if response.status_code == 400 and has_images and "storage" in response.text.lower():
             logger.warning(
                 "[Gluvok API] Storage failed on remote server. Retrying without image payload..."
             )
             fallback_files = [("file", (filename, b"", "image/jpeg"))]
-            response = requests.post(
-                entries_url, auth=auth, data=data, files=fallback_files, timeout=CLOUD_POST_TIMEOUT
+            response = _post_entry(
+                entries_url,
+                auth=auth,
+                data=data,
+                files=fallback_files,
+                headers=headers,
+                timeout=CLOUD_POST_TIMEOUT,
             )
         return _parse_cloud_response(response, safe_plate, weight)
 
@@ -148,33 +193,34 @@ def transmit_entry_multipart(
         return False, None, err_msg, False
 
 
+def snapshot_images(session_payload: dict[str, Any]) -> list[tuple[str, bytes]]:
+    """Non-empty camera snapshots of a session as (filename, jpeg bytes), ordered by camera name."""
+    fleet_dict = session_payload.get("camera_snapshots", {})
+    if not isinstance(fleet_dict, dict):
+        return []
+    return [
+        (f"truck_{cam_name}.jpg", b)
+        for cam_name, b in sorted(fleet_dict.items())
+        if b and isinstance(b, bytes)
+    ]
+
+
 def post_to_cloud(session_payload: dict[str, Any]) -> tuple[bool, str | None, str | None, bool]:
     """
     Bridge function: transmits entry from session dictionary and updates telemetry.
     Preserved for direct callers; does NOT wipe session_payload on completion.
     """
-    center_id = int(config.center_id)
-    plate = _safe_plate(session_payload.get("anpr_plate"))
-    weight = float(session_payload.get("weight", 0.0))
-
-    images_to_send: list[tuple[str, bytes]] = []
-    fleet_dict = session_payload.get("camera_snapshots", {})
-    if isinstance(fleet_dict, dict):
-        for cam_name in sorted(fleet_dict.keys()):
-            b = fleet_dict[cam_name]
-            if b and isinstance(b, bytes):
-                images_to_send.append((f"truck_{cam_name}.jpg", b))
-
     return transmit_entry_multipart(
-        center_id=center_id,
-        detected_vehicle_number=plate,
-        weight=weight,
-        images=images_to_send,
+        center_id=int(config.center_id),
+        detected_vehicle_number=_safe_plate(session_payload.get("anpr_plate")),
+        weight=float(session_payload.get("weight", 0.0)),
+        images=snapshot_images(session_payload),
     )
 
 
 __all__ = [
     "GLUVOK_BASE_URL",
     "post_to_cloud",
+    "snapshot_images",
     "transmit_entry_multipart",
 ]
