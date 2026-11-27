@@ -1,12 +1,22 @@
+import io
 import unittest
 
-import cv2
-import numpy as np
+from PIL import Image, ImageDraw
 
 from src.config.constants import ANPR_CAPTURE_INTERVAL, POST_STABILITY_DURATION
 from src.core.session import WeighbridgeSessionManager
 from src.core.stability import ScaleStabilityMachine, ScaleState
 from src.services.image_compressor import compress_image_bytes
+
+
+def _jpeg(size: tuple[int, int], text: str = "") -> bytes:
+    """Q100 JPEG of a black frame with optional white text (stand-in for a camera snapshot)."""
+    img = Image.new("RGB", size, (128, 128, 128) if not text else (0, 0, 0))
+    if text:
+        ImageDraw.Draw(img).text((size[0] // 8, size[1] // 2), text, fill=(255, 255, 255), font_size=size[1] // 10)
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=100)
+    return buf.getvalue()
 
 
 class TestImageCompressor(unittest.TestCase):
@@ -20,57 +30,42 @@ class TestImageCompressor(unittest.TestCase):
         self.assertEqual(res, corrupt)
 
     def test_compress_4k_image_downscaled_to_1920(self):
-        # Create a synthetic 4K image (3840 x 2160)
-        img_4k = np.zeros((2160, 3840, 3), dtype=np.uint8)
-        # Draw some features
-        cv2.putText(img_4k, "RJ45CX3690", (500, 1000), cv2.FONT_HERSHEY_SIMPLEX, 5, (255, 255, 255), 10)
-        ok, raw_jpeg = cv2.imencode(".jpg", img_4k, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-        self.assertTrue(ok)
-        raw_bytes = raw_jpeg.tobytes()
+        raw_bytes = _jpeg((3840, 2160), "RJ45CX3690")
 
         compressed = compress_image_bytes(raw_bytes, max_dim=1920, quality=85)
         self.assertIsNotNone(compressed)
         assert compressed is not None
 
-        # Verify decoded compressed image has max dimension <= 1920
-        dec = cv2.imdecode(np.frombuffer(compressed, np.uint8), cv2.IMREAD_COLOR)
-        self.assertIsNotNone(dec)
-        assert dec is not None
-        h, w = dec.shape[:2]
-        self.assertLessEqual(max(h, w), 1920)
+        self.assertEqual(Image.open(io.BytesIO(compressed)).size, (1920, 1080))
         self.assertLess(len(compressed), len(raw_bytes))
 
     def test_compress_1080p_image_dimensions_preserved(self):
-        # Create a 1920x1080 image
-        img_1080 = np.zeros((1080, 1920, 3), dtype=np.uint8)
-        cv2.putText(img_1080, "PLATE", (200, 500), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 255, 255), 5)
-        ok, raw_jpeg = cv2.imencode(".jpg", img_1080, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-        self.assertTrue(ok)
-        raw_bytes = raw_jpeg.tobytes()
+        raw_bytes = _jpeg((1920, 1080), "PLATE")
 
         compressed = compress_image_bytes(raw_bytes, max_dim=1920, quality=85)
         self.assertIsNotNone(compressed)
         assert compressed is not None
 
-        dec = cv2.imdecode(np.frombuffer(compressed, np.uint8), cv2.IMREAD_COLOR)
-        self.assertIsNotNone(dec)
-        assert dec is not None
-        h, w = dec.shape[:2]
-        self.assertEqual(w, 1920)
-        self.assertEqual(h, 1080)
+        self.assertEqual(Image.open(io.BytesIO(compressed)).size, (1920, 1080))
 
     def test_compress_always_runs_for_small_image(self):
-        # Create a small image (200x200) encoded at Q100
-        img_small = np.full((200, 200, 3), 128, dtype=np.uint8)
-        ok, raw_jpeg = cv2.imencode(".jpg", img_small, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
-        self.assertTrue(ok)
-        raw_bytes = raw_jpeg.tobytes()
+        raw_bytes = _jpeg((200, 200))
 
         # Should still run compression with quality=75 and produce smaller payload
         compressed = compress_image_bytes(raw_bytes, quality=75)
         self.assertIsNotNone(compressed)
         assert compressed is not None
         self.assertLess(len(compressed), len(raw_bytes))
+
+    def test_compress_applies_exif_orientation(self):
+        img = Image.new("RGB", (400, 200), (10, 20, 30))
+        exif = Image.Exif()
+        exif[0x0112] = 6  # Orientation: rotate 90 CW -> displayed as 200x400
+        buf = io.BytesIO()
+        img.save(buf, "JPEG", quality=95, exif=exif.tobytes())
+        compressed = compress_image_bytes(buf.getvalue())
+        assert compressed is not None
+        self.assertEqual(Image.open(io.BytesIO(compressed)).size, (200, 400))
 
 
 class TestMidStabilityAndShortPostStability(unittest.TestCase):

@@ -103,14 +103,13 @@ class TestAsyncANPR(unittest.TestCase):
         start = time.time()
         with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=slow_sender):
             futures = self.sm._capture_and_record_anpr_sample(wait=False)
+            elapsed = time.time() - start
+            # Wait inside the patch: without a GIL the worker may run after the with-block exits (3.14t)
+            concurrent.futures.wait(futures, timeout=1.0)
 
-        elapsed = time.time() - start
         # Non-blocking dispatch must return almost immediately (< 0.05s)
         self.assertLess(elapsed, 0.05)
         self.assertEqual(len(futures), 1)
-
-        # Wait for the future to verify result eventually landed
-        concurrent.futures.wait(futures, timeout=1.0)
         self.assertEqual(self.sm._anpr_plates, ["MH12AB9999"])
 
     def test_error_isolation_on_worker_crash(self):

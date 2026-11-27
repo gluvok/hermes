@@ -55,7 +55,7 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
 ## `src/devices/`
 
 - **`scale.py`**: `ScaleUARTReader` (singleton via `get_uart_reader()`): `start`, `stop`, `restart`, `is_alive`. Packets end at CR, LF, STX, ETX, 256 bytes, or 300 ms of silence. Weight is read as `\d{3,6}MN` first, then as any signed number.
-- **`camera.py`**: `fetch_image_bytes(url)` (HTTP GET, or one OpenCV RTSP frame encoded at JPEG 85), `capture_anpr_snapshots()` (1-based indexes), `capture_all_camera_snapshots()` (labels `anpr_N`, `aux_N`), `log_camera_fleet()`. All logging masks `user:pass@`. TLS verification is off for HTTP snapshots because LAN cameras use self-signed certificates.
+- **`camera.py`**: `fetch_image_bytes(url)` (HTTP GET, or one PyAV RTSP frame encoded at JPEG 85), `capture_anpr_snapshots()` (1-based indexes), `capture_all_camera_snapshots()` (labels `anpr_N`, `aux_N`), `log_camera_fleet()`. All logging masks `user:pass@`. TLS verification is off for HTTP snapshots because LAN cameras use self-signed certificates.
 - **`led/`**: `colors.py`, `driver.py` (GPIO or mock), `controller.py` (`led_controller`: `set_idle`, `set_active`, `set_network_status`, `trigger_cloud_success`, `startup_test`, `cleanup`).
 - **`wifi/`** (package):
 
@@ -84,7 +84,7 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
 
 ## `src/services/image_compressor.py`
 
-`compress_image_bytes(bytes, max_dim=1920, quality=75)`: downscale, then JPEG at quality 75 with optimization. Returns the input on decode or encode failure.
+`compress_image_bytes(bytes, max_dim=1920, quality=75)`: downscale (Pillow, EXIF orientation applied), then JPEG at quality 75 with optimization. Returns the input on decode or encode failure.
 
 ## `src/web/`
 
