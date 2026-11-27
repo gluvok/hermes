@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import io
 import unittest
 from unittest.mock import Mock, patch
 
-import cv2
-import numpy as np
 import requests
+from PIL import Image
 
 from src.config import ConfigManager, config
 from src.core.telemetry import get_error_counts, get_system_events, reset_state
@@ -149,10 +149,9 @@ class TestCloudPost(unittest.TestCase):
 
     def test_build_multipart_files_passes_bytes_through_untouched(self):
         # Snapshots are already compressed in session.py; re-encoding is lossy and wastes Pi CPU.
-        img = np.random.default_rng(0).integers(0, 256, (64, 64, 3), dtype=np.uint8)
-        ok, enc = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
-        self.assertTrue(ok)
-        jpeg = enc.tobytes()
+        buf = io.BytesIO()
+        Image.effect_noise((64, 64), 64).convert("RGB").save(buf, "JPEG", quality=95)
+        jpeg = buf.getvalue()
 
         files, has_images = _build_multipart_files([("a.jpg", jpeg)], None, "f.jpg")
         self.assertTrue(has_images)
