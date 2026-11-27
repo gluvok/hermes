@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import urlsplit
 
 INTER_CHAR_TIMEOUT_S = 0.3
 MAX_BUFFER_LEN = 256
@@ -19,7 +20,22 @@ ANPR_MAX_IN_FLIGHT = 2
 ANPR_WORKERS = 2
 MAX_PARALLEL_CAMERA_WORKERS = 4
 
-GLUVOK_BASE_URL = os.environ.get("GLUVOK_BASE_URL", "https://gluvok.vercel.app").rstrip("/")
+_LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
+
+
+def _gluvok_base_url(raw: str) -> str:
+    """Every upload carries the device key, so refuse plain http unless it never leaves this machine."""
+    url = raw.rstrip("/")
+    parts = urlsplit(url)
+    if parts.scheme != "https" and not (parts.scheme == "http" and parts.hostname in _LOOPBACK_HOSTS):
+        raise ValueError(
+            f"GLUVOK_BASE_URL must be https (http only for loopback); "
+            f"got scheme {parts.scheme!r}, host {parts.hostname!r}."
+        )
+    return url
+
+
+GLUVOK_BASE_URL = _gluvok_base_url(os.environ.get("GLUVOK_BASE_URL", "https://gluvok.vercel.app"))
 CLOUD_POST_TIMEOUT = 20.0
 CLOUD_POST_RETRIES = 3  # retries after the first attempt
 CLOUD_RETRY_AFTER_MAX_S = 60  # janus sends <=60 s; never park an upload thread longer for a stray proxy

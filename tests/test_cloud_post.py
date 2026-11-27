@@ -11,7 +11,7 @@ import requests
 from PIL import Image
 
 from src.config import ConfigManager, config
-from src.config.constants import GLUVOK_BASE_URL
+from src.config.constants import GLUVOK_BASE_URL, _gluvok_base_url
 from src.core.telemetry import get_error_counts, get_system_events, reset_state
 from src.integrations.gluvok import (
     _RETRY,
@@ -332,6 +332,14 @@ class TestCloudPost(unittest.TestCase):
     def test_retry_after_is_capped_at_sixty_seconds(self):
         self.assertEqual(_RETRY.parse_retry_after("3600"), 60)
         self.assertEqual(_RETRY.parse_retry_after("5"), 5)
+
+    def test_base_url_must_be_https_unless_loopback(self):
+        self.assertEqual(_gluvok_base_url("https://gluvok.vercel.app/"), "https://gluvok.vercel.app")
+        for ok in ("http://127.0.0.1:8000", "http://localhost:3000", "http://[::1]:3000", "https://localhost"):
+            self.assertEqual(_gluvok_base_url(ok), ok)
+        for bad in ("http://gluvok.vercel.app", "http://10.0.0.5", "ftp://127.0.0.1", "gluvok.vercel.app", ""):
+            with self.assertRaises(ValueError, msg=bad):
+                _gluvok_base_url(bad)
 
     def test_transmit_does_not_retry_400(self):
         url, seen = self._serve_script([(400, {}, b"bad weight")])
