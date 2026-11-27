@@ -21,11 +21,6 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Setup Python Runtime
-        uses: actions/setup-python@v7.1.0
-        with:
-          python-version-file: ".python-version"
-
       - name: Install Dependencies
         run: uv sync
 

@@ -24,17 +24,12 @@ jobs:
       - name: Install System Compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang patchelf
+          sudo apt-get install -y gcc clang patchelf
 
       - name: Setup uv Package Manager
         uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: false
-
-      - name: Setup Python Runtime
-        uses: actions/setup-python@v7.1.0
-        with:
-          python-version-file: ".python-version"
 
       - name: Install Dependencies
         run: uv sync
@@ -50,6 +45,13 @@ jobs:
             --python-flag=no_docstrings \
             --output-dir=compiled_dist \
             src
+
+      - name: Verify Compiled Module Keeps the GIL Off
+        run: |
+          CHECK_DIR=$(mktemp -d)
+          cp compiled_dist/src.*.so "$CHECK_DIR/"
+          cd "$CHECK_DIR"
+          SUPERADMIN_PASS=ci HERMES_HOTSPOT_PASS=ci-check-pass "$GITHUB_WORKSPACE/.venv/bin/python" -W error::RuntimeWarning -c "import sys, src, src.web.app, src.core.session, src.devices.camera; assert hasattr(src, '__compiled__'), 'not the Nuitka module'; assert not sys._is_gil_enabled(), 'GIL re-enabled'; print('compiled src OK, GIL disabled')"
 
       - name: Deploy to release Branch
         run: |

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -45,18 +46,24 @@ def _check_argus_online(anpr_url: str) -> bool:
         return False
 
 
-_last_argus_check_time: float = 0.0
+_last_argus_check_time: float = float("-inf")
 _last_argus_online_status: bool = False
 _ARGUS_CACHE_TTL_S: float = 5.0
+_argus_probe_lock = threading.Lock()
 
 
 def _get_cached_argus_status(target_url: str) -> bool:
-    """Returns cached Argus health status with 5s TTL to prevent log and network spamming."""
+    """Cached Argus health (5s TTL). One thread probes; concurrent /api/status calls get the cached value."""
     global _last_argus_check_time, _last_argus_online_status
-    now = time.time()
-    if now - _last_argus_check_time >= _ARGUS_CACHE_TTL_S:
+    if time.monotonic() - _last_argus_check_time < _ARGUS_CACHE_TTL_S or not _argus_probe_lock.acquire(blocking=False):
+        return _last_argus_online_status
+    try:
+        if time.monotonic() - _last_argus_check_time < _ARGUS_CACHE_TTL_S:
+            return _last_argus_online_status
         _last_argus_online_status = _check_argus_online(target_url)
-        _last_argus_check_time = now
+        _last_argus_check_time = time.monotonic()
+    finally:
+        _argus_probe_lock.release()
     return _last_argus_online_status
 
 

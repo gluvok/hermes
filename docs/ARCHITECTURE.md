@@ -45,7 +45,7 @@ Every dropped weighment increments `cloud.unsent_weighments` in `GET /api/status
 
 ### Cloud upload
 
-`POST {GLUVOK_BASE_URL}/api/entries` with HTTP Basic auth (`device_id:device_key`), timeout 20 s, multipart form fields `center_id`, `detected_vehicle_number`, `weight`, and one `file` part per camera (`truck_<label>.jpg`, labels `anpr_1`, `aux_1`, ...). If the server answers 400 with "storage" in the body, the entry is re-posted once without images. HTTP 200/201 is success. Everything else, including 409, is an error recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400) or `CLOUD_UPLOAD_ERROR` (other). On success the LED pulses blue for 10 s.
+`POST {GLUVOK_BASE_URL}/api/entries` with an `x-api-key: <device_key>` header, timeout 20 s, multipart form fields `center_id`, `detected_vehicle_number`, `weight`, and one `file` part per camera (`truck_<label>.jpg`, labels `anpr_1`, `aux_1`, ...). If the server answers 400 with "storage" in the body, the entry is re-posted once without images. HTTP 200/201 is success. Everything else, including 409, is an error recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400) or `CLOUD_UPLOAD_ERROR` (other). On success the LED pulses blue for 10 s.
 
 ### Images
 

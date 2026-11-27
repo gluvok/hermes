@@ -8,7 +8,7 @@ Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Module reference: [d
 
 ## Requirements
 
-- Python 3.14 and [uv](https://docs.astral.sh/uv/)
+- Free-threaded Python 3.14t (`uv sync` installs it from `.python-version`) and [uv](https://docs.astral.sh/uv/)
 - Linux with NetworkManager (`nmcli`) for Wi-Fi features
 
 ## Run from source
