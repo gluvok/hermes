@@ -112,10 +112,10 @@ def setup():
     log_camera_fleet()
 
     # Verify Gluvok Cloud device credentials
-    if config.device_id and config.device_key:
-        logger.info(f"[Auth] Gluvok device authentication configured for Device ID: {config.device_id}")
+    if config.device_key:
+        logger.info(f"[Auth] Gluvok device key configured (Device ID: {config.device_id or 'none'})")
     else:
-        logger.warning("[Auth] Gluvok device credentials (device_id, device_key) not configured in client_config.py.")
+        logger.warning("[Auth] Gluvok device key (device_key) not configured in client_config.py.")
 
 
 def _supervise_threads() -> None:

@@ -82,6 +82,16 @@ class TestCloudPost(unittest.TestCase):
         self.assertGreaterEqual(error_counts.get("CLOUD_AUTH_FAILED", 0), 1)
 
     @patch("src.integrations.gluvok.requests.Session.post")
+    def test_post_to_cloud_sends_with_device_key_only(self, mock_post: Mock):
+        mock_post.return_value = Mock(status_code=201, content=b'{"data": {"id": 5}}')
+        mock_post.return_value.json.return_value = {"data": {"id": 5}}
+        with patch.object(ConfigManager, "device_id", ""):
+            result = post_to_cloud({"weight": 1000.0, "anpr_plate": "MH12AB1234"})
+
+        self.assertTrue(result[0])
+        mock_post.assert_called_once()
+
+    @patch("src.integrations.gluvok.requests.Session.post")
     def test_post_to_cloud_401_unauthorized(self, mock_post: Mock):
         mock_resp = Mock(status_code=401, content=b"Unauthorized", text="Unauthorized")
         mock_post.return_value = mock_resp

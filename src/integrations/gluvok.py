@@ -138,8 +138,8 @@ def transmit_entry_multipart(
     Pass idempotency_key (a UUIDv7 minted once per weighment) to replay a stored weighment safely;
     without one a fresh key is minted for this call.
     """
-    if not config.device_id or not config.device_key:
-        msg = "Device credentials (device_id, device_key) not configured."
+    if not config.device_key:  # janus reads only the key; a licence without device_id must still upload
+        msg = "Device key (device_key) not configured."
         logger.warning(f"[Gluvok API] POST entry aborted: {msg}")
         _record_cloud_event("CLOUD_AUTH_FAILED", msg, is_error=True)
         return False, None, msg, False

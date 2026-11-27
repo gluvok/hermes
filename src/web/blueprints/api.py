@@ -152,7 +152,7 @@ def status():
             "online": argus_online,
         },
         "cloud": {
-            "configured": bool(config.device_id and config.device_key),
+            "configured": bool(config.device_key),
             "unsent_weighments": get_unsent_weighment_count(),
             "outbox_pending": get_outbox_pending(),
             "auth_failing": get_cloud_auth_failures() >= CLOUD_AUTH_ALERT_THRESHOLD,
