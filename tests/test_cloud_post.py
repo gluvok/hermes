@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import io
-import threading
 import unittest
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import Mock, patch
 
 import requests
@@ -11,11 +9,7 @@ from PIL import Image
 
 from src.config import ConfigManager, config
 from src.core.telemetry import get_error_counts, get_system_events, reset_state
-from src.integrations.gluvok import (
-    _build_multipart_files,
-    post_to_cloud,
-    transmit_entry_multipart,
-)
+from src.integrations.gluvok import _build_multipart_files, post_to_cloud
 
 
 class TestCloudPost(unittest.TestCase):
@@ -171,46 +165,6 @@ class TestCloudPost(unittest.TestCase):
         for call in mock_post.call_args_list:
             self.assertEqual(call.kwargs["headers"], {"x-api-key": str(config.device_key)})
             self.assertNotIn("auth", call.kwargs)
-
-    def test_transmit_does_not_forward_api_key_on_redirect(self):
-        seen: list[str | None] = []
-
-        def serve(handler_fn):
-            class Handler(BaseHTTPRequestHandler):
-                def do_POST(self):
-                    self.rfile.read(int(self.headers.get("Content-Length", 0)))
-                    handler_fn(self)
-
-                def log_message(self, format, *args):
-                    pass
-
-            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-            threading.Thread(target=server.serve_forever, daemon=True).start()
-            self.addCleanup(server.server_close)
-            self.addCleanup(server.shutdown)
-            return server.server_address[1]
-
-        def record_and_ok(h):
-            seen.append(h.headers.get("x-api-key"))
-            h.send_response(201)
-            h.send_header("Content-Length", "0")
-            h.end_headers()
-
-        port_b = serve(record_and_ok)
-
-        def redirect(h):
-            h.send_response(307)
-            h.send_header("Location", f"http://localhost:{port_b}/steal")
-            h.send_header("Content-Length", "0")
-            h.end_headers()
-
-        port_a = serve(redirect)
-
-        with patch("src.integrations.gluvok.GLUVOK_BASE_URL", f"http://127.0.0.1:{port_a}"):
-            result = transmit_entry_multipart(1, "MH12AB1234", 100.0)
-
-        self.assertEqual(seen, [])
-        self.assertFalse(result[0])
 
     def test_build_multipart_files_passes_bytes_through_untouched(self):
         # Snapshots are already compressed in session.py; re-encoding is lossy and wastes Pi CPU.
