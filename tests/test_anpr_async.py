@@ -187,3 +187,29 @@ class TestAsyncANPR(unittest.TestCase):
 
         assert self.sm._anpr_pool is not None
         self.assertEqual(self.sm._anpr_pool._max_workers, ANPR_WORKERS)
+
+    @patch("src.core.session.capture_anpr_snapshots")
+    def test_in_flight_cap_survives_session_reset(self, mock_snaps):
+        mock_snaps.return_value = [(1, "http://cam1/frame", b"jpeg")]
+        release = threading.Event()
+
+        def blocked_sender(_img_bytes, **_kwargs):
+            release.wait(timeout=5.0)
+            return ("MH12AB9999", "SUCCESS")
+
+        with patch("src.integrations.anpr.send_frame_to_anpr_server", side_effect=blocked_sender):
+            with patch.object(self.sm, "_anpr_loop"):
+                self.sm.start_session()
+            for _ in range(ANPR_MAX_IN_FLIGHT):
+                self.sm._capture_and_record_anpr_sample(wait=False)
+            stale = list(self.sm._pending_anpr_futures)
+
+            # Truck A aborts mid-request; truck B must not stack more requests on Argus.
+            self.sm.reset_session()
+            with patch.object(self.sm, "_anpr_loop"):
+                self.sm.start_session()
+            self.assertEqual(self.sm._capture_and_record_anpr_sample(wait=False), [])
+            self.assertEqual(mock_snaps.call_count, ANPR_MAX_IN_FLIGHT)
+
+            release.set()
+            concurrent.futures.wait(stale, timeout=2.0)

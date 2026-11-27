@@ -106,7 +106,6 @@ class WeighbridgeSessionManager:
             self._anpr_statuses.clear()
             self._anpr_frame_buffers.clear()
             self._fleet_snapshots.clear()
-            self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
 
             self._anpr_pool = ThreadPoolExecutor(
@@ -167,7 +166,7 @@ class WeighbridgeSessionManager:
         self, wait: bool = True
     ) -> list[Future[tuple[str | None, str]]]:
         """Fetch frames from ANPR cameras and dispatch asynchronously to Argus worker pool."""
-        # ponytail: cap counts futures (one per camera) per Hermes process; a shared Argus across several Hermes units needs a server-side queue limit.
+        # ponytail: cap counts futures (one per camera) per Hermes process, including ones left over from a reset session; a shared Argus across several Hermes units needs a server-side queue limit.
         with self._lock:
             self._pending_anpr_futures = [f for f in self._pending_anpr_futures if not f.done()]
             in_flight = len(self._pending_anpr_futures)
@@ -350,7 +349,6 @@ class WeighbridgeSessionManager:
 
         with self._lock:
             pending = list(self._pending_anpr_futures)
-            self._pending_anpr_futures.clear()
 
         if pending:
             concurrent.futures.wait(pending, timeout=0.3)
@@ -412,7 +410,6 @@ class WeighbridgeSessionManager:
             self._fleet_snapshot_thread = None
             self._anpr_pool = None
             self._http_session = None
-            self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
             self.phase = SessionPhase.PHASE_IDLE
             self.session_id = None

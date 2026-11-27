@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import re
 import subprocess
@@ -37,11 +38,14 @@ def secrets_env_text() -> str:
         if any(c in v for c in "\r\n\0"):  # a newline would inject extra EnvironmentFile lines
             print(f"[Deploy] {n} must not contain newlines.", file=sys.stderr)
             sys.exit(1)
-    try:
-        float(env.get("ANPR_SERVER_TIMEOUT", "0"))
-    except ValueError:
-        print("[Deploy] ANPR_SERVER_TIMEOUT must be a number.", file=sys.stderr)
-        sys.exit(1)
+    if "ANPR_SERVER_TIMEOUT" in env:
+        try:
+            ok = 0 < float(env["ANPR_SERVER_TIMEOUT"]) < math.inf  # also rejects nan
+        except ValueError:
+            ok = False
+        if not ok:
+            print("[Deploy] ANPR_SERVER_TIMEOUT must be a positive number of seconds.", file=sys.stderr)
+            sys.exit(1)
     return "".join(f'{n}="{esc(v)}"\n' for n, v in env.items())
 
 

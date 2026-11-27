@@ -72,7 +72,7 @@ Each Argus call yields a plate or a status code: `SUCCESS`, `NO_PLATE_DETECTED`,
 
 `main.loop()` restarts the UART reader and the watchdog if their threads died. The web server and portal threads are not supervised.
 
-The watchdog is the only code that probes the network (TCP to the Gluvok cloud host first, then 1.1.1.1:53 and 8.8.8.8:53, 1.5 s each). After 5 consecutive failed checks it calls `notify_network_status(False)`, which updates the stability machine first and the LED second, so an LED fault cannot stop the weighment from going offline. The UART thread reuses that verdict and never probes. The stability machine assumes online until the watchdog says otherwise.
+The watchdog is the only code that probes the network (TCP to the Gluvok cloud host first, then 1.1.1.1:53 and 8.8.8.8:53, 1.5 s each). After 5 consecutive failed checks (about 5 s if the link refuses connections, up to about 30 s if it silently drops packets) it calls `notify_network_status(False)`, which updates the stability machine first and the LED second, so an LED fault cannot stop the weighment from going offline. The UART thread reuses that verdict and never probes. The stability machine assumes online until the watchdog says otherwise.
 
 Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the session manager, telemetry (`_events_lock`, `_live_lock`), the Wi-Fi vault, nmcli (`nmcli_lock`, serializes all nmcli calls), `ScaleStabilityMachine` (`RLock`), `ScaleUARTReader._lifecycle_lock` (`RLock`), `_argus_probe_lock` (`Lock`).
 
