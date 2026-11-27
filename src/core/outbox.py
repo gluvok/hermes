@@ -3,12 +3,18 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import sqlite3
+import threading
 import uuid
 from contextlib import closing
 from typing import Any
 
+from src.config.constants import LED_CLOUD_SUCCESS_DURATION, OUTBOX_POLL_INTERVAL
 from src.core import db
+from src.core.telemetry import record_system_event
+
+logger = logging.getLogger(__name__)
 
 OUTBOX_DDL = """
 CREATE TABLE IF NOT EXISTS outbox (
@@ -64,3 +70,80 @@ def remove(row_id: int) -> None:
 
 def mark_failed(row_id: int) -> None:
     _run("UPDATE outbox SET failed = 1 WHERE id = ?", (row_id,))
+
+
+def _is_permanent(err: str | None) -> bool:
+    """4xx the entry itself caused. 401/403 are device-key problems: keep the row so it goes once the key is fixed."""
+    # ponytail: parses gluvok's own "HTTP <code>:" error prefix; return the status code if a second caller needs it.
+    return bool(err) and err.startswith("HTTP 4") and not err.startswith(("HTTP 401", "HTTP 403", "HTTP 408", "HTTP 429"))
+
+
+def drain_once() -> bool:
+    """Sends the oldest entry. True = row handled (sent or parked), keep draining."""
+    from src.devices import led_controller
+    from src.integrations.gluvok import transmit_entry_multipart
+
+    row = peek_oldest()
+    if row is None:
+        return False
+    ok, entry_id, err, _ = transmit_entry_multipart(
+        center_id=row["center_id"], detected_vehicle_number=row["plate"], weight=row["weight"],
+        images=row["images"], idempotency_key=row["idempotency_key"],
+    )
+    if ok:
+        remove(row["id"])
+        led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
+        logger.info(f"[Outbox] Sent {row['idempotency_key']} (entry {entry_id}).")
+        return True
+    if _is_permanent(err):
+        mark_failed(row["id"])
+        record_system_event("OUTBOX", f"Entry {row['idempotency_key']} rejected: {err}")
+        return True
+    return False
+
+
+_thread: threading.Thread | None = None
+_stop = threading.Event()
+
+
+def _drain_pending() -> None:
+    """One entry at a time while online and not mid-measurement, so blue never cuts into a truck's red."""
+    from src.core.stability import ScaleState, scale_state_machine
+
+    # ponytail: after a backlog, older entries may pulse blue while a newly recorded truck waits its turn;
+    # light blue only for the truck's own key if drivers start leaving early.
+    while (
+        scale_state_machine.is_online
+        and scale_state_machine.state != ScaleState.SCALE_STABILIZING
+        and drain_once()
+    ):
+        pass
+
+
+def _worker_loop(stop: threading.Event, interval: float) -> None:
+    while not stop.wait(interval):
+        try:
+            _drain_pending()
+        except Exception:
+            logger.exception("[Outbox] drain failed; continuing")
+
+
+def start_outbox_worker(interval: float = OUTBOX_POLL_INTERVAL) -> None:
+    global _thread, _stop
+    if is_outbox_worker_running():
+        return
+    _stop = threading.Event()
+    _thread = threading.Thread(target=_worker_loop, args=(_stop, interval), name="OutboxWorker", daemon=True)
+    _thread.start()
+
+
+def stop_outbox_worker() -> None:
+    global _thread
+    _stop.set()
+    if _thread and _thread.is_alive():
+        _thread.join(timeout=2.0)
+    _thread = None
+
+
+def is_outbox_worker_running() -> bool:
+    return bool(_thread and _thread.is_alive())

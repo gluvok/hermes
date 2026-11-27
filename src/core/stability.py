@@ -9,13 +9,18 @@ One transmission per session; resets only when weight returns to zero.
 from __future__ import annotations
 
 import logging
+import sqlite3
 import threading
 import time
 from enum import Enum
 from typing import Any
 
 from src.config import config
-from src.config.constants import STABILITY_DURATION, STABILITY_TOLERANCE
+from src.config.constants import (
+    OFFLINE_QUEUE_ENABLED,
+    STABILITY_DURATION,
+    STABILITY_TOLERANCE,
+)
 from src.core.session import session_manager
 
 logger = logging.getLogger(__name__)
@@ -42,9 +47,9 @@ class ScaleStabilityMachine:
         return self._is_online
 
     def set_network_status(self, is_online: bool) -> None:
-        """Immediately blocks and cancels active weighment session when offline."""
+        """Immediately blocks and cancels active weighment session when offline (unless queueing, #42)."""
         self._is_online = is_online
-        if not is_online:
+        if not is_online and not OFFLINE_QUEUE_ENABLED:
             self.abort_offline_session()
 
     def abort_offline_session(self) -> None:
@@ -123,7 +128,7 @@ class ScaleStabilityMachine:
             self._mid_stability_triggered = False
 
     def process_new_weight(self, parsed_weight: float):
-        if not self._is_online:
+        if not self._is_online and not OFFLINE_QUEUE_ENABLED:
             return
 
         now = time.time()
@@ -156,8 +161,12 @@ class ScaleStabilityMachine:
         self._evaluate_stability_window(parsed_weight, now)
 
     def _trigger_upload(self, session_package: dict[str, Any]) -> str:
-        """Transmits session directly to Gluvok Cloud if online; drops if offline."""
+        """Queues the session for the outbox worker (flag on), else posts it if online; drops if offline."""
         session_id = str(session_package.get("session_id", "UNKNOWN"))
+
+        if OFFLINE_QUEUE_ENABLED:
+            self._enqueue_weighment(session_id, session_package)
+            return session_id
 
         if not self._is_online:
             logger.warning(
@@ -179,6 +188,24 @@ class ScaleStabilityMachine:
             daemon=True,
         ).start()
         return session_id
+
+    def _enqueue_weighment(self, session_id: str, session_package: dict[str, Any]) -> None:
+        from src.core import outbox
+        from src.core.telemetry import record_unsent_weighment
+        from src.integrations.gluvok import snapshot_images
+
+        try:
+            key = outbox.enqueue(
+                int(config.center_id),
+                str(session_package.get("anpr_plate") or ""),
+                float(session_package.get("weight", 0.0)),
+                snapshot_images(session_package),
+            )
+        except sqlite3.Error:
+            logger.exception(f"[Weighment] Could not queue session {session_id}; weighment lost.")
+            record_unsent_weighment()
+            return
+        logger.info(f"[Weighment] Session {session_id} queued for upload (key {key}).")
 
     def _transmit_online_weighment(self, session_package: dict[str, Any]) -> None:
         from src.config.constants import LED_CLOUD_SUCCESS_DURATION

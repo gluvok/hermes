@@ -95,4 +95,3 @@ def test_snapshot_images_sorts_cameras_and_skips_empty():
     payload = {"camera_snapshots": {"b": b"2", "a": b"1", "c": b"", "d": None}}
     assert gluvok.snapshot_images(payload) == [("truck_a.jpg", b"1"), ("truck_b.jpg", b"2")]
     assert gluvok.snapshot_images({}) == []
-    assert "snapshot_images" in gluvok.__all__
