@@ -22,6 +22,9 @@ import requests
 from src.config import config
 from src.config.constants import (
     ANPR_CAPTURE_INTERVAL,
+    ANPR_MAX_IN_FLIGHT,
+    ANPR_SERVER_TIMEOUT,
+    ANPR_WORKERS,
     POST_STABILITY_DURATION,
 )
 from src.core.telemetry import record_system_event, record_weighment_result
@@ -103,12 +106,10 @@ class WeighbridgeSessionManager:
             self._anpr_statuses.clear()
             self._anpr_frame_buffers.clear()
             self._fleet_snapshots.clear()
-            self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
 
-            workers = getattr(config, "max_parallel_camera_workers", 4)
             self._anpr_pool = ThreadPoolExecutor(
-                max_workers=workers,
+                max_workers=ANPR_WORKERS,
                 thread_name_prefix=f"ANPR_{self.session_id}",
             )
             self._http_session = requests.Session()
@@ -165,6 +166,14 @@ class WeighbridgeSessionManager:
         self, wait: bool = True
     ) -> list[Future[tuple[str | None, str]]]:
         """Fetch frames from ANPR cameras and dispatch asynchronously to Argus worker pool."""
+        # ponytail: cap counts futures (one per camera) per Hermes process, including ones left over from a reset session; a shared Argus across several Hermes units needs a server-side queue limit.
+        with self._lock:
+            self._pending_anpr_futures = [f for f in self._pending_anpr_futures if not f.done()]
+            in_flight = len(self._pending_anpr_futures)
+        if in_flight >= ANPR_MAX_IN_FLIGHT:
+            logger.debug(f"[ANPR] {in_flight} request(s) in flight, skipping capture tick.")
+            return []
+
         snapshots = capture_anpr_snapshots()
         if not snapshots:
             logger.warning("[ANPR] No ANPR cameras available or configured.")
@@ -216,9 +225,7 @@ class WeighbridgeSessionManager:
             self._pending_anpr_futures.extend(futures)
 
         if wait and futures:
-            concurrent.futures.wait(
-                futures, timeout=getattr(config, "anpr_server_timeout", 3.0)
-            )
+            concurrent.futures.wait(futures, timeout=ANPR_SERVER_TIMEOUT)
 
         return futures
 
@@ -342,7 +349,6 @@ class WeighbridgeSessionManager:
 
         with self._lock:
             pending = list(self._pending_anpr_futures)
-            self._pending_anpr_futures.clear()
 
         if pending:
             concurrent.futures.wait(pending, timeout=0.3)
@@ -404,7 +410,6 @@ class WeighbridgeSessionManager:
             self._fleet_snapshot_thread = None
             self._anpr_pool = None
             self._http_session = None
-            self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
             self.phase = SessionPhase.PHASE_IDLE
             self.session_id = None

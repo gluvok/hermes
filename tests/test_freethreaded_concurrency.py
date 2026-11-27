@@ -191,9 +191,12 @@ def test_parallel_anpr_capture_records_every_result(monkeypatch, argus_url):
     finally:
         sm.reset_session()
 
-    assert all(len(b) == 2 for b in batches)
+    # In-flight cap (#14): a call either skips capture entirely or dispatches both cameras.
+    assert all(len(b) in (0, 2) for b in batches)
+    dispatched = sum(len(b) for b in batches)
+    assert dispatched > 0
     assert pkg is not None and pkg["anpr_plate"] == "KA01AB1234"
-    assert pkg["total_anpr_samples"] >= 80  # 40 x 2 cameras from the hammer, plus the loop's own
+    assert pkg["total_anpr_samples"] >= dispatched  # every dispatched frame recorded, plus the loop's own
     assert pkg["anpr_status_counts"] == {"SUCCESS": pkg["total_anpr_samples"]}
 
 

@@ -35,7 +35,7 @@ tests/                  pytest suite
 | `runtime.py` | `RuntimeConfig`: locked in-memory view of overrides, `update_system`, `update_wifi`, `clear_wifi` |
 | `manager.py` | `ConfigManager` (the `config` singleton): licensed values first, then `client_config`; runtime values from `RuntimeConfig` |
 
-Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05`, `STABILITY_DURATION=10.0`, `STABILITY_TOLERANCE=2.0`, `ANPR_CAPTURE_INTERVAL=1.0`, `POST_STABILITY_DURATION=5.0`, `CAMERA_TIMEOUT=3.0`, `ANPR_SERVER_TIMEOUT=30.0`, `MAX_PARALLEL_CAMERA_WORKERS=4`, `CLOUD_POST_TIMEOUT=20.0`, `LED_CLOUD_SUCCESS_DURATION=10.0`.
+Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05`, `STABILITY_DURATION=10.0`, `STABILITY_TOLERANCE=2.0`, `ANPR_CAPTURE_INTERVAL=1.0`, `POST_STABILITY_DURATION=5.0`, `CAMERA_TIMEOUT=3.0`, `ANPR_SERVER_TIMEOUT=30.0` (env-overridable), `ANPR_MAX_IN_FLIGHT=2`, `ANPR_WORKERS=2`, `MAX_PARALLEL_CAMERA_WORKERS=4`, `CLOUD_POST_TIMEOUT=20.0`, `LED_CLOUD_SUCCESS_DURATION=10.0`.
 
 ## `src/core/`
 
@@ -63,7 +63,7 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
 | :--- | :--- |
 | `runner.py` | `run_nmcli` (locked, `sudo -n` when not root), `get_wifi_interface`, simulation mode |
 | `activity.py` | `nmcli_lock`, `suspend_watchdog`, `is_watchdog_suspended` |
-| `connectivity.py` | `is_network_connected` (TCP to 1.1.1.1:53, 8.8.8.8:53) |
+| `connectivity.py` | `is_network_connected` (TCP to the Gluvok cloud host first, then 1.1.1.1:53 and 8.8.8.8:53, 1.5 s each) |
 | `watchdog.py` | `WiFiWatchdog` thread, `notify_network_status`, start, stop, `is_watchdog_running` |
 | `hotspot.py` | `start_hotspot`, `stop_hotspot`, `start_emergency_hotspot`, `stop_emergency_hotspot`, `is_hotspot_active` |
 | `connection.py` | `connect_wifi`, `connect_to_wifi`, `get_active_wifi_ssid`, `get_existing_profile` |

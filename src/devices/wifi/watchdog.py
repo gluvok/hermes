@@ -41,7 +41,7 @@ def _watchdog_tick(fails: int, threshold: int) -> int:
     return fails
 
 
-def _watchdog_loop(interval: float = 1.0, threshold: int = 2) -> None:
+def _watchdog_loop(interval: float = 1.0, threshold: int = 5) -> None:
     fails = 0
     while _running:
         time.sleep(interval)
