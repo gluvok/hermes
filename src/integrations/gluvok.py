@@ -17,6 +17,7 @@ from urllib3.util import Retry
 
 from src.config import config
 from src.config.constants import (
+    CLOUD_MAX_BODY_BYTES,
     CLOUD_MAX_IMAGES,
     CLOUD_POST_RETRIES,
     CLOUD_POST_TIMEOUT,
@@ -80,6 +81,14 @@ def _build_multipart_files(
     if len(valid_images) > CLOUD_MAX_IMAGES:
         logger.warning(f"[Gluvok API] {len(valid_images)} images; sending first {CLOUD_MAX_IMAGES}.")
         valid_images = valid_images[:CLOUD_MAX_IMAGES]
+
+    counted = len(valid_images)
+    while valid_images and sum(len(b) for _, b in valid_images) > CLOUD_MAX_BODY_BYTES:
+        valid_images.pop()  # drop trailing images (aux cameras sort last) until the body fits janus's limit
+    if len(valid_images) < counted:
+        logger.warning(
+            f"[Gluvok API] Images exceed {CLOUD_MAX_BODY_BYTES} bytes; sending {len(valid_images)} of {counted}."
+        )
 
     if valid_images:
         files: list[tuple[str, tuple[str, bytes, str]]] = [

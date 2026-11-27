@@ -11,7 +11,7 @@ import requests
 from PIL import Image
 
 from src.config import ConfigManager, config
-from src.config.constants import GLUVOK_BASE_URL, _gluvok_base_url
+from src.config.constants import CLOUD_MAX_BODY_BYTES, GLUVOK_BASE_URL, _gluvok_base_url
 from src.core.telemetry import get_error_counts, get_system_events, reset_state
 from src.integrations.gluvok import (
     _RETRY,
@@ -349,6 +349,18 @@ class TestCloudPost(unittest.TestCase):
 
         self.assertFalse(result[0])
         self.assertEqual(len(seen), 1)
+
+    def test_build_multipart_files_drops_trailing_images_over_the_body_limit(self):
+        half = CLOUD_MAX_BODY_BYTES // 2  # two images fit exactly, a third does not
+        images = [(f"{n}.jpg", b"x" * half) for n in "abc"]
+
+        files, has_images = _build_multipart_files(images, None, "f.jpg")
+        self.assertTrue(has_images)
+        self.assertEqual([part[1][0] for part in files], ["a.jpg", "b.jpg"])
+
+        files, has_images = _build_multipart_files([("big.jpg", b"x" * (CLOUD_MAX_BODY_BYTES + 1))], None, "f.jpg")
+        self.assertFalse(has_images)  # nothing fits: the empty-part fallback still creates the entry
+        self.assertEqual(files, [("file", ("f.jpg", b"", "image/jpeg"))])
 
     def test_build_multipart_files_passes_bytes_through_untouched(self):
         # Snapshots are already compressed in session.py; re-encoding is lossy and wastes Pi CPU.

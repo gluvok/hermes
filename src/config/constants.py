@@ -40,6 +40,7 @@ CLOUD_POST_TIMEOUT = 20.0
 CLOUD_POST_RETRIES = 3  # retries after the first attempt
 CLOUD_RETRY_AFTER_MAX_S = 60  # janus sends <=60 s; never park an upload thread longer for a stray proxy
 CLOUD_MAX_IMAGES = 3  # janus ingest rejects more than 3 file parts
+CLOUD_MAX_BODY_BYTES = 4_000_000  # janus rejects bodies over 4 MB; images are the only large part
 CLOUD_AUTH_ALERT_THRESHOLD = 3  # consecutive 401/403 replies before /api/status flags auth_failing
 OUTBOX_MAX_ROWS = 500  # ~250 KB per weighment: bounds the outbox near 125 MB of SD card
 OUTBOX_DRAIN_INTERVAL_S = 30.0
