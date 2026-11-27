@@ -62,8 +62,15 @@ signal.signal(signal.SIGTERM, shutdown)
 # ─────────────────────────────────────────────────────────────────────────────
 #  SETUP
 # ─────────────────────────────────────────────────────────────────────────────
+def _warn_if_gil_enabled() -> None:
+    """Hermes is pinned to free-threaded 3.14t; an extension without Py_mod_gil silently re-enables the GIL."""
+    if sys._is_gil_enabled():
+        logger.warning("[Main] GIL is enabled (not CPython 3.14t, or an extension turned it on); worker threads will serialize.")
+
+
 def setup():
     require_runtime_secrets()
+    _warn_if_gil_enabled()
     logger.info("")
     logger.info("==============================================")
     logger.info("Gluvok Weighment & ANPR System Starting...")
