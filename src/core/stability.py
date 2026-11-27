@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+import uuid
 from enum import Enum
 from typing import Any
 
@@ -36,6 +37,9 @@ class ScaleStabilityMachine:
         self._mid_stability_triggered = False
         self._last_printed_weight = -9999.0
         self._is_online = True
+        # UART thread (process_new_weight) and Wi-Fi watchdog (set_network_status) mutate state in parallel on 3.14t
+        # ponytail: one coarse lock; an offline abort holds it while reset_session() joins threads (<=0.6s), split if UART latency matters
+        self._lock = threading.RLock()
 
     @property
     def is_online(self) -> bool:
@@ -43,18 +47,20 @@ class ScaleStabilityMachine:
 
     def set_network_status(self, is_online: bool) -> None:
         """Immediately blocks and cancels active weighment session when offline."""
-        self._is_online = is_online
-        if not is_online:
-            self.abort_offline_session()
+        with self._lock:
+            self._is_online = is_online
+            if not is_online:
+                self.abort_offline_session()
 
     def abort_offline_session(self) -> None:
         """Aborts active weighment session and resets session manager."""
-        if self.state != ScaleState.SCALE_IDLE:
-            logger.warning("[Scale] Wi-Fi lost. Immediately aborting active weighment session.")
-            self._reset_candidate_state()
-            session_manager.reset_session()
-            from src.devices import led_controller
-            led_controller.set_idle()
+        with self._lock:
+            if self.state != ScaleState.SCALE_IDLE:
+                logger.warning("[Scale] Wi-Fi lost. Immediately aborting active weighment session.")
+                self._reset_candidate_state()
+                session_manager.reset_session()
+                from src.devices import led_controller
+                led_controller.set_idle()
 
     def _reset_candidate_state(self):
         self.state = ScaleState.SCALE_IDLE
@@ -123,6 +129,10 @@ class ScaleStabilityMachine:
             self._mid_stability_triggered = False
 
     def process_new_weight(self, parsed_weight: float):
+        with self._lock:
+            self._process_new_weight(parsed_weight)
+
+    def _process_new_weight(self, parsed_weight: float):
         if not self._is_online:
             return
 
@@ -156,19 +166,17 @@ class ScaleStabilityMachine:
         self._evaluate_stability_window(parsed_weight, now)
 
     def _trigger_upload(self, session_package: dict[str, Any]) -> str:
-        """Transmits session directly to Gluvok Cloud if online; drops if offline."""
+        """Transmits session directly to Gluvok Cloud if online; queues it in the outbox if offline."""
         session_id = str(session_package.get("session_id", "UNKNOWN"))
 
         if not self._is_online:
-            logger.warning(
-                f"[Weighment] Wi-Fi offline. Weighment {session_id} discarded."
-            )
-            from src.core.telemetry import record_system_event, record_unsent_weighment
-            record_unsent_weighment()
-            record_system_event(
-                "WEIGHMENT_DISCARDED",
-                f"Session {session_id} discarded: Wi-Fi offline",
-            )
+            # The drain thread delivers it once Wi-Fi is back; enqueue() logs and counts it if it can't be kept.
+            from src.core import outbox
+            from src.core.telemetry import record_system_event
+            from src.integrations.gluvok import package_to_entry
+
+            if outbox.enqueue(str(uuid.uuid7()), *package_to_entry(session_package)):
+                record_system_event("WEIGHMENT_QUEUED", f"Session {session_id} queued: Wi-Fi offline")
             return session_id
 
         logger.info(f"[Weighment] Transmitting session {session_id} directly to cloud...")
@@ -182,34 +190,43 @@ class ScaleStabilityMachine:
 
     def _transmit_online_weighment(self, session_package: dict[str, Any]) -> None:
         from src.config.constants import LED_CLOUD_SUCCESS_DURATION
+        from src.core import outbox
         from src.core.telemetry import record_unsent_weighment
         from src.devices import led_controller
-        from src.integrations.gluvok import post_to_cloud
+        from src.integrations.gluvok import (
+            is_validation_rejection,
+            package_to_entry,
+            post_to_cloud,
+        )
 
         session_id = str(session_package.get("session_id", "UNKNOWN"))
+        # One key per weighment, minted before the first attempt: the outbox replays it unchanged.
+        key = str(uuid.uuid7())
         try:
-            ok, entry_id, err, _timed_out = post_to_cloud(session_package)
+            ok, entry_id, err, _timed_out = post_to_cloud(session_package, idempotency_key=key)
         except (OSError, RuntimeError, ValueError) as exc:
-            logger.error(f"[Weighment] Direct cloud upload error for {session_id}: {exc}")
-            record_unsent_weighment()
+            ok, entry_id, err = False, None, f"{type(exc).__name__}: {exc}"
+        if ok:
+            led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
+            logger.info(f"[Weighment] Uploaded session {session_id} to cloud (entry {entry_id}).")
             return
-        if not ok:
-            logger.error(f"[Weighment] Cloud upload failed for {session_id}: {err}")
-            record_unsent_weighment()
-            return
-        led_controller.trigger_cloud_success(LED_CLOUD_SUCCESS_DURATION)
-        logger.info(f"[Weighment] Uploaded session {session_id} to cloud (entry {entry_id}).")
+        logger.error(f"[Weighment] Cloud upload failed for {session_id}: {err}")
+        if is_validation_rejection(err):
+            record_unsent_weighment()  # a replay of a rejected entry can never succeed
+        else:
+            outbox.enqueue(key, *package_to_entry(session_package))
 
     def reset(self):
         """Manually reset the state machine."""
-        self.state = ScaleState.SCALE_IDLE
-        self.last_weight = 0.0
-        self._current_stable_candidate = 0.0
-        self._candidate_start_time = 0.0
-        self._last_printed_weight = -9999.0
-        session_manager.reset_session()
-        from src.devices import led_controller
-        led_controller.set_idle()
+        with self._lock:
+            self.state = ScaleState.SCALE_IDLE
+            self.last_weight = 0.0
+            self._current_stable_candidate = 0.0
+            self._candidate_start_time = 0.0
+            self._last_printed_weight = -9999.0
+            session_manager.reset_session()
+            from src.devices import led_controller
+            led_controller.set_idle()
 
 
 # Module-level singleton

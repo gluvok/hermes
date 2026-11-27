@@ -17,7 +17,7 @@ graph TD
     Cams -->|JPEG| Argus[Argus /recognize]
     Argus -->|plate or status| Sess
     Sess -->|package| Upload[CloudUpload thread]
-    Upload -->|POST /api/entries| Cloud[Gluvok cloud]
+    Upload -->|POST /api/entries/automatic| Cloud[Gluvok cloud]
     Watchdog[WiFiWatchdog] -->|online / offline| Stab
     Watchdog -->|offline| Hotspot[Hotspot + captive portal]
     Web[Flask console :8080] --- Sess
@@ -33,19 +33,19 @@ One weighment, in order:
 
 `main.loop()` and the UART thread both call `check_session_progress()`. The phase change inside it is lock-protected, so only one caller receives the package.
 
-### Offline, failed and errored weighments are dropped
-
-There is no spool, outbox or retry queue. Nothing is written to disk for a weighment.
+### Offline weighments are dropped; failed uploads are queued
 
 - While the watchdog reports offline, the state machine ignores scale input and aborts any active session.
-- If the package completes while offline, it is discarded and a `WEIGHMENT_DISCARDED` event is logged.
-- If the upload fails (HTTP error, timeout, network error, exception), it is logged and not retried.
+- If the package completes while offline, it is queued in the outbox and a `WEIGHMENT_QUEUED` event is logged; the drain delivers it once Wi-Fi is back.
+- If the upload fails in a way the cloud may accept later (network error, timeout, 5xx, 429, 401/403, after the in-call retries), `src/core/outbox.py` stores plate, weight, up to 3 JPEGs, `created_at`, `attempts` and the `Idempotency-Key` in SQLite (`upload_outbox`, `upload_outbox_images` in `data/hermes.db`). The key is minted once per weighment, before the first attempt.
+- The `OutboxDrain` thread (started and supervised by `main.py`) replays the oldest row every 30 s, stops the pass at the first failure, and deletes a row on 200 or 201. janus dedupes on (center, key), so a replay is safe.
+- A `400` that survives the plate and storage fallbacks is logged, dropped and counted. A full outbox (500 rows) refuses the new weighment with a critical log, an `OUTBOX_FULL` event and a count.
 
-Every dropped weighment increments `cloud.unsent_weighments` in `GET /api/status`. The dashboard shows it on the cloud card, in amber when above 0. The counter is in memory and resets on restart.
+`cloud.unsent_weighments` in `GET /api/status` counts weighments lost for good (400, full or unwritable outbox). It is in memory and resets on restart. `cloud.outbox_pending` is the queue size (it survives restarts) and `cloud.auth_failing` is true after 3 consecutive 401/403 replies, until the next accepted upload.
 
 ### Cloud upload
 
-`POST {GLUVOK_BASE_URL}/api/entries` with HTTP Basic auth (`device_id:device_key`), timeout 20 s, multipart form fields `center_id`, `detected_vehicle_number`, `weight`, and one `file` part per camera (`truck_<label>.jpg`, labels `anpr_1`, `aux_1`, ...). If the server answers 400 with "storage" in the body, the entry is re-posted once without images. HTTP 200/201 is success. Everything else, including 409, is an error recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400) or `CLOUD_UPLOAD_ERROR` (other). On success the LED pulses blue for 10 s.
+`POST {GLUVOK_BASE_URL}/api/entries/automatic` with headers `x-api-key: <device_key>` and `Idempotency-Key: <UUIDv7>` (one per weighment, reused by every retry and fallback), timeout 20 s per attempt, redirects not followed. `GLUVOK_BASE_URL` must be `https` (plain `http` only for 127.0.0.1, ::1 or localhost); anything else stops Hermes at import with a `ValueError`. Multipart fields: `vehicle_number`, `weight`, and up to 3 `file` parts (`truck_<label>.jpg`, sorted so ANPR cameras come first), trailing images dropped until they total at most 4 MB. The center comes from the key; no `center_id` is sent. `429`, `500`, `502`, `503`, `504`, connection errors and timeouts are retried 3 times (0 s, 4 s, 8 s, or the server's `Retry-After` on `429`/`503`, capped at 60 s). A `400` naming the vehicle registration is re-posted once as `NO_PLATE_DETECTED`; a `400` with "storage" in the body is re-posted once without images. HTTP 200 (replay) or 201 is success. Other statuses are recorded as `CLOUD_AUTH_FAILED` (401), `CLOUD_AUTH_FORBIDDEN` (403), `CLOUD_VALIDATION_ERROR` (400), `CLOUD_RATE_LIMITED` (429) or `CLOUD_UPLOAD_ERROR`. On success the LED pulses blue for 10 s.
 
 ### Images
 
@@ -65,16 +65,16 @@ Each Argus call yields a plate or a status code: `SUCCESS`, `NO_PLATE_DETECTED`,
 | `ScaleUART` | `ScaleUARTReader.start()` | Read serial, parse weights, drive the stability machine. Reopens the port every 5 s after a loss. |
 | `FallbackWebServer` | `start_web_server()` | Flask console, `:8080` |
 | `WiFiWatchdog` | `start_wifi_watchdog()` | Connectivity checks every 1 s |
-| `ANPRLoop_<id>` | session start | Capture ANPR frames every 1 s, dispatch to the Argus worker pool (4 workers) |
+| `ANPRLoop_<id>` | session start | Capture ANPR frames every 1 s, dispatch to the Argus worker pool (2 workers, max 2 in flight) |
 | `FleetCapture_<id>` | mid-stability or stable | Capture all cameras and compress |
 | `CloudUpload_<id>` | session finalized | Upload one entry |
 | `CaptiveHTTP`, `CaptiveDNS` | hotspot start | Captive portal, only while the hotspot is up |
 
 `main.loop()` restarts the UART reader and the watchdog if their threads died. The web server and portal threads are not supervised.
 
-The watchdog is the only code that probes the network (TCP to 1.1.1.1:53, then 8.8.8.8:53, 2 s each). After 2 consecutive failed checks it calls `notify_network_status(False)`, which updates the stability machine first and the LED second, so an LED fault cannot stop the weighment from going offline. The UART thread reuses that verdict and never probes. The stability machine assumes online until the watchdog says otherwise.
+The watchdog is the only code that probes the network (TCP to the Gluvok cloud host first, then 1.1.1.1:53 and 8.8.8.8:53, 1.5 s each). After 5 consecutive failed checks (about 5 s if the link refuses connections, up to about 30 s if it silently drops packets) it calls `notify_network_status(False)`, which updates the stability machine first and the LED second, so an LED fault cannot stop the weighment from going offline. The UART thread reuses that verdict and never probes. The stability machine assumes online until the watchdog says otherwise.
 
-Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the session manager, telemetry (`_events_lock`, `_live_lock`), the Wi-Fi vault, nmcli (`nmcli_lock`, serializes all nmcli calls).
+Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the session manager, telemetry (`_events_lock`, `_live_lock`), the Wi-Fi vault, nmcli (`nmcli_lock`, serializes all nmcli calls), `ScaleStabilityMachine` (`RLock`), `ScaleUARTReader._lifecycle_lock` (`RLock`), `_argus_probe_lock` (`Lock`).
 
 ---
 
@@ -83,7 +83,7 @@ Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the sess
 - **Credentials**: `SUPERADMIN_USER` (default `superadmin`) and `SUPERADMIN_PASS`. With `SUPERADMIN_PASS` empty, every login fails.
 - **Tokens**: `POST /api/login` returns a random 64-hex token, valid 2 h and renewed on each use. Tokens live in memory and are lost on restart. Send them as `Authorization: Bearer <token>` or `X-Auth-Token`. `POST /api/logout` revokes the token.
 - **Login limit**: 5 failed logins per client IP per 60 s, then HTTP 429. Each failure also sleeps 0.5 s. The captive portal `/connect` shares the same limiter.
-- **Anonymous `GET /api/status`** returns health only: scale state and weight, Argus online, cloud `configured` and `unsent_weighments`, Wi-Fi `connected` and `hotspot_active`. With a valid token it adds center ID, SSID, config values, latest weighment, error counts and the event log.
+- **Anonymous `GET /api/status`** returns health only: scale state and weight, Argus online, cloud `configured`, `unsent_weighments`, `outbox_pending` and `auth_failing`, Wi-Fi `connected` and `hotspot_active`. With a valid token it adds center ID, SSID, config values, latest weighment, error counts and the event log.
 - **Headers** on every response: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and a Content-Security-Policy that allows only same-origin resources plus inline scripts and styles.
 - **No CORS**: no CORS headers are sent.
 - **Input**: `serial_port` must match `/dev/ttyAMA*`, `ttyS*`, `ttyUSB*`, `ttyACM*`, `serial0/1` or `serial/by-id/*`. Baud rate must be in a fixed list. Camera URLs must be http, https or rtsp. The dashboard HTML-escapes server-supplied values it renders.
@@ -95,7 +95,7 @@ Locks: `ConfigManager`/`RuntimeConfig` (`RLock`), the UART line buffer, the sess
 
 Package `src/devices/wifi/` drives NetworkManager through `nmcli` (via `sudo -n` when not root).
 
-- When the watchdog sees 2 failed checks, it starts the emergency hotspot: SSID `hermes`, connection `hermes-hotspot`, gateway `10.42.0.1`, WPA2 passphrase from `HERMES_HOTSPOT_PASS`. If that variable is shorter than 8 characters, the hotspot refuses to start. When connectivity returns, the watchdog stops the hotspot.
+- When the watchdog sees 5 failed checks, it starts the emergency hotspot: SSID `hermes`, connection `hermes-hotspot`, gateway `10.42.0.1`, WPA2 passphrase from `HERMES_HOTSPOT_PASS`. If that variable is shorter than 8 characters, the hotspot refuses to start. When connectivity returns, the watchdog stops the hotspot.
 - The portal serves a Wi-Fi setup page on port 80 (falls back to 8088 with iptables redirects), a DNS responder that answers every query with the gateway IP (binds UDP 53, else 5354; iptables also redirects interface port 53 to 5354), DHCP option 114 and `/.well-known/captive-portal` (RFC 8908), and maps `hermes.local` and `hermes.config` in `/etc/hosts`.
 - `POST /connect` on the portal requires `userid` and `admin_password` (the console credentials) in the JSON body, with the shared per-IP limiter. Bodies over 4096 bytes get 413. On success it joins the network, saves it to the vault and stops the hotspot. On failure the hotspot restarts if it was up. Before joining, it deletes an existing profile only if that profile is a station-mode profile for the same SSID.
 - Saved networks are kept in the `wifi_networks` table, password in plain text. `GET /api/wifi/saved` returns SSIDs without passwords and needs a token.
@@ -133,8 +133,8 @@ Package `src/devices/wifi/` drives NetworkManager through `nmcli` (via `sudo -n`
 
 1. Requires `SUPERADMIN_PASS` and `HERMES_HOTSPOT_PASS` in the local environment, or exits.
 2. Optionally signs `data/client.lic` (`--device-id`, `--device-key`, `--center-id`, `--min-weight`) with `scripts/keygen.py`.
-3. Rsyncs the repo to `/opt/hermes`, runs `uv sync`, builds the native binary with Nuitka (`scripts/build.py`), then deletes all `.py` files, `scripts/`, `tests/` and `docs/` on the Pi.
-4. Writes `data/hermes.env` (mode 600) and uploads `data/client.lic`.
+3. Rsyncs the repo to `/opt/hermes`, runs `uv sync --locked`, builds the native binary with Nuitka (`scripts/build.py`), then deletes all `.py` files, `scripts/`, `tests/` and `docs/` on the Pi.
+4. Writes `data/hermes.env` (mode 600; required secrets plus `GLUVOK_BASE_URL`/`ANPR_SERVER_TIMEOUT` when set locally) and uploads `data/client.lic`.
 5. Creates the system user `hermes` (groups `dialout`, `gpio`, `netdev`), installs `/etc/sudoers.d/hermes` after `visudo -c`, and installs and restarts the `hermes` systemd unit.
 
 The service runs as user `hermes` with `ProtectSystem=strict`, write access limited to `data/`, `/etc/hosts` and the NetworkManager dnsmasq directory, and `CAP_NET_BIND_SERVICE` for port 80. The sudoers drop-in allows only the commands Hermes runs with `sudo -n`: `nmcli`, the portal's `iptables` rules, `fuser -k -9 80/tcp`, and the `/etc/hosts` and dnsmasq file edits.

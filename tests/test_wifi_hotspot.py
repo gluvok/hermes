@@ -1,6 +1,7 @@
 """test_wifi_hotspot.py — Unit tests for nmcli hotspot AP and watchdog lifecycle."""
 from __future__ import annotations
 
+import inspect
 import time
 import unittest
 from unittest.mock import MagicMock, patch
@@ -48,8 +49,28 @@ class TestWiFiHotspot(unittest.TestCase):
     @patch("src.devices.wifi.watchdog.notify_network_status")
     @patch("src.devices.wifi.watchdog.is_network_connected", return_value=False)
     def test_watchdog_loop_notifies_status(self, mock_conn: MagicMock, mock_notify: MagicMock, _mock_hs: MagicMock) -> None:
-        watchdog.start_wifi_watchdog(interval=0.01); time.sleep(0.08); watchdog.stop_wifi_watchdog()
+        watchdog.start_wifi_watchdog(interval=0.01)
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline and not mock_notify.called:
+            time.sleep(0.01)
+        watchdog.stop_wifi_watchdog()
         mock_notify.assert_any_call(False)
+
+    @patch("src.devices.wifi.watchdog.hotspot.start_emergency_hotspot")
+    @patch("src.devices.wifi.watchdog.notify_network_status")
+    def test_watchdog_ignores_transient_two_tick_blip(
+        self, mock_notify: MagicMock, mock_hs: MagicMock
+    ) -> None:
+        # Default threshold must tolerate a 2-tick blip; fails RED while the default is 2.
+        threshold = inspect.signature(watchdog._watchdog_loop).parameters["threshold"].default
+        self.assertEqual(threshold, 5)
+        fails = 0
+        with patch("src.devices.wifi.watchdog.is_network_connected", return_value=False):
+            for _ in range(2):
+                fails = watchdog._watchdog_tick(fails, threshold)
+        self.assertEqual(fails, 2)
+        mock_notify.assert_not_called()
+        mock_hs.assert_not_called()
 
 
 if __name__ == "__main__":

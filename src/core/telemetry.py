@@ -25,8 +25,12 @@ _latest_weighment: dict[str, Any] = {
     "status_code": "READY",
 }
 _error_counts: dict[str, int] = {}
-# Weighments that finished but never reached the cloud (offline, failed or errored upload).
+# Weighments lost for good: discarded offline, rejected with a 400, or the outbox was full or unwritable.
 _unsent_weighments = 0
+# Weighments waiting in the SQLite outbox for a later retry (published by src.core.outbox).
+_outbox_pending = 0
+# Consecutive 401/403 replies from the cloud; the next accepted upload clears the streak.
+_cloud_auth_failures = 0
 _live_lock = threading.Lock()
 
 
@@ -81,6 +85,32 @@ def get_unsent_weighment_count() -> int:
         return _unsent_weighments
 
 
+def set_outbox_pending(count: int) -> None:
+    """Publishes the outbox size so /api/status never touches SQLite."""
+    global _outbox_pending
+    with _live_lock:
+        _outbox_pending = count
+
+
+def get_outbox_pending() -> int:
+    """Returns how many weighments are queued for retry."""
+    with _live_lock:
+        return _outbox_pending
+
+
+def record_cloud_auth(accepted: bool) -> None:
+    """Tracks the 401/403 streak; an accepted upload clears it."""
+    global _cloud_auth_failures
+    with _live_lock:
+        _cloud_auth_failures = 0 if accepted else _cloud_auth_failures + 1
+
+
+def get_cloud_auth_failures() -> int:
+    """Returns the current run of consecutive 401/403 replies."""
+    with _live_lock:
+        return _cloud_auth_failures
+
+
 def get_latest_weighment() -> dict[str, Any]:
     """Returns a snapshot of the latest weighment status."""
     with _live_lock:
@@ -101,11 +131,13 @@ def get_system_events() -> list[dict[str, str]]:
 
 def reset_telemetry() -> None:
     """Resets in-memory telemetry buffers (useful for testing and reset flows)."""
-    global _unsent_weighments
+    global _unsent_weighments, _outbox_pending, _cloud_auth_failures
     with _events_lock:
         _system_events.clear()
     with _live_lock:
         _unsent_weighments = 0
+        _outbox_pending = 0
+        _cloud_auth_failures = 0
         _latest_weighment["session_id"] = None
         _latest_weighment["plate"] = None
         _latest_weighment["weight"] = 0.0
@@ -119,14 +151,18 @@ def reset_telemetry() -> None:
 reset_state = reset_telemetry
 
 __all__ = [
+    "get_cloud_auth_failures",
     "get_error_counts",
     "get_latest_weighment",
+    "get_outbox_pending",
     "get_system_events",
     "get_unsent_weighment_count",
+    "record_cloud_auth",
     "record_error_event",
     "record_system_event",
     "record_unsent_weighment",
     "record_weighment_result",
     "reset_state",
     "reset_telemetry",
+    "set_outbox_pending",
 ]

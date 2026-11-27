@@ -12,6 +12,7 @@ class TestThreadingIsolation(unittest.TestCase):
     @patch("src.integrations.gluvok.post_to_cloud")
     @patch("src.devices.is_wifi_connected", return_value=True)
     def test_trigger_upload_is_non_blocking(self, _mock_wifi, mock_post):
+        mock_post.return_value = (False, None, "HTTP 503: down", False)  # queued, into the test's outbox db
         machine = ScaleStabilityMachine()
         package = {"session_id": "TEST_SESSION_ASYNC", "weight": 25000.0, "anpr_plate": "MH12AB1234"}
 
@@ -22,6 +23,10 @@ class TestThreadingIsolation(unittest.TestCase):
         # Trigger should return instantaneously (< 0.05s) to never stall scale UART
         self.assertLess(elapsed, 0.05)
         self.assertEqual(session_id, "TEST_SESSION_ASYNC")
+        # The upload thread must finish while the outbox db is still the test's temporary one
+        for thread in threading.enumerate():
+            if thread.name == "CloudUpload_TEST_SESSION_ASYNC":
+                thread.join(timeout=2.0)
 
 
     @patch("src.core.session.capture_anpr_snapshots", return_value=[])

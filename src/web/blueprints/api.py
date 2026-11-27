@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -8,9 +9,12 @@ import requests
 from flask import Blueprint, jsonify, request
 
 from src.config import config
+from src.config.constants import CLOUD_AUTH_ALERT_THRESHOLD
 from src.core.telemetry import (
+    get_cloud_auth_failures,
     get_error_counts,
     get_latest_weighment,
+    get_outbox_pending,
     get_system_events,
     get_unsent_weighment_count,
     record_system_event,
@@ -45,18 +49,24 @@ def _check_argus_online(anpr_url: str) -> bool:
         return False
 
 
-_last_argus_check_time: float = 0.0
+_last_argus_check_time: float = float("-inf")
 _last_argus_online_status: bool = False
 _ARGUS_CACHE_TTL_S: float = 5.0
+_argus_probe_lock = threading.Lock()
 
 
 def _get_cached_argus_status(target_url: str) -> bool:
-    """Returns cached Argus health status with 5s TTL to prevent log and network spamming."""
+    """Cached Argus health (5s TTL). One thread probes; concurrent /api/status calls get the cached value."""
     global _last_argus_check_time, _last_argus_online_status
-    now = time.time()
-    if now - _last_argus_check_time >= _ARGUS_CACHE_TTL_S:
+    if time.monotonic() - _last_argus_check_time < _ARGUS_CACHE_TTL_S or not _argus_probe_lock.acquire(blocking=False):
+        return _last_argus_online_status
+    try:
+        if time.monotonic() - _last_argus_check_time < _ARGUS_CACHE_TTL_S:
+            return _last_argus_online_status
         _last_argus_online_status = _check_argus_online(target_url)
-        _last_argus_check_time = now
+        _last_argus_check_time = time.monotonic()
+    finally:
+        _argus_probe_lock.release()
     return _last_argus_online_status
 
 
@@ -142,8 +152,10 @@ def status():
             "online": argus_online,
         },
         "cloud": {
-            "configured": bool(config.device_id and config.device_key),
+            "configured": bool(config.device_key),
             "unsent_weighments": get_unsent_weighment_count(),
+            "outbox_pending": get_outbox_pending(),
+            "auth_failing": get_cloud_auth_failures() >= CLOUD_AUTH_ALERT_THRESHOLD,
         },
         "wifi": {
             "connected": is_wifi_connected(),

@@ -29,6 +29,11 @@ from src.core import (
     scale_state_machine,
     session_manager,
 )
+from src.core.outbox import (
+    is_outbox_drain_running,
+    start_outbox_drain,
+    stop_outbox_drain,
+)
 from src.devices import (
     get_uart_reader,
     is_watchdog_running,
@@ -50,6 +55,7 @@ def shutdown(signum, frame):
     get_uart_reader().stop()
     stop_web_server()
     stop_wifi_watchdog()
+    stop_outbox_drain()
     stop_emergency_hotspot()
     session_manager.reset_session()
     sys.exit(0)
@@ -62,8 +68,15 @@ signal.signal(signal.SIGTERM, shutdown)
 # ─────────────────────────────────────────────────────────────────────────────
 #  SETUP
 # ─────────────────────────────────────────────────────────────────────────────
+def _warn_if_gil_enabled() -> None:
+    """Hermes is pinned to free-threaded 3.14t; an extension without Py_mod_gil silently re-enables the GIL."""
+    if sys._is_gil_enabled():
+        logger.warning("[Main] GIL is enabled (not CPython 3.14t, or an extension turned it on); worker threads will serialize.")
+
+
 def setup():
     require_runtime_secrets()
+    _warn_if_gil_enabled()
     logger.info("")
     logger.info("==============================================")
     logger.info("Gluvok Weighment & ANPR System Starting...")
@@ -85,6 +98,8 @@ def setup():
     # Initialize SQLite database for Wi-Fi credentials and system settings
     init_db()
 
+    # Replay weighments whose upload failed (survives restarts: rows live in SQLite)
+    start_outbox_drain()
 
     # Log active client settings
     logger.info(
@@ -97,10 +112,10 @@ def setup():
     log_camera_fleet()
 
     # Verify Gluvok Cloud device credentials
-    if config.device_id and config.device_key:
-        logger.info(f"[Auth] Gluvok device authentication configured for Device ID: {config.device_id}")
+    if config.device_key:
+        logger.info(f"[Auth] Gluvok device key configured (Device ID: {config.device_id or 'none'})")
     else:
-        logger.warning("[Auth] Gluvok device credentials (device_id, device_key) not configured in client_config.py.")
+        logger.warning("[Auth] Gluvok device key (device_key) not configured in client_config.py.")
 
 
 def _supervise_threads() -> None:
@@ -111,6 +126,9 @@ def _supervise_threads() -> None:
     if not is_watchdog_running():
         logger.error("[Main] Wi-Fi watchdog thread is dead. Restarting...")
         start_wifi_watchdog(interval=1.0)
+    if not is_outbox_drain_running():
+        logger.error("[Main] Outbox drain thread is dead. Restarting...")
+        start_outbox_drain()
 
 
 def loop():

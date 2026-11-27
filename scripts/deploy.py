@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import re
 import subprocess
@@ -12,6 +13,7 @@ EXCLUDES = ["--exclude=.venv", "--exclude=dist", "--exclude=__pycache__", "--exc
 
 
 REQUIRED_SECRETS = ("SUPERADMIN_PASS", "HERMES_HOTSPOT_PASS")
+OPTIONAL_ENV_VARS = ("GLUVOK_BASE_URL", "ANPR_SERVER_TIMEOUT")  # forwarded only when set locally
 SERVICE_USER = "hermes"
 SERVICE_GROUPS = ("dialout", "gpio", "netdev")  # UART, /dev/gpiochip*, NetworkManager polkit
 SUDOERS_PATH = "/etc/sudoers.d/hermes"
@@ -25,13 +27,26 @@ def run_cmd(cmd: list[str], input: str | None = None) -> None:
 
 
 def secrets_env_text() -> str:
-    """KEY="value" lines for systemd's EnvironmentFile; exits 1 if a required secret is unset (#33)."""
+    """KEY="value" lines for systemd's EnvironmentFile (secrets + set optional overrides); exits 1 if a required secret is unset (#33)."""
     missing = [n for n in REQUIRED_SECRETS if not os.environ.get(n)]
     if missing:
         print(f"[Deploy] Set {', '.join(missing)} in your local environment first.", file=sys.stderr)
         sys.exit(1)
     esc = lambda v: v.replace("\\", "\\\\").replace('"', '\\"')
-    return "".join(f'{n}="{esc(os.environ[n])}"\n' for n in REQUIRED_SECRETS)
+    env = {n: v for n in (*REQUIRED_SECRETS, *OPTIONAL_ENV_VARS) if (v := os.environ.get(n))}
+    for n, v in env.items():
+        if any(c in v for c in "\r\n\0"):  # a newline would inject extra EnvironmentFile lines
+            print(f"[Deploy] {n} must not contain newlines.", file=sys.stderr)
+            sys.exit(1)
+    if "ANPR_SERVER_TIMEOUT" in env:
+        try:
+            ok = 0 < float(env["ANPR_SERVER_TIMEOUT"]) < math.inf  # also rejects nan
+        except ValueError:
+            ok = False
+        if not ok:
+            print("[Deploy] ANPR_SERVER_TIMEOUT must be a positive number of seconds.", file=sys.stderr)
+            sys.exit(1)
+    return "".join(f'{n}="{esc(v)}"\n' for n, v in env.items())
 
 
 def build_service_unit(target: str) -> str:
@@ -109,7 +124,7 @@ def deploy_remote(host: str, target: str = "/opt/hermes", lic: str = "data/clien
     run_cmd(["rsync", "-avz", "--delete", *EXCLUDES, "./", f"{host}:{target}/"])
     print(f"[Deploy] 3. Compiling binary into {target}/bin/ and purging source...")
     build = (
-        f"set -e; export PATH=\"$HOME/.local/bin:$PATH\"; cd {target} && uv sync && uv run python scripts/build.py --output-dir={target}/bin && chmod +x {target}/run.sh {target}/bin/hermes; "
+        f"set -e; export PATH=\"$HOME/.local/bin:$PATH\"; cd {target} && uv sync --locked && uv run python scripts/build.py --output-dir={target}/bin && chmod +x {target}/run.sh {target}/bin/hermes; "
         f"rm -f {target}/bin/hermes.sh; find {target} -maxdepth 1 -name '*.py' -delete && find {target}/src -name '*.py' -delete; rm -rf {target}/scripts {target}/tests {target}/docs; "
         f"echo '[Deploy] Source purged! Only bin/hermes and run.sh remain at {target}.'"
     )

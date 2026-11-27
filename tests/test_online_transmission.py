@@ -3,7 +3,7 @@ test_online_transmission.py — Online Transmission & Offline Discard Tests
 ==========================================================================
 Verifies that:
 1. Online weighments transmit directly to Gluvok Cloud API via post_to_cloud.
-2. Offline weighments are safely discarded with zero database writes.
+2. Offline weighments are queued in the outbox, not discarded, and never touch the old spool tables.
 3. SQLite database retains Wi-Fi network credentials while spool tables are removed.
 """
 
@@ -13,11 +13,15 @@ import sqlite3
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 from src.core.db import init_db
 from src.core.stability import ScaleStabilityMachine, ScaleState
-from src.core.telemetry import get_unsent_weighment_count, reset_telemetry
+from src.core.telemetry import (
+    get_outbox_pending,
+    get_unsent_weighment_count,
+    reset_telemetry,
+)
 from src.core.wifi_vault import get_saved_wifi_networks, save_wifi_network
 
 
@@ -44,35 +48,28 @@ class TestOnlineTransmission(unittest.TestCase):
 
             # Reuses the watchdog's verdict; never probes on the UART thread (#19).
             mock_wifi.assert_not_called()
-            mock_post.assert_called_once_with(self.package)
+            mock_post.assert_called_once_with(self.package, idempotency_key=ANY)
             mock_led.assert_called_once()
 
     @patch("src.integrations.gluvok.post_to_cloud")
     @patch("src.devices.is_wifi_connected", return_value=True)
-    def test_offline_weighment_is_discarded_with_zero_db_writes(self, mock_wifi, mock_post):
+    def test_offline_weighment_is_queued_not_posted(self, mock_wifi, mock_post):
+        from src.core import outbox
+
         self.machine._is_online = False
-        with tempfile.NamedTemporaryFile() as tmp:
-            init_db(tmp.name)
-            with patch("src.core.telemetry.record_system_event") as mock_event:
-                session_id = self.machine._trigger_upload(self.package)
-                self.assertEqual(session_id, "SESS_TEST_ONLINE_001")
-                time.sleep(0.05)
-
-                mock_wifi.assert_not_called()
-                mock_post.assert_not_called()
-                mock_event.assert_called_once_with(
-                    "WEIGHMENT_DISCARDED",
-                    "Session SESS_TEST_ONLINE_001 discarded: Wi-Fi offline",
-                )
-
-            # Verify no weighment records exist in SQLite
-            with sqlite3.connect(tmp.name) as conn:
-                tables = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table';"
-                ).fetchall()
-                table_names = [t[0] for t in tables]
-                self.assertNotIn("weighment_spool", table_names)
-                self.assertNotIn("spool_images", table_names)
+        with patch("src.core.telemetry.record_system_event") as mock_event:
+            session_id = self.machine._trigger_upload(self.package)
+        self.assertEqual(session_id, "SESS_TEST_ONLINE_001")
+        mock_wifi.assert_not_called()
+        mock_post.assert_not_called()
+        mock_event.assert_called_once_with(
+            "WEIGHMENT_QUEUED", "Session SESS_TEST_ONLINE_001 queued: Wi-Fi offline"
+        )
+        row = outbox.next_row()
+        assert row is not None
+        self.assertEqual((row.plate, row.weight), ("HR26DK8333", 35400.0))
+        self.assertEqual(row.images, [("truck_anpr_1.jpg", b"fake_cam1_jpeg")])
+        self.assertEqual(get_outbox_pending(), 1)
 
     def test_sqlite_preserves_wifi_vault_without_spool_tables(self):
         with tempfile.NamedTemporaryFile() as tmp:
@@ -136,18 +133,20 @@ def test_drop_below_threshold_during_session_sets_led_idle(mock_sm, mock_led):
     "src.integrations.gluvok.post_to_cloud",
     return_value=(False, None, "HTTP 500: boom", False),
 )
-def test_failed_upload_counts_as_unsent(mock_post, mock_led):
+def test_failed_upload_is_queued_not_lost(mock_post, mock_led):
     reset_telemetry()
     ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
-    assert get_unsent_weighment_count() == 1
+    assert get_unsent_weighment_count() == 0
+    assert get_outbox_pending() == 1
 
 
 @patch("src.devices.led_controller")
 @patch("src.integrations.gluvok.post_to_cloud", side_effect=OSError("link down"))
-def test_upload_exception_counts_as_unsent(mock_post, mock_led):
+def test_upload_exception_is_queued_not_lost(mock_post, mock_led):
     reset_telemetry()
     ScaleStabilityMachine()._transmit_online_weighment({"session_id": "S1"})
-    assert get_unsent_weighment_count() == 1
+    assert get_unsent_weighment_count() == 0
+    assert get_outbox_pending() == 1
 
 
 @patch("src.devices.led_controller")
@@ -158,12 +157,13 @@ def test_successful_upload_does_not_count_as_unsent(mock_post, mock_led):
     assert get_unsent_weighment_count() == 0
 
 
-def test_offline_discard_counts_as_unsent():
+def test_offline_weighment_is_not_counted_as_lost():
     reset_telemetry()
     machine = ScaleStabilityMachine()
     machine._is_online = False
-    machine._trigger_upload({"session_id": "S1"})
-    assert get_unsent_weighment_count() == 1
+    machine._trigger_upload({"session_id": "S1", "weight": 1000.0})
+    assert get_unsent_weighment_count() == 0
+    assert get_outbox_pending() == 1
 
 
 def test_reset_telemetry_zeroes_unsent_count():

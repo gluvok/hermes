@@ -35,7 +35,7 @@ tests/                  pytest suite
 | `runtime.py` | `RuntimeConfig`: locked in-memory view of overrides, `update_system`, `update_wifi`, `clear_wifi` |
 | `manager.py` | `ConfigManager` (the `config` singleton): licensed values first, then `client_config`; runtime values from `RuntimeConfig` |
 
-Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05`, `STABILITY_DURATION=10.0`, `STABILITY_TOLERANCE=2.0`, `ANPR_CAPTURE_INTERVAL=1.0`, `POST_STABILITY_DURATION=5.0`, `CAMERA_TIMEOUT=3.0`, `ANPR_SERVER_TIMEOUT=30.0`, `MAX_PARALLEL_CAMERA_WORKERS=4`, `CLOUD_POST_TIMEOUT=20.0`, `LED_CLOUD_SUCCESS_DURATION=10.0`.
+Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05`, `STABILITY_DURATION=10.0`, `STABILITY_TOLERANCE=2.0`, `ANPR_CAPTURE_INTERVAL=1.0`, `POST_STABILITY_DURATION=5.0`, `CAMERA_TIMEOUT=3.0`, `ANPR_SERVER_TIMEOUT=30.0` (env-overridable), `ANPR_MAX_IN_FLIGHT=2`, `ANPR_WORKERS=2`, `MAX_PARALLEL_CAMERA_WORKERS=4`, `CLOUD_POST_TIMEOUT=20.0`, `LED_CLOUD_SUCCESS_DURATION=10.0`.
 
 ## `src/core/`
 
@@ -46,8 +46,9 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
   - `check_session_progress()`: after 5 s post-stability, marks completed and returns the package.
   - Package keys: `session_id`, `weight`, `anpr_plate`, `camera_snapshots`, `total_anpr_samples`, `total_anpr_frames`, `anpr_status_counts`, `timestamp`. The last 5 frames per ANPR camera are kept as a fallback for a missing fleet snapshot.
   - `reset_session()`: stops threads and clears state.
-- **`stability.py`**: `ScaleStabilityMachine` (singleton `scale_state_machine`). States `SCALE_IDLE`, `SCALE_STABILIZING`, `SCALE_STABLE_RECORDED`. `process_new_weight`, `set_network_status`, `abort_offline_session`, `_trigger_upload`, `_transmit_online_weighment`. Calls `record_unsent_weighment()` when it drops a weighment.
-- **`telemetry.py`**: in-memory store. Event log (last 20), latest weighment, error counts, unsent-weighment counter. `record_system_event`, `record_weighment_result`, `record_error_event`, `record_unsent_weighment`, `get_*`, `reset_telemetry`.
+- **`stability.py`**: `ScaleStabilityMachine` (singleton `scale_state_machine`). States `SCALE_IDLE`, `SCALE_STABILIZING`, `SCALE_STABLE_RECORDED`. `process_new_weight`, `set_network_status`, `abort_offline_session`, `_trigger_upload`, `_transmit_online_weighment`. Mints one `Idempotency-Key` per weighment; queues a failed upload in the outbox, or calls `record_unsent_weighment()` when it drops one.
+- **`outbox.py`**: SQLite outbox for failed uploads (`upload_outbox`, `upload_outbox_images`). `enqueue`, `next_row`, `remove`, `drain_once`, `start_outbox_drain`, `stop_outbox_drain`. Bounded by `OUTBOX_MAX_ROWS`.
+- **`telemetry.py`**: in-memory store. Event log (last 20), latest weighment, error counts, unsent-weighment counter, outbox size, 401/403 streak. `record_system_event`, `record_weighment_result`, `record_error_event`, `record_unsent_weighment`, `set_outbox_pending`, `record_cloud_auth`, `get_*`, `reset_telemetry`.
 - **`db.py`**: `init_db()` sets WAL and creates `wifi_networks`.
 - **`wifi_vault.py`**: save, list (no passwords), get, delete and clear saved networks.
 - **`logger.py`**: `setup_colored_logging`.
@@ -55,7 +56,7 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
 ## `src/devices/`
 
 - **`scale.py`**: `ScaleUARTReader` (singleton via `get_uart_reader()`): `start`, `stop`, `restart`, `is_alive`. Packets end at CR, LF, STX, ETX, 256 bytes, or 300 ms of silence. Weight is read as `\d{3,6}MN` first, then as any signed number.
-- **`camera.py`**: `fetch_image_bytes(url)` (HTTP GET, or one OpenCV RTSP frame encoded at JPEG 85), `capture_anpr_snapshots()` (1-based indexes), `capture_all_camera_snapshots()` (labels `anpr_N`, `aux_N`), `log_camera_fleet()`. All logging masks `user:pass@`. TLS verification is off for HTTP snapshots because LAN cameras use self-signed certificates.
+- **`camera.py`**: `fetch_image_bytes(url)` (HTTP GET, or one PyAV RTSP frame encoded at JPEG 85), `capture_anpr_snapshots()` (1-based indexes), `capture_all_camera_snapshots()` (labels `anpr_N`, `aux_N`), `log_camera_fleet()`. All logging masks `user:pass@`. TLS verification is off for HTTP snapshots because LAN cameras use self-signed certificates.
 - **`led/`**: `colors.py`, `driver.py` (GPIO or mock), `controller.py` (`led_controller`: `set_idle`, `set_active`, `set_network_status`, `trigger_cloud_success`, `startup_test`, `cleanup`).
 - **`wifi/`** (package):
 
@@ -63,7 +64,7 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
 | :--- | :--- |
 | `runner.py` | `run_nmcli` (locked, `sudo -n` when not root), `get_wifi_interface`, simulation mode |
 | `activity.py` | `nmcli_lock`, `suspend_watchdog`, `is_watchdog_suspended` |
-| `connectivity.py` | `is_network_connected` (TCP to 1.1.1.1:53, 8.8.8.8:53) |
+| `connectivity.py` | `is_network_connected` (TCP to the Gluvok cloud host first, then 1.1.1.1:53 and 8.8.8.8:53, 1.5 s each) |
 | `watchdog.py` | `WiFiWatchdog` thread, `notify_network_status`, start, stop, `is_watchdog_running` |
 | `hotspot.py` | `start_hotspot`, `stop_hotspot`, `start_emergency_hotspot`, `stop_emergency_hotspot`, `is_hotspot_active` |
 | `connection.py` | `connect_wifi`, `connect_to_wifi`, `get_active_wifi_ssid`, `get_existing_profile` |
@@ -80,11 +81,11 @@ Constants: `INTER_CHAR_TIMEOUT_S=0.3`, `MAX_BUFFER_LEN=256`, `SCALE_TIMEOUT=0.05
 ## `src/integrations/`
 
 - **`anpr.py`**: `send_frame_to_anpr_server` returns `(plate, status)`; `dispatch_anpr_batch` and `send_and_record_anpr_frame` run it in a pool; `get_highest_frequency_plate` votes; `resolve_anpr_endpoint` maps `0.0.0.0` to `127.0.0.1` and appends `/recognize`. Reads `results[0].plate` from Argus responses, or flat keys (`plate`, `number_plate`, `plate_number`, `text`, `result`).
-- **`gluvok.py`**: `post_to_cloud(package)` builds the image list and calls `transmit_entry_multipart(...)`, which returns `(ok, entry_id, error, timed_out)`. Single attempt, no verification step. Plates that are empty or placeholders (`UNKNOWN`, `NONE`, `NULL`, `SUCCESS`, ...) are sent as `NO_PLATE_DETECTED`.
+- **`gluvok.py`**: `post_to_cloud(package)` builds the image list and calls `transmit_entry_multipart(...)`, which returns `(ok, entry_id, error, timed_out)`. Retries 429/5xx/timeouts up to 3 times with one `Idempotency-Key`; sends at most 3 images. Plates that are empty or placeholders (`UNKNOWN`, `NONE`, `NULL`, `SUCCESS`, ...) are sent as `NO_PLATE_DETECTED`.
 
 ## `src/services/image_compressor.py`
 
-`compress_image_bytes(bytes, max_dim=1920, quality=75)`: downscale, then JPEG at quality 75 with optimization. Returns the input on decode or encode failure.
+`compress_image_bytes(bytes, max_dim=1920, quality=75)`: downscale (Pillow, EXIF orientation applied), then JPEG at quality 75 with optimization. Returns the input on decode or encode failure.
 
 ## `src/web/`
 
@@ -104,7 +105,7 @@ Files: `app.py` (`create_app`, security headers, error handlers), `server.py` (`
 | `POST /wifi` | Token | Save and connect `{ssid, password}` |
 | `POST /wifi/clear` | Token | Clear saved credentials and vault |
 
-`GET /api/status` fields: `status`, `scale{state,current_weight}`, `argus{online}` (cached 5 s), `cloud{configured,unsent_weighments}`, `wifi{connected,hotspot_active}`. With a token it adds `cloud.center_id`, `wifi.ssid`, `config`, `latest_weighment`, `error_counts`, `events`.
+`GET /api/status` fields: `status`, `scale{state,current_weight}`, `argus{online}` (cached 5 s), `cloud{configured,unsent_weighments,outbox_pending,auth_failing}`, `wifi{connected,hotspot_active}`. With a token it adds `cloud.center_id`, `wifi.ssid`, `config`, `latest_weighment`, `error_counts`, `events`.
 
 ### Pages and probes (`views.py`)
 

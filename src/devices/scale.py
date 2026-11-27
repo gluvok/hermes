@@ -45,6 +45,8 @@ class ScaleUARTReader:
         self._last_char_time = 0.0
         self._last_reconnect_attempt = 0.0
         self._lock = threading.Lock()
+        # start/stop/restart race between the main-loop supervisor and the web config thread
+        self._lifecycle_lock = threading.RLock()
         self.active_port = ""
         self.active_baudrate = 0
 
@@ -53,40 +55,44 @@ class ScaleUARTReader:
         return not self._stop_event.is_set()
 
     def start(self, port: str | None = None, baudrate: int | None = None):
-        target_port = port or get_current_serial_port()
-        target_baudrate = baudrate or get_current_baudrate()
+        with self._lifecycle_lock:
+            target_port = port or get_current_serial_port()
+            target_baudrate = baudrate or get_current_baudrate()
 
-        if self._thread and self._thread.is_alive():
-            if self.active_port == target_port and self.active_baudrate == target_baudrate:
+            if self._thread and self._thread.is_alive():
+                if self.active_port == target_port and self.active_baudrate == target_baudrate:
+                    return
+                self.restart(target_port, target_baudrate)
                 return
-            self.restart(target_port, target_baudrate)
-            return
 
-        self.active_port = target_port
-        self.active_baudrate = target_baudrate
-        self._stop_event.clear()
+            self.active_port = target_port
+            self.active_baudrate = target_baudrate
+            self._stop_event.clear()
 
-        self._thread = threading.Thread(target=self._read_loop, daemon=True, name="ScaleUART")
-        self._thread.start()
-        logger.info(f"[Scale] UART reader thread started for {target_port} @ {target_baudrate} baud.")
+            self._thread = threading.Thread(target=self._read_loop, daemon=True, name="ScaleUART")
+            self._thread.start()
+            logger.info(f"[Scale] UART reader thread started for {target_port} @ {target_baudrate} baud.")
 
     def restart(self, port: str | None = None, baudrate: int | None = None):
         """Restarts the UART reader thread with updated port and baud rate."""
-        logger.info("[Scale] Restarting UART reader with updated serial configuration...")
-        self.stop()
-        time.sleep(0.1)
-        self.start(port, baudrate)
+        with self._lifecycle_lock:
+            logger.info("[Scale] Restarting UART reader with updated serial configuration...")
+            self.stop()
+            time.sleep(0.1)
+            self.start(port, baudrate)
 
     def is_alive(self) -> bool:
-        return bool(self._thread and self._thread.is_alive())
+        thread = self._thread
+        return bool(thread and thread.is_alive())
 
     def stop(self):
-        self._stop_event.set()
-        self._close_serial()
-        if self._thread and self._thread.is_alive() and self._thread != threading.current_thread():
-            self._thread.join(timeout=1.5)
-        self._thread = None
-        logger.info("[Scale] UART reader stopped.")
+        with self._lifecycle_lock:
+            self._stop_event.set()
+            self._close_serial()
+            if self._thread and self._thread.is_alive() and self._thread != threading.current_thread():
+                self._thread.join(timeout=1.5)
+            self._thread = None
+            logger.info("[Scale] UART reader stopped.")
 
     def _close_serial(self) -> None:
         with self._serial_lock:

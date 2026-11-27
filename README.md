@@ -4,11 +4,11 @@ Weighbridge controller for a Raspberry Pi 5. It reads the scale over UART, captu
 
 Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Module reference: [docs/CODEBASE_REFERENCE.md](docs/CODEBASE_REFERENCE.md).
 
-**Weighments are not queued.** If Hermes is offline, or an upload fails, that weighment is dropped and counted. The count is `cloud.unsent_weighments` on `/api/status` and a card on the dashboard.
+**Failed uploads are queued.** If an upload fails in a way the cloud may accept later (network error, timeout, 5xx, 429, 401/403), the weighment is stored in SQLite with its `Idempotency-Key` and retried every 30 s until the cloud answers 200 or 201. A weighment that completes while Wi-Fi is offline is queued the same way. A weighment rejected with a 400 or arriving at a full outbox is dropped and counted in `cloud.unsent_weighments` on `/api/status`. `cloud.outbox_pending` is the queue size; `cloud.auth_failing` turns true after 3 consecutive 401/403 replies.
 
 ## Requirements
 
-- Python 3.14 and [uv](https://docs.astral.sh/uv/)
+- Free-threaded Python 3.14t (`uv sync` installs it from `.python-version`) and [uv](https://docs.astral.sh/uv/)
 - Linux with NetworkManager (`nmcli`) for Wi-Fi features
 
 ## Run from source
@@ -87,4 +87,8 @@ GPIO 17 red, 27 green, 22 blue.
 uv run ruff check --fix && uv run ty check && uv run pytest -q
 ```
 
-The same checks run in CI and in `.githooks/pre-push`.
+The same checks run in CI and in `.githooks/pre-push`. Git does not run that hook until you enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
