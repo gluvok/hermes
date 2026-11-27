@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from src.config.constants import (
     ANPR_CAPTURE_INTERVAL,
+    ANPR_MAX_IN_FLIGHT,
     ANPR_SERVER_TIMEOUT,
+    ANPR_WORKERS,
     CAMERA_TIMEOUT,
     CLOUD_POST_TIMEOUT,
     DEFAULT_DB_PATH,
@@ -23,7 +25,9 @@ config = ConfigManager()
 
 __all__ = [
     "ANPR_CAPTURE_INTERVAL",
+    "ANPR_MAX_IN_FLIGHT",
     "ANPR_SERVER_TIMEOUT",
+    "ANPR_WORKERS",
     "CAMERA_TIMEOUT",
     "CLOUD_POST_TIMEOUT",
     "DEFAULT_DB_PATH",
