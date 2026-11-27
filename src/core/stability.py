@@ -166,19 +166,17 @@ class ScaleStabilityMachine:
         self._evaluate_stability_window(parsed_weight, now)
 
     def _trigger_upload(self, session_package: dict[str, Any]) -> str:
-        """Transmits session directly to Gluvok Cloud if online; drops if offline."""
+        """Transmits session directly to Gluvok Cloud if online; queues it in the outbox if offline."""
         session_id = str(session_package.get("session_id", "UNKNOWN"))
 
         if not self._is_online:
-            logger.warning(
-                f"[Weighment] Wi-Fi offline. Weighment {session_id} discarded."
-            )
-            from src.core.telemetry import record_system_event, record_unsent_weighment
-            record_unsent_weighment()
-            record_system_event(
-                "WEIGHMENT_DISCARDED",
-                f"Session {session_id} discarded: Wi-Fi offline",
-            )
+            # The drain thread delivers it once Wi-Fi is back; enqueue() logs and counts it if it can't be kept.
+            from src.core import outbox
+            from src.core.telemetry import record_system_event
+            from src.integrations.gluvok import package_to_entry
+
+            if outbox.enqueue(str(uuid.uuid7()), *package_to_entry(session_package)):
+                record_system_event("WEIGHMENT_QUEUED", f"Session {session_id} queued: Wi-Fi offline")
             return session_id
 
         logger.info(f"[Weighment] Transmitting session {session_id} directly to cloud...")

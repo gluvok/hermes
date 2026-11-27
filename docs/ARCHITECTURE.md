@@ -36,12 +36,12 @@ One weighment, in order:
 ### Offline weighments are dropped; failed uploads are queued
 
 - While the watchdog reports offline, the state machine ignores scale input and aborts any active session.
-- If the package completes while offline, it is discarded and a `WEIGHMENT_DISCARDED` event is logged.
+- If the package completes while offline, it is queued in the outbox and a `WEIGHMENT_QUEUED` event is logged; the drain delivers it once Wi-Fi is back.
 - If the upload fails in a way the cloud may accept later (network error, timeout, 5xx, 429, 401/403, after the in-call retries), `src/core/outbox.py` stores plate, weight, up to 3 JPEGs, `created_at`, `attempts` and the `Idempotency-Key` in SQLite (`upload_outbox`, `upload_outbox_images` in `data/hermes.db`). The key is minted once per weighment, before the first attempt.
 - The `OutboxDrain` thread (started and supervised by `main.py`) replays the oldest row every 30 s, stops the pass at the first failure, and deletes a row on 200 or 201. janus dedupes on (center, key), so a replay is safe.
 - A `400` that survives the plate and storage fallbacks is logged, dropped and counted. A full outbox (500 rows) refuses the new weighment with a critical log, an `OUTBOX_FULL` event and a count.
 
-`cloud.unsent_weighments` in `GET /api/status` counts weighments lost for good (offline discard, 400, full or unwritable outbox). It is in memory and resets on restart. `cloud.outbox_pending` is the queue size (it survives restarts) and `cloud.auth_failing` is true after 3 consecutive 401/403 replies, until the next accepted upload.
+`cloud.unsent_weighments` in `GET /api/status` counts weighments lost for good (400, full or unwritable outbox). It is in memory and resets on restart. `cloud.outbox_pending` is the queue size (it survives restarts) and `cloud.auth_failing` is true after 3 consecutive 401/403 replies, until the next accepted upload.
 
 ### Cloud upload
 
