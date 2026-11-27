@@ -19,6 +19,8 @@ MAX_PARALLEL_CAMERA_WORKERS = 4
 
 GLUVOK_BASE_URL = os.environ.get("GLUVOK_BASE_URL", "https://gluvok.vercel.app").rstrip("/")
 CLOUD_POST_TIMEOUT = 20.0
+CLOUD_POST_MAX_ATTEMPTS = 3
+CLOUD_RETRY_WAIT_MAX = 30.0
 DEFAULT_CENTER_ID = 1
 
 DEFAULT_DB_PATH = "data/hermes.db"
