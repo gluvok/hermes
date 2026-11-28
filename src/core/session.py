@@ -35,7 +35,7 @@ from src.integrations.anpr import (
     get_highest_frequency_plate,
     send_frame_to_anpr_server,
 )
-from src.services.image_compressor import compress_image_bytes
+from src.services.image_compressor import compress_image_bytes, crop_image_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,9 @@ class WeighbridgeSessionManager:
         self._anpr_plates: list[str] = []
         self._anpr_statuses: list[str] = []
         self._anpr_frame_buffers: dict[int, list[bytes]] = {}
+        self._anpr_box_candidates: dict[
+            int, list[tuple[str | None, tuple[int, int, int, int], bytes]]
+        ] = {}
         self._fleet_snapshots: dict[str, bytes | None] = {}
 
         self._anpr_thread: threading.Thread | None = None
@@ -102,6 +105,7 @@ class WeighbridgeSessionManager:
             self._anpr_plates.clear()
             self._anpr_statuses.clear()
             self._anpr_frame_buffers.clear()
+            self._anpr_box_candidates.clear()
             self._fleet_snapshots.clear()
             self._pending_anpr_futures.clear()
             self._stop_anpr_event = threading.Event()
@@ -161,6 +165,41 @@ class WeighbridgeSessionManager:
             )
         return True
 
+    def record_anpr_detection(
+        self,
+        session_id: str,
+        cam_idx: int,
+        plate: str | None,
+        status_code: str,
+        vehicle_box: tuple[int, int, int, int] | None,
+        image_bytes: bytes,
+    ) -> bool:
+        """Record a camera frame and its Argus vehicle bounding box for active session."""
+        with self._lock:
+            if self.session_id != session_id or self.phase == SessionPhase.PHASE_IDLE:
+                logger.debug(
+                    f"[ANPR] Stale detection discarded for session {session_id} "
+                    f"(active: {self.session_id})"
+                )
+                return False
+
+            if image_bytes and _is_valid_vehicle_box(vehicle_box):
+                assert vehicle_box is not None
+                normalized_plate = (
+                    plate.strip().upper()
+                    if isinstance(plate, str) and plate.strip()
+                    else None
+                )
+                candidates = self._anpr_box_candidates.setdefault(cam_idx, [])
+                if len(candidates) >= 5:
+                    candidates.pop(0)
+                candidates.append((normalized_plate, vehicle_box, image_bytes))
+                logger.debug(
+                    f"[ANPR] Camera {cam_idx} recorded vehicle_box={vehicle_box} "
+                    f"(plate={normalized_plate!r}, status={status_code})"
+                )
+        return True
+
     def _capture_and_record_anpr_sample(
         self, wait: bool = True
     ) -> list[Future[tuple[str | None, str]]]:
@@ -209,6 +248,7 @@ class WeighbridgeSessionManager:
             batch_to_dispatch,
             server_url=getattr(config, "anpr_server_url", None),
             callback=self.record_anpr_result,
+            box_callback=self.record_anpr_detection,
             session=http_sess,
         )
 
@@ -354,6 +394,15 @@ class WeighbridgeSessionManager:
                 final_anpr_plate = "NO_PLATE_DETECTED"
 
             fleet_copy: dict[str, bytes | None] = dict(self._fleet_snapshots)
+            for cam_idx, candidates in self._anpr_box_candidates.items():
+                chosen = _select_anpr_box_candidate(candidates, final_anpr_plate)
+                if chosen is None:
+                    continue
+                vehicle_box, frame_bytes = chosen
+                cropped = crop_image_bytes(frame_bytes, vehicle_box)
+                if cropped:
+                    fleet_copy[f"anpr_{cam_idx}"] = compress_image_bytes(cropped)
+
             for cam_idx, frames in self._anpr_frame_buffers.items():
                 label = f"anpr_{cam_idx}"
                 if not fleet_copy.get(label) and frames:
@@ -375,6 +424,7 @@ class WeighbridgeSessionManager:
             }
 
             self._anpr_frame_buffers.clear()
+            self._anpr_box_candidates.clear()
             self._fleet_snapshots.clear()
 
             logger.info(
@@ -410,6 +460,7 @@ class WeighbridgeSessionManager:
             self.session_id = None
             self.stable_weight = 0.0
             self._anpr_frame_buffers.clear()
+            self._anpr_box_candidates.clear()
             self._anpr_plates.clear()
             self._anpr_statuses.clear()
             self._fleet_snapshots.clear()
@@ -425,6 +476,44 @@ class WeighbridgeSessionManager:
                 old_http.close()
             except (OSError, RuntimeError):
                 pass
+
+
+def _is_valid_vehicle_box(box: Any) -> bool:
+    """Return True if box is a 4-coordinate bounding box with positive area."""
+    if box is None:
+        return False
+    try:
+        if len(box) != 4:
+            return False
+        x1, y1, x2, y2 = box
+        return x2 > x1 and y2 > y1
+    except (TypeError, ValueError):
+        return False
+
+
+def _select_anpr_box_candidate(
+    candidates: list[tuple[str | None, tuple[int, int, int, int], bytes]],
+    final_anpr_plate: str,
+) -> tuple[tuple[int, int, int, int], bytes] | None:
+    """Pick the latest candidate matching final_anpr_plate, or latest with a valid box."""
+    if final_anpr_plate != "NO_PLATE_DETECTED":
+        for plate, vehicle_box, frame_bytes in reversed(candidates):
+            normalized = (
+                plate.strip().upper()
+                if isinstance(plate, str) and plate.strip()
+                else None
+            )
+            if (
+                normalized == final_anpr_plate
+                and frame_bytes
+                and _is_valid_vehicle_box(vehicle_box)
+            ):
+                return vehicle_box, frame_bytes
+
+    for _plate, vehicle_box, frame_bytes in reversed(candidates):
+        if frame_bytes and _is_valid_vehicle_box(vehicle_box):
+            return vehicle_box, frame_bytes
+    return None
 
 
 def _record_session_telemetry(
