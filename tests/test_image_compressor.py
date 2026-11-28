@@ -6,7 +6,7 @@ import numpy as np
 from src.config.constants import ANPR_CAPTURE_INTERVAL, POST_STABILITY_DURATION
 from src.core.session import WeighbridgeSessionManager
 from src.core.stability import ScaleStabilityMachine, ScaleState
-from src.services.image_compressor import compress_image_bytes
+from src.services.image_compressor import compress_image_bytes, crop_image_bytes
 
 
 class TestImageCompressor(unittest.TestCase):
@@ -118,3 +118,88 @@ class TestMidStabilityAndShortPostStability(unittest.TestCase):
         self.machine._evaluate_stability_window(25050.0, 1007.0)
         self.assertFalse(self.machine._mid_stability_triggered)
         self.assertEqual(self.machine._current_stable_candidate, 25050.0)
+
+
+class TestCropImageBytes(unittest.TestCase):
+    @staticmethod
+    def _make_jpeg(width: int = 200, height: int = 100) -> bytes:
+        img = np.zeros((height, width, 3), dtype=np.uint8)
+        img[:, :] = (40, 80, 120)
+        ok, encoded = cv2.imencode(".jpg", img, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+        assert ok and encoded is not None
+        return encoded.tobytes()
+
+    def test_crop_valid_dimensions(self):
+        raw = self._make_jpeg(200, 100)
+        cropped = crop_image_bytes(raw, [20, 10, 140, 70])
+        self.assertIsNotNone(cropped)
+        assert cropped is not None
+
+        dec = cv2.imdecode(np.frombuffer(cropped, np.uint8), cv2.IMREAD_COLOR)
+        self.assertIsNotNone(dec)
+        assert dec is not None
+        h, w = dec.shape[:2]
+        self.assertEqual((w, h), (120, 60))
+
+    def test_crop_float_coordinates(self):
+        raw = self._make_jpeg(200, 100)
+        cropped = crop_image_bytes(raw, (10.4, 20.6, 110.4, 80.6))
+        self.assertIsNotNone(cropped)
+        assert cropped is not None
+
+        dec = cv2.imdecode(np.frombuffer(cropped, np.uint8), cv2.IMREAD_COLOR)
+        self.assertIsNotNone(dec)
+        assert dec is not None
+        h, w = dec.shape[:2]
+        self.assertEqual((w, h), (100, 60))
+
+    def test_crop_out_of_bounds_clamping(self):
+        raw = self._make_jpeg(200, 100)
+        cropped = crop_image_bytes(raw, [-50, -25, 250, 80])
+        self.assertIsNotNone(cropped)
+        assert cropped is not None
+
+        dec = cv2.imdecode(np.frombuffer(cropped, np.uint8), cv2.IMREAD_COLOR)
+        self.assertIsNotNone(dec)
+        assert dec is not None
+        h, w = dec.shape[:2]
+        self.assertEqual((w, h), (200, 80))
+
+    def test_crop_none_or_empty_image_returns_unchanged(self):
+        self.assertIsNone(crop_image_bytes(None, [0, 0, 10, 10]))
+        self.assertEqual(crop_image_bytes(b"", [0, 0, 10, 10]), b"")
+
+    def test_crop_corrupt_image_returns_unchanged(self):
+        corrupt = b"not_an_image"
+        self.assertEqual(crop_image_bytes(corrupt, [0, 0, 10, 10]), corrupt)
+
+    def test_crop_invalid_box_returns_unchanged(self):
+        raw = self._make_jpeg(200, 100)
+        invalid_boxes: list = [
+            None,
+            [10, 20, 30],
+            [10, 20, 30, 40, 50],
+            [float("nan"), 0, 50, 50],
+            [0, float("inf"), 50, 50],
+            [0, 0, float("-inf"), 50],
+            ["0", "0", "50", "50"],
+            [True, 0, 50, 50],
+            "1234",
+        ]
+        for box in invalid_boxes:
+            with self.subTest(box=box):
+                self.assertEqual(crop_image_bytes(raw, box), raw)
+
+    def test_crop_degenerate_box_returns_unchanged(self):
+        raw = self._make_jpeg(200, 100)
+        degenerate_boxes = [
+            [50, 10, 50, 60],
+            [80, 10, 20, 60],
+            [10, 50, 60, 50],
+            [10, 80, 60, 20],
+            [250, 10, 300, 50],
+            [-50, -50, -10, -10],
+        ]
+        for box in degenerate_boxes:
+            with self.subTest(box=box):
+                self.assertEqual(crop_image_bytes(raw, box), raw)
